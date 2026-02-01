@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
+/* ================= TYPES ================= */
+
 type Game = { id: number; title: string };
 type Group = { id: number; name: string };
 
@@ -16,48 +18,52 @@ type DetailRow = {
   pinned_at?: string | null;
 };
 
+/* ================= STYLES ================= */
+
 const inputClass =
-  "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200";
+  "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition";
 
 const selectClass =
-  "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200";
+  "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition cursor-pointer";
 
 const btnBase =
-  "inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold whitespace-nowrap cursor-pointer transition active:scale-[0.99]";
+  "inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold whitespace-nowrap cursor-pointer transition active:scale-[0.98]";
 
 const btnPrimary =
-  btnBase + " bg-slate-900 text-white shadow-sm hover:bg-slate-800";
+  btnBase + " bg-slate-900 text-white shadow-md shadow-slate-900/10 hover:bg-slate-800";
 
 const btnGhost =
-  btnBase + " border border-slate-200 bg-white text-slate-800 shadow-sm hover:bg-slate-100";
+  btnBase + " border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900";
 
-const btnDanger =
-  btnBase + " border border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100";
+const btnDangerGhost =
+  "inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition";
 
-const pillClass =
-  "inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-700";
+/* ================= HELPERS ================= */
 
-function Pill({ text }: { text: string }) {
-  return <span className={pillClass}>{text}</span>;
+function Pill({ text, color = "slate" }: { text: string; color?: "slate" | "blue" | "amber" }) {
+  let colors = "border-slate-200 bg-slate-50 text-slate-700";
+  if (color === "blue") colors = "border-blue-200 bg-blue-50 text-blue-700";
+  if (color === "amber") colors = "border-amber-200 bg-amber-50 text-amber-700";
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${colors}`}
+    >
+      {text}
+    </span>
+  );
 }
 
 function typeLabel(t: string) {
-  switch (t) {
-    case "small_detail":
-      return "Small detail";
-    case "easter_egg":
-      return "Easter egg";
-    case "npc_reaction":
-      return "NPC reaction";
-    case "physics":
-      return "Physics";
-    case "troll":
-      return "Troll";
-    case "punish":
-      return "Punish";
-    default:
-      return t;
-  }
+  const map: Record<string, string> = {
+    small_detail: "Small detail",
+    easter_egg: "Easter egg",
+    npc_reaction: "NPC reaction",
+    physics: "Physics",
+    troll: "Troll",
+    punish: "Punish",
+  };
+  return map[t] ?? t;
 }
 
 function priorityLabel(p: number) {
@@ -73,8 +79,45 @@ function yyyyMmDdLocal(d: Date) {
   return `${y}-${m}-${day}`;
 }
 
+/* ================= COMPONENTS ================= */
+
+function IdeaItem({ r, gameTitle }: { r: DetailRow; gameTitle: string }) {
+  return (
+    <li className="group">
+      <a
+        href={`/idea/${r.id}`}
+        className="block rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 hover:shadow-md"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <h3 className="truncate text-base font-semibold text-slate-900 group-hover:text-blue-600">
+              {r.title}
+            </h3>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Pill text={gameTitle} />
+              <Pill text={typeLabel(r.detail_type)} />
+            </div>
+          </div>
+
+          <div
+            className={`shrink-0 rounded-lg border px-2 py-1 text-xs font-bold ${
+              r.priority === 1
+                ? "border-rose-200 bg-rose-50 text-rose-700"
+                : r.priority === 5
+                ? "border-slate-100 bg-slate-50 text-slate-500"
+                : "border-slate-200 bg-white text-slate-700"
+            }`}
+          >
+            {priorityLabel(r.priority)}
+          </div>
+        </div>
+      </a>
+    </li>
+  );
+}
+
 function ComboBox({
-  label,
+  label, // hidden visually in this new design but used for a11y
   placeholder,
   items,
   selectedId,
@@ -113,35 +156,33 @@ function ComboBox({
   }, []);
 
   return (
-    <div ref={boxRef} className="relative">
-      <label className="grid gap-1">
-        <span className="text-sm font-medium text-slate-800">{label}</span>
-
-        <button
-          type="button"
-          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-left text-sm text-slate-900 hover:bg-slate-50 cursor-pointer"
-          onClick={() => setOpen((v) => !v)}
-        >
-          {selected ? selected.name : allowAllLabel}
-        </button>
-      </label>
+    <div ref={boxRef} className="relative w-full">
+      <button
+        type="button"
+        className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-left text-sm text-slate-900 shadow-sm transition hover:border-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="block truncate">
+          {selected ? selected.name : <span className="text-slate-500">{placeholder}</span>}
+        </span>
+      </button>
 
       {open && (
-        <div className="absolute z-20 mt-2 w-full rounded-2xl border border-slate-200 bg-white shadow-lg">
+        <div className="absolute left-0 top-full z-20 mt-1 w-full min-w-[200px] rounded-xl border border-slate-200 bg-white shadow-xl">
           <div className="p-2">
             <input
-              className={inputClass}
+              className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 text-sm outline-none focus:border-blue-400 focus:bg-white"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={placeholder}
+              placeholder="Search..."
               autoFocus
             />
           </div>
 
-          <div className="max-h-64 overflow-auto p-2 pt-0">
+          <div className="max-h-60 overflow-auto p-1 pt-0">
             <button
               type="button"
-              className="mb-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-100 cursor-pointer"
+              className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-600 hover:bg-slate-100"
               onClick={() => {
                 onChange("");
                 setOpen(false);
@@ -152,16 +193,14 @@ function ComboBox({
             </button>
 
             {filtered.length === 0 ? (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
-                No matches.
-              </div>
+              <div className="p-3 text-center text-xs text-slate-500">No matches.</div>
             ) : (
-              <ul className="space-y-1">
+              <ul>
                 {filtered.map((x) => (
                   <li key={x.id}>
                     <button
                       type="button"
-                      className="w-full rounded-xl px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-100 cursor-pointer"
+                      className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-900 hover:bg-blue-50 hover:text-blue-700"
                       onClick={() => {
                         onChange(x.id);
                         setOpen(false);
@@ -175,15 +214,13 @@ function ComboBox({
               </ul>
             )}
           </div>
-
-          <div className="border-t border-slate-200 p-2 text-xs text-slate-500">
-            Showing up to 50 results
-          </div>
         </div>
       )}
     </div>
   );
 }
+
+/* ================= MAIN PAGE ================= */
 
 export default function Home() {
   const [games, setGames] = useState<Game[]>([]);
@@ -192,6 +229,7 @@ export default function Home() {
 
   const [err, setErr] = useState<string | null>(null);
 
+  // Data states
   const [pinned, setPinned] = useState<DetailRow[]>([]);
   const [daily, setDaily] = useState<DetailRow[]>([]);
   const [loadingDefault, setLoadingDefault] = useState(true);
@@ -202,14 +240,15 @@ export default function Home() {
   const [random5, setRandom5] = useState<DetailRow[]>([]);
   const [loadingRandom, setLoadingRandom] = useState(false);
 
+  // Filter states
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
-
   const [gameId, setGameId] = useState<number | "">("");
-  const [groupId, setGroupId] = useState<number | "">("");
+  const [groupId, setGroupId] = useState<number | "">(""); // Can be set from sidebar
   const [type, setType] = useState<string | "">("");
   const [priority, setPriority] = useState<number | "">("");
 
+  // UI states
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupDesc, setNewGroupDesc] = useState("");
@@ -231,88 +270,53 @@ export default function Home() {
   }, [games]);
 
   async function refreshGroups() {
-    const { data, error } = await supabase
-      .from("idea_groups")
-      .select("id,name")
-      .order("name");
-
+    const { data, error } = await supabase.from("idea_groups").select("id,name").order("name");
     if (error) {
       setErr(error.message);
       return;
     }
     setGroups((data ?? []) as Group[]);
 
-    const { data: items, error: e2 } = await supabase
-      .from("idea_group_items")
-      .select("group_id");
-
-    if (e2) {
-      setErr(e2.message);
-      setGroupCounts(new Map());
-      return;
+    const { data: items, error: e2 } = await supabase.from("idea_group_items").select("group_id");
+    if (!e2) {
+      const m = new Map<number, number>();
+      for (const row of items ?? []) {
+        const gid = Number((row as any).group_id);
+        m.set(gid, (m.get(gid) ?? 0) + 1);
+      }
+      setGroupCounts(m);
     }
-
-    const m = new Map<number, number>();
-    for (const row of items ?? []) {
-      const gid = Number((row as any).group_id);
-      m.set(gid, (m.get(gid) ?? 0) + 1);
-    }
-    setGroupCounts(m);
   }
 
   useEffect(() => {
-    supabase
-      .from("games")
-      .select("id,title")
-      .order("title")
-      .then(({ data, error }) => {
-        if (error) setErr(error.message);
-        setGames((data ?? []) as Game[]);
-      });
-
+    supabase.from("games").select("id,title").order("title").then(({ data }) => setGames((data ?? []) as Game[]));
     refreshGroups();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // LOAD DEFAULT VIEW
   async function loadDefaultView() {
     setLoadingDefault(true);
     setErr(null);
 
-    const { data: p, error: e1 } = await supabase
+    const { data: p } = await supabase
       .from("details")
       .select("id,title,priority,detail_type,game_id,pinned,pinned_at")
       .eq("status", "idea")
       .eq("pinned", true)
-      .order("pinned_at", { ascending: false })
-      .order("id", { ascending: false });
-
-    if (e1) {
-      setErr(e1.message);
-      setPinned([]);
-      setDaily([]);
-      setLoadingDefault(false);
-      return;
-    }
+      .order("pinned_at", { ascending: false });
 
     const seedDate = yyyyMmDdLocal(new Date());
-    const { data: d, error: e2 } = await supabase.rpc("get_daily_seed_ideas", {
+    const { data: d } = await supabase.rpc("get_daily_seed_ideas", {
       seed_date: seedDate,
       take_count: 5,
     });
-
-    if (e2) {
-      setErr(e2.message);
-      setPinned((p ?? []) as DetailRow[]);
-      setDaily([]);
-      setLoadingDefault(false);
-      return;
-    }
 
     setPinned((p ?? []) as DetailRow[]);
     setDaily((d ?? []) as DetailRow[]);
     setLoadingDefault(false);
   }
 
+  // LOAD FILTERED IDEAS
   async function loadFilteredIdeas() {
     setLoading(true);
     setErr(null);
@@ -320,18 +324,7 @@ export default function Home() {
     let groupDetailIds: number[] | null = null;
 
     if (groupId) {
-      const { data: gi, error: eG } = await supabase
-        .from("idea_group_items")
-        .select("detail_id")
-        .eq("group_id", groupId);
-
-      if (eG) {
-        setErr(eG.message);
-        setIdeas([]);
-        setLoading(false);
-        return;
-      }
-
+      const { data: gi } = await supabase.from("idea_group_items").select("detail_id").eq("group_id", groupId);
       groupDetailIds = (gi ?? []).map((x: any) => Number(x.detail_id));
       if (groupDetailIds.length === 0) {
         setIdeas([]);
@@ -356,13 +349,7 @@ export default function Home() {
       .order("priority", { ascending: true })
       .order("created_at", { ascending: false });
 
-    if (error) {
-      setErr(error.message);
-      setIdeas([]);
-      setLoading(false);
-      return;
-    }
-
+    if (error) setErr(error.message);
     setIdeas((data ?? []) as DetailRow[]);
     setLoading(false);
   }
@@ -373,45 +360,25 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDefaultView, debouncedQ, gameId, groupId, type, priority]);
 
+  // ACTIONS
   async function getRandom5() {
     setLoadingRandom(true);
-    setErr(null);
-
-    const { data, error } = await supabase.rpc("get_random_ideas", {
-      take_count: 5,
-      include_pinned: true,
-    });
-
+    const { data } = await supabase.rpc("get_random_ideas", { take_count: 5, include_pinned: true });
     setLoadingRandom(false);
-
-    if (error) {
-      setErr(error.message);
-      return;
-    }
     setRandom5((data ?? []) as DetailRow[]);
   }
 
   async function createGroupOnHome() {
-    const name = newGroupName.trim();
-    if (!name) {
-      setErr("Group name is required.");
-      return;
-    }
-
+    if (!newGroupName.trim()) return;
     setSavingGroup(true);
-    setErr(null);
-
     const { error } = await supabase
       .from("idea_groups")
-      .insert({ name, description: newGroupDesc.trim() || null });
-
+      .insert({ name: newGroupName.trim(), description: newGroupDesc.trim() || null });
     setSavingGroup(false);
-
     if (error) {
       setErr(error.message);
       return;
     }
-
     setShowCreateGroup(false);
     setNewGroupName("");
     setNewGroupDesc("");
@@ -419,320 +386,363 @@ export default function Home() {
   }
 
   async function deleteGroup(g: Group) {
-    const ok = confirm(
-      `Delete group "${g.name}"?\nThis will remove all links to ideas as well.`
-    );
-    if (!ok) return;
-
-    setErr(null);
-
-    const { error } = await supabase.from("idea_groups").delete().eq("id", g.id);
-    if (error) {
-      setErr(error.message);
-      return;
-    }
-
+    if (!confirm(`Delete group "${g.name}"?`)) return;
+    await supabase.from("idea_groups").delete().eq("id", g.id);
     if (groupId === g.id) setGroupId("");
     await refreshGroups();
   }
 
-  function IdeaItem({ r }: { r: DetailRow }) {
-    return (
-      <li key={r.id}>
-        <a
-          href={`/idea/${r.id}`}
-          className="block rounded-xl border border-slate-200 bg-white p-3 shadow-sm hover:bg-slate-50 hover:shadow transition cursor-pointer"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="truncate font-medium text-slate-900">{r.title}</p>
-              <div className="mt-1 flex flex-wrap gap-2">
-                <Pill text={gameMap.get(r.game_id) ?? "Unknown game"} />
-                <Pill text={typeLabel(r.detail_type)} />
-              </div>
-            </div>
-
-            <div className="shrink-0 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-800">
-              {priorityLabel(r.priority)}
-            </div>
-          </div>
-        </a>
-      </li>
-    );
-  }
+  // RESET FILTERS
+  const resetFilters = () => {
+    setQ("");
+    setGameId("");
+    setGroupId("");
+    setType("");
+    setPriority("");
+  };
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50">
-      <div className="mx-auto max-w-6xl px-4 py-8">
-        {/* Header */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">GameKB</h1>
-            <p className="text-sm text-slate-600">
-              Ideas, groups, and daily picks for your next videos.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={getRandom5} className={btnGhost}>
-              {loadingRandom ? "🎲 Rolling…" : "🎲 Random 5"}
-            </button>
-
-            <button type="button" onClick={() => setShowCreateGroup(true)} className={btnGhost}>
-              + Create group
-            </button>
-
-            <a href="/games/new" className={btnGhost}>
-              + Add game
-            </a>
-
-            <a href="/add" className={btnPrimary}>
-              + Add idea
-            </a>
-          </div>
+    <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
+      {/* ================= SIDEBAR ================= */}
+      <aside className="fixed inset-y-0 left-0 z-10 hidden w-64 flex-col border-r border-slate-200 bg-white md:flex">
+        {/* Logo */}
+        <div className="flex h-16 items-center border-b border-slate-100 px-6">
+          <div className="text-xl font-bold tracking-tight text-slate-900">GameKB 🎮</div>
         </div>
 
-        {/* Create group panel */}
-        {showCreateGroup && (
-          <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-base font-semibold text-slate-900">Create group</div>
-              <button type="button" className={btnGhost} onClick={() => setShowCreateGroup(false)}>
-                Close
-              </button>
-            </div>
-
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
-              <label className="grid gap-1">
-                <span className="text-sm font-medium text-slate-800">Name</span>
-                <input className={inputClass} value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} />
-              </label>
-
-              <label className="grid gap-1">
-                <span className="text-sm font-medium text-slate-800">Description</span>
-                <input className={inputClass} value={newGroupDesc} onChange={(e) => setNewGroupDesc(e.target.value)} />
-              </label>
-
-              <button type="button" className={btnPrimary} disabled={savingGroup} onClick={createGroupOnHome}>
-                {savingGroup ? "Saving…" : "Create"}
-              </button>
-            </div>
-          </section>
-        )}
-
-        {/* Filters */}
-        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            <label className="grid gap-1 sm:col-span-2">
-              <span className="text-sm font-medium text-slate-800">Search</span>
-              <input
-                className={inputClass}
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Type keywords…"
-              />
-            </label>
-
-            <ComboBox
-              label="Game"
-              placeholder="Search games…"
-              items={games.map((g) => ({ id: g.id, name: g.title }))}
-              selectedId={gameId}
-              onChange={setGameId}
-              allowAllLabel="All games"
-            />
-
-            <ComboBox
-              label="Group"
-              placeholder="Search groups…"
-              items={groups.map((g) => ({ id: g.id, name: g.name }))}
-              selectedId={groupId}
-              onChange={setGroupId}
-              allowAllLabel="All groups"
-            />
-
-            <label className="grid gap-1">
-              <span className="text-sm font-medium text-slate-800">Type</span>
-              <select className={selectClass} value={type} onChange={(e) => setType(e.target.value)}>
-                <option value="">All types</option>
-                <option value="small_detail">Small detail</option>
-                <option value="easter_egg">Easter egg</option>
-                <option value="npc_reaction">NPC reaction</option>
-                <option value="physics">Physics</option>
-                <option value="troll">Troll</option>
-                <option value="punish">Punish</option>
-              </select>
-            </label>
-
-            <label className="grid gap-1 lg:col-start-5">
-              <span className="text-sm font-medium text-slate-800">Priority</span>
-              <select
-                className={selectClass}
-                value={priority}
-                onChange={(e) => setPriority(e.target.value ? Number(e.target.value) : "")}
-              >
-                <option value="">All priorities</option>
-                <option value={1}>High</option>
-                <option value={3}>Normal</option>
-                <option value={5}>Low</option>
-              </select>
-            </label>
-          </div>
-
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-sm text-slate-600">
-              {isDefaultView
-                ? loadingDefault
-                  ? "Loading…"
-                  : `⭐ ${pinned.length} pinned · 🧠 5 daily picks`
-                : loading
-                ? "Loading…"
-                : `${ideas.length} result(s)`}
-            </div>
-
+        {/* Navigation */}
+        <div className="flex-1 overflow-y-auto px-4 py-6">
+          <nav className="space-y-1">
             <button
-              type="button"
-              className={btnGhost}
-              onClick={() => {
-                setQ("");
-                setGameId("");
-                setGroupId("");
-                setType("");
-                setPriority("");
-              }}
+              onClick={resetFilters}
+              className={`flex w-full items-center rounded-xl px-3 py-2 text-sm font-medium transition ${
+                !groupId && isDefaultView
+                  ? "bg-slate-100 text-slate-900"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+              }`}
             >
-              Reset
+              🏠 Home
             </button>
-          </div>
+            <button
+              onClick={getRandom5}
+              className="flex w-full items-center rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+            >
+              {loadingRandom ? "🎲 Rolling..." : "🎲 Random 5"}
+            </button>
+            <a
+              href="/games/new"
+              className="flex w-full items-center rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+            >
+              🕹️ Add Game
+            </a>
+          </nav>
 
+          <div className="mt-8 mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
+            Groups
+          </div>
+          <nav className="space-y-1">
+            {groups.map((g) => {
+              const isActive = groupId === g.id;
+              return (
+                <div key={g.id} className="group flex items-center gap-1">
+                  <button
+                    onClick={() => {
+                      setGroupId(g.id);
+                      if (g.id !== groupId) {
+                        // Reset other filters if switching group to allow focus
+                        setQ("");
+                        setGameId("");
+                      }
+                    }}
+                    className={`flex flex-1 items-center justify-between rounded-xl px-3 py-2 text-left text-sm font-medium transition ${
+                      isActive
+                        ? "bg-blue-50 text-blue-700"
+                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                    }`}
+                  >
+                    <span className="truncate">{g.name}</span>
+                    <span
+                      className={`ml-2 rounded-full px-2 py-0.5 text-[10px] ${
+                        isActive ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500"
+                      }`}
+                    >
+                      {groupCounts.get(g.id) ?? 0}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => deleteGroup(g)}
+                    className="hidden text-slate-400 hover:text-rose-500 group-hover:block"
+                    title="Delete group"
+                  >
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              );
+            })}
+          </nav>
+
+          <button
+            onClick={() => setShowCreateGroup(true)}
+            className="mt-4 flex w-full items-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-500 hover:border-slate-400 hover:text-slate-700"
+          >
+            + New Group
+          </button>
+
+          {/* Inline Create Group Form */}
+          {showCreateGroup && (
+            <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <input
+                className="mb-2 block w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-slate-400 outline-none"
+                placeholder="Group Name"
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                autoFocus
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={createGroupOnHome}
+                  className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
+                >
+                  Create
+                </button>
+                <button
+                  onClick={() => setShowCreateGroup(false)}
+                  className="text-xs text-slate-500 hover:text-slate-700"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </aside>
+
+      {/* ================= MAIN CONTENT ================= */}
+      <main className="flex-1 pl-0 md:pl-64">
+        <div className="mx-auto max-w-5xl px-6 py-8">
+          {/* HEADER & SEARCH */}
+          <header className="mb-8">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center">
+              {/* Search Bar - Big Hero Input */}
+              <div className="relative flex-1">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                  <svg
+                    className="h-5 w-5 text-slate-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  className="block h-12 w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-4 text-base text-slate-900 shadow-sm placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-4 focus:ring-slate-100 transition"
+                  placeholder="Find an idea..."
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                />
+              </div>
+
+              {/* Primary Action */}
+              <a href="/add" className={`${btnPrimary} h-12 px-6 text-base`}>
+                + Add Idea
+              </a>
+            </div>
+
+            {/* Filters Row */}
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-3/4">
+              <ComboBox
+                label="Game"
+                placeholder="Game"
+                items={games.map((g) => ({ id: g.id, name: g.title }))}
+                selectedId={gameId}
+                onChange={setGameId}
+                allowAllLabel="All games"
+              />
+              <div className="relative">
+                <select
+                  className={selectClass}
+                  value={type}
+                  onChange={(e) => setType(e.target.value)}
+                >
+                  <option value="">All Types</option>
+                  <option value="small_detail">Small detail</option>
+                  <option value="easter_egg">Easter egg</option>
+                  <option value="npc_reaction">NPC reaction</option>
+                  <option value="physics">Physics</option>
+                  <option value="troll">Troll</option>
+                  <option value="punish">Punish</option>
+                </select>
+              </div>
+              <div className="relative">
+                <select
+                  className={selectClass}
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value ? Number(e.target.value) : "")}
+                >
+                  <option value="">All Priorities</option>
+                  <option value={1}>High Priority</option>
+                  <option value={3}>Normal</option>
+                  <option value={5}>Low</option>
+                </select>
+              </div>
+              {!isDefaultView && (
+                <button
+                  onClick={resetFilters}
+                  className="text-sm font-medium text-rose-600 hover:text-rose-700 hover:underline text-left px-2"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+          </header>
+
+          {/* ERROR ALERT */}
           {err && (
-            <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900">
+            <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
               {err}
             </div>
           )}
-        </section>
 
-        {/* Random 5 */}
-        {random5.length > 0 && (
-          <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-slate-900">🎲 Random 5</h2>
-              <button type="button" className={btnGhost} onClick={() => setRandom5([])}>
-                Clear
-              </button>
-            </div>
-            <ul className="space-y-2">
-              {random5.map((r) => (
-                <IdeaItem key={r.id} r={r} />
-              ))}
-            </ul>
-          </section>
-        )}
-
-        {/* Default view: 3 boxes */}
-        {isDefaultView ? (
-          <div className="mt-4 grid gap-4 lg:grid-cols-3">
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="mb-2 flex items-center justify-between">
-                <h2 className="text-base font-semibold text-slate-900">⭐ Pinned</h2>
-                <span className="text-xs text-slate-500">{pinned.length}</span>
+          {/* RANDOM 5 RESULT */}
+          {random5.length > 0 && (
+            <section className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-lg font-bold text-slate-900">🎲 Random Picks</h2>
+                <button
+                  onClick={() => setRandom5([])}
+                  className="text-sm text-slate-500 hover:text-slate-900"
+                >
+                  Clear
+                </button>
               </div>
-
-              {loadingDefault ? (
-                <p className="text-sm text-slate-500">Loading…</p>
-              ) : pinned.length === 0 ? (
-                <p className="text-sm text-slate-500">No pinned ideas.</p>
-              ) : (
-                <ul className="space-y-2">
-                  {pinned.map((r) => (
-                    <IdeaItem key={r.id} r={r} />
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="mb-2 flex items-center justify-between">
-                <h2 className="text-base font-semibold text-slate-900">🧠 Today’s picks</h2>
-                <span className="text-xs text-slate-500">5</span>
-              </div>
-
-              {loadingDefault ? (
-                <p className="text-sm text-slate-500">Loading…</p>
-              ) : daily.length === 0 ? (
-                <p className="text-sm text-slate-500">No ideas available.</p>
-              ) : (
-                <ul className="space-y-2">
-                  {daily.map((r) => (
-                    <IdeaItem key={r.id} r={r} />
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="mb-2 flex items-center justify-between">
-                <h2 className="text-base font-semibold text-slate-900">🧩 Groups</h2>
-                <span className="text-xs text-slate-500">{groups.length}</span>
-              </div>
-
-              {groups.length === 0 ? (
-                <p className="text-sm text-slate-500">No groups yet.</p>
-              ) : (
-                <div className="space-y-2">
-                  {groups.slice(0, 8).map((g) => (
-                    <div
-                      key={g.id}
-                      className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"
-                    >
-                      <button
-                        type="button"
-                        className="text-left cursor-pointer"
-                        onClick={() => setGroupId(g.id)}
-                        title="Filter by this group"
-                      >
-                        <div className="font-semibold text-slate-900">{g.name}</div>
-                        <div className="text-xs text-slate-600">
-                          {(groupCounts.get(g.id) ?? 0) + " idea(s)"}
-                        </div>
-                      </button>
-
-                      <button
-                        type="button"
-                        className={btnDanger}
-                        onClick={() => deleteGroup(g)}
-                        title="Delete group"
-                      >
-                        🗑
-                      </button>
-                    </div>
-                  ))}
-
-                  {groups.length > 8 && (
-                    <div className="text-xs text-slate-500">
-                      Showing 8 of {groups.length}. Use Group filter to find more.
-                    </div>
-                  )}
-                </div>
-              )}
-            </section>
-          </div>
-        ) : (
-          <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            {loading ? (
-              <p className="text-sm text-slate-500">Loading ideas…</p>
-            ) : ideas.length === 0 ? (
-              <p className="text-sm text-slate-500">No matching ideas.</p>
-            ) : (
-              <ul className="space-y-2">
-                {ideas.map((r) => (
-                  <IdeaItem key={r.id} r={r} />
+              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {random5.map((r) => (
+                  <IdeaItem key={r.id} r={r} gameTitle={gameMap.get(r.game_id) ?? "Game"} />
                 ))}
               </ul>
-            )}
-          </section>
-        )}
-      </div>
-    </main>
+            </section>
+          )}
+
+          {/* ================= DASHBOARD CONTENT ================= */}
+
+          {isDefaultView ? (
+            <div className="grid gap-8 lg:grid-cols-2">
+              {/* PINNED SECTION */}
+              <section>
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-lg">
+                      ⭐
+                    </span>
+                    <h2 className="text-xl font-bold text-slate-900">Pinned Ideas</h2>
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+                    {pinned.length}
+                  </span>
+                </div>
+
+                {loadingDefault ? (
+                  <div className="h-32 rounded-2xl border border-slate-100 bg-white p-4 text-slate-400">
+                    Loading pinned...
+                  </div>
+                ) : pinned.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center">
+                    <p className="text-sm text-slate-500">No pinned ideas yet.</p>
+                    <p className="mt-1 text-xs text-slate-400">Pin an idea to see it here.</p>
+                  </div>
+                ) : (
+                  <ul className="space-y-3">
+                    {pinned.map((r) => (
+                      <IdeaItem key={r.id} r={r} gameTitle={gameMap.get(r.game_id) ?? "Game"} />
+                    ))}
+                  </ul>
+                )}
+              </section>
+
+              {/* DAILY PICKS SECTION */}
+              <section>
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 text-lg">
+                      🧠
+                    </span>
+                    <h2 className="text-xl font-bold text-slate-900">Today's Picks</h2>
+                  </div>
+                  <span className="text-xs text-slate-400">{yyyyMmDdLocal(new Date())}</span>
+                </div>
+
+                {loadingDefault ? (
+                  <div className="h-32 rounded-2xl border border-slate-100 bg-white p-4 text-slate-400">
+                    Loading daily picks...
+                  </div>
+                ) : daily.length === 0 ? (
+                  <div className="p-4 text-sm text-slate-500">No ideas available.</div>
+                ) : (
+                  <ul className="space-y-3">
+                    {daily.map((r) => (
+                      <IdeaItem key={r.id} r={r} gameTitle={gameMap.get(r.game_id) ?? "Game"} />
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </div>
+          ) : (
+            /* ================= SEARCH RESULTS ================= */
+            <section>
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-lg font-bold text-slate-900">
+                  {loading ? "Searching..." : `${ideas.length} Results`}
+                </h2>
+                {groupId && (
+                  <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800">
+                    Group: {groups.find((g) => g.id === groupId)?.name}
+                  </span>
+                )}
+              </div>
+
+              {loading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="h-20 animate-pulse rounded-xl bg-slate-200" />
+                  ))}
+                </div>
+              ) : ideas.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 py-12">
+                  <p className="text-lg font-medium text-slate-900">No ideas found</p>
+                  <p className="text-sm text-slate-500">Try adjusting your filters.</p>
+                  <button
+                    onClick={resetFilters}
+                    className="mt-4 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
+                  >
+                    Clear all filters
+                  </button>
+                </div>
+              ) : (
+                <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {ideas.map((r) => (
+                    <IdeaItem key={r.id} r={r} gameTitle={gameMap.get(r.game_id) ?? "Game"} />
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
+        </div>
+      </main>
+    </div>
   );
 }
