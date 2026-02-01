@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
@@ -46,6 +46,18 @@ type SourceRow = {
   note: string | null;
   reliability: number;
   created_at: string | null;
+};
+
+type Group = {
+  id: number;
+  name: string;
+  description: string | null;
+};
+
+type IdeaGroupItem = {
+  group_id: number;
+  detail_id: number;
+  position: number;
 };
 
 /* ================= UI CLASSES ================= */
@@ -103,6 +115,109 @@ function confidenceLabel(c: number | null) {
   return "5 – Verified";
 }
 
+/* ================= GROUP PICKER ================= */
+
+function GroupAddPicker({
+  groups,
+  onAdd,
+  onCreate,
+}: {
+  groups: Group[];
+  onAdd: (groupId: number) => void;
+  onCreate: (name: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const boxRef = useRef<HTMLDivElement | null>(null);
+
+  const filtered = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    if (!s) return groups.slice(0, 50);
+    return groups.filter((g) => g.name.toLowerCase().includes(s)).slice(0, 50);
+  }, [groups, q]);
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!boxRef.current) return;
+      if (!boxRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  return (
+    <div ref={boxRef} className="relative">
+      <button
+        type="button"
+        className={ghostButtonClass}
+        onClick={() => setOpen((v) => !v)}
+      >
+        + Add to group
+      </button>
+
+      {open && (
+        <div className="absolute z-20 mt-2 w-[420px] max-w-[90vw] rounded-2xl border border-slate-200 bg-white shadow-lg">
+          <div className="p-2">
+            <input
+              className={inputClass}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search groups…"
+              autoFocus
+            />
+          </div>
+
+          <div className="max-h-64 overflow-auto p-2 pt-0">
+            {filtered.length === 0 ? (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                <div className="font-semibold text-slate-900">No matches</div>
+                <div className="mt-1 text-xs text-slate-600">
+                  Create a new group with this name.
+                </div>
+
+                <button
+                  type="button"
+                  className="mt-3 h-10 w-full rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800"
+                  onClick={() => {
+                    const name = q.trim();
+                    if (name) onCreate(name);
+                    setOpen(false);
+                    setQ("");
+                  }}
+                >
+                  + Create group
+                </button>
+              </div>
+            ) : (
+              <ul className="space-y-1">
+                {filtered.map((g) => (
+                  <li key={g.id}>
+                    <button
+                      type="button"
+                      className="w-full rounded-xl px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-100"
+                      onClick={() => {
+                        onAdd(g.id);
+                        setOpen(false);
+                        setQ("");
+                      }}
+                    >
+                      {g.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="border-t border-slate-200 p-2 text-xs text-slate-500">
+            Showing up to 50
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ================= PAGE ================= */
 
 export default function IdeaDetailPage() {
@@ -120,6 +235,11 @@ export default function IdeaDetailPage() {
   const [game, setGame] = useState<Game | null>(null);
   const [footage, setFootage] = useState<FootageRow[]>([]);
   const [sources, setSources] = useState<SourceRow[]>([]);
+
+  // Groups
+  const [allGroups, setAllGroups] = useState<Group[]>([]);
+  const [ideaGroups, setIdeaGroups] = useState<Group[]>([]);
+  const [savingGroup, setSavingGroup] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -168,6 +288,52 @@ export default function IdeaDetailPage() {
     reliability: 3,
   });
 
+  async function loadGroups() {
+    const { data, error } = await supabase
+      .from("idea_groups")
+      .select("id,name,description,created_at")
+      .order("name");
+
+    if (error) {
+      setErr(error.message);
+      return;
+    }
+    setAllGroups((data ?? []) as Group[]);
+  }
+
+  async function loadIdeaGroups(detailId: number) {
+    const { data: links, error: e1 } = await supabase
+      .from("idea_group_items")
+      .select("group_id,detail_id,position")
+      .eq("detail_id", detailId);
+
+    if (e1) {
+      setErr(e1.message);
+      setIdeaGroups([]);
+      return;
+    }
+
+    const groupIds = (links ?? []).map((x: any) => Number(x.group_id));
+    if (groupIds.length === 0) {
+      setIdeaGroups([]);
+      return;
+    }
+
+    const { data: gs, error: e2 } = await supabase
+      .from("idea_groups")
+      .select("id,name,description")
+      .in("id", groupIds)
+      .order("name");
+
+    if (e2) {
+      setErr(e2.message);
+      setIdeaGroups([]);
+      return;
+    }
+
+    setIdeaGroups((gs ?? []) as Group[]);
+  }
+
   async function loadAll() {
     setLoading(true);
     setErr(null);
@@ -177,6 +343,8 @@ export default function IdeaDetailPage() {
       setLoading(false);
       return;
     }
+
+    await loadGroups();
 
     const { data: d, error: e1 } = await supabase
       .from("details")
@@ -242,6 +410,8 @@ export default function IdeaDetailPage() {
     }
     setSources((s ?? []) as SourceRow[]);
 
+    await loadIdeaGroups(detailRow.id);
+
     setLoading(false);
   }
 
@@ -278,7 +448,7 @@ export default function IdeaDetailPage() {
     if (!detail) return;
 
     const ok = confirm(
-      `Delete this idea?\n\n"${detail.title}"\n\nFootage and sources will be deleted too.`
+      `Delete this idea?\n\n"${detail.title}"\n\nFootage, sources, and group links will be deleted too.`
     );
     if (!ok) return;
 
@@ -346,7 +516,89 @@ export default function IdeaDetailPage() {
     setDraftConfidence(detail.confidence ?? 3);
   }
 
-  /* ================= Footage actions (OPTIONAL FIELDS) ================= */
+  /* ================= Group actions ================= */
+
+  async function addToGroup(groupId: number) {
+    if (!detail) return;
+
+    // avoid duplicates: try insert, ignore if already exists (PK will block)
+    setSavingGroup(true);
+    setErr(null);
+
+    const { error } = await supabase.from("idea_group_items").insert({
+      group_id: groupId,
+      detail_id: detail.id,
+      position: 0,
+    } satisfies IdeaGroupItem);
+
+    setSavingGroup(false);
+
+    if (error) {
+      // If it's duplicate key, ignore; else show error
+      const msg = error.message.toLowerCase();
+      if (!msg.includes("duplicate") && !msg.includes("already exists")) {
+        setErr(error.message);
+        return;
+      }
+    }
+
+    await loadIdeaGroups(detail.id);
+  }
+
+  async function removeFromGroup(groupId: number) {
+    if (!detail) return;
+
+    const ok = confirm("Remove this idea from the group?");
+    if (!ok) return;
+
+    setSavingGroup(true);
+    setErr(null);
+
+    const { error } = await supabase
+      .from("idea_group_items")
+      .delete()
+      .eq("group_id", groupId)
+      .eq("detail_id", detail.id);
+
+    setSavingGroup(false);
+
+    if (error) {
+      setErr(error.message);
+      return;
+    }
+
+    await loadIdeaGroups(detail.id);
+  }
+
+  async function createGroupHere(name: string) {
+    if (!detail) return;
+
+    const groupName = name.trim();
+    if (!groupName) return;
+
+    setSavingGroup(true);
+    setErr(null);
+
+    const { data, error } = await supabase
+      .from("idea_groups")
+      .insert({ name: groupName })
+      .select("id,name,description")
+      .single();
+
+    if (error) {
+      setSavingGroup(false);
+      setErr(error.message);
+      return;
+    }
+
+    // refresh list + auto add
+    await loadGroups();
+    const newId = data?.id as number;
+    await addToGroup(newId);
+    setSavingGroup(false);
+  }
+
+  /* ================= Footage actions (optional fields) ================= */
 
   async function addFootage() {
     if (!detail) return;
@@ -445,7 +697,7 @@ export default function IdeaDetailPage() {
     await loadAll();
   }
 
-  /* ================= Source actions (OPTIONAL NOTE) ================= */
+  /* ================= Source actions (optional note) ================= */
 
   async function addSource() {
     if (!detail) return;
@@ -647,8 +899,53 @@ export default function IdeaDetailPage() {
                 </span>
               </div>
 
+              {/* GROUPS */}
+              <div className="mt-6">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-base font-semibold text-slate-900">Groups</div>
+                    <div className="text-sm text-slate-600">
+                      Add or remove this idea from video topic groups.
+                    </div>
+                  </div>
+
+                  <GroupAddPicker
+                    groups={allGroups}
+                    onAdd={(gid) => addToGroup(gid)}
+                    onCreate={(name) => createGroupHere(name)}
+                  />
+                </div>
+
+                {savingGroup && (
+                  <div className="mt-2 text-sm text-slate-600">Updating groups…</div>
+                )}
+
+                {ideaGroups.length === 0 ? (
+                  <p className="mt-2 text-sm text-slate-600">No groups yet.</p>
+                ) : (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {ideaGroups.map((g) => (
+                      <div
+                        key={g.id}
+                        className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm text-slate-800"
+                      >
+                        <span>{g.name}</span>
+                        <button
+                          type="button"
+                          className="text-slate-500 hover:text-slate-900"
+                          title="Remove from group"
+                          onClick={() => removeFromGroup(g.id)}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* CORE EDIT FIELDS */}
-              <div className="mt-5 grid gap-4">
+              <div className="mt-6 grid gap-4">
                 <div>
                   <div className="text-sm font-semibold text-slate-800">Description</div>
                   {editingCore ? (
@@ -713,9 +1010,11 @@ export default function IdeaDetailPage() {
               </div>
 
               {/* FOOTAGE */}
-              <div className="mt-8">
+              <div className="mt-10">
                 <div className="text-base font-semibold text-slate-900">Footage</div>
-                <p className="mt-1 text-sm text-slate-600">Only link/path is required. Everything else is optional.</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  Link/path required. Start/end/label/notes optional.
+                </p>
 
                 <div className="mt-3 grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <label className="grid gap-1">
@@ -728,6 +1027,7 @@ export default function IdeaDetailPage() {
                       <span className="text-sm font-medium text-slate-800">Start</span>
                       <input className={inputClass} value={startTs} onChange={(e) => setStartTs(e.target.value)} placeholder="00:01:23" />
                     </label>
+
                     <label className="grid gap-1">
                       <span className="text-sm font-medium text-slate-800">End</span>
                       <input className={inputClass} value={endTs} onChange={(e) => setEndTs(e.target.value)} placeholder="00:01:40" />
@@ -739,6 +1039,7 @@ export default function IdeaDetailPage() {
                       <span className="text-sm font-medium text-slate-800">Label</span>
                       <input className={inputClass} value={fLabel} onChange={(e) => setFLabel(e.target.value)} />
                     </label>
+
                     <label className="grid gap-1">
                       <span className="text-sm font-medium text-slate-800">Notes</span>
                       <input className={inputClass} value={fNotes} onChange={(e) => setFNotes(e.target.value)} />
@@ -854,7 +1155,9 @@ export default function IdeaDetailPage() {
               {/* SOURCES */}
               <div className="mt-10">
                 <div className="text-base font-semibold text-slate-900">Sources</div>
-                <p className="mt-1 text-sm text-slate-600">Only URL is required. Note is optional.</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  URL required. Note optional.
+                </p>
 
                 <div className="mt-3 grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <label className="grid gap-1">
