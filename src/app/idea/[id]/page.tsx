@@ -69,6 +69,14 @@ const selectClass =
 const textareaClass =
   "min-h-[120px] w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400";
 
+// ĐÃ SỬA: Thêm inline-flex, items-center, justify-center, cursor-pointer
+const buttonClass =
+  "inline-flex items-center justify-center cursor-pointer h-10 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed";
+
+// ĐÃ SỬA: Thêm inline-flex, items-center, justify-center, cursor-pointer
+const ghostButtonClass =
+  "inline-flex items-center justify-center cursor-pointer h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-100";
+
 /* ================= HELPERS ================= */
 
 function typeLabel(t: string) {
@@ -799,8 +807,9 @@ export default function IdeaDetailPage() {
               <button
                 type="button"
                 onClick={togglePinHere}
+                // ĐÃ SỬA: Thêm inline-flex items-center justify-center cursor-pointer
                 className={
-                  "h-10 rounded-xl border px-4 text-sm font-semibold shadow-sm " +
+                  "inline-flex items-center justify-center cursor-pointer h-10 rounded-xl border px-4 text-sm font-semibold shadow-sm " +
                   (detail.pinned
                     ? "border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100"
                     : "border-slate-200 bg-white text-slate-800 hover:bg-slate-100")
@@ -813,7 +822,8 @@ export default function IdeaDetailPage() {
             <button
               type="button"
               onClick={deleteIdea}
-              className="h-10 rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-900 shadow-sm hover:bg-rose-100"
+              // ĐÃ SỬA: Thêm inline-flex items-center justify-center cursor-pointer
+              className="inline-flex items-center justify-center cursor-pointer h-10 rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-900 shadow-sm hover:bg-rose-100"
             >
               Delete
             </button>
