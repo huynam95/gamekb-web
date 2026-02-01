@@ -196,6 +196,10 @@ export default function Home() {
   const [daily, setDaily] = useState<DetailRow[]>([]);
   const [loadingDefault, setLoadingDefault] = useState(true);
 
+  // Random 5
+  const [random5, setRandom5] = useState<DetailRow[]>([]);
+  const [loadingRandom, setLoadingRandom] = useState(false);
+
   // Filters
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
@@ -344,6 +348,25 @@ export default function Home() {
     else await loadFilteredIdeas();
   }
 
+  async function getRandom5() {
+    setLoadingRandom(true);
+    setErr(null);
+
+    const { data, error } = await supabase.rpc("get_random_ideas", {
+      take_count: 5,
+      include_pinned: true,
+    });
+
+    setLoadingRandom(false);
+
+    if (error) {
+      setErr(error.message);
+      return;
+    }
+
+    setRandom5((data ?? []) as DetailRow[]);
+  }
+
   function IdeaItem({ r }: { r: DetailRow }) {
     return (
       <li key={r.id}>
@@ -409,11 +432,19 @@ export default function Home() {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Ideas</h1>
             <p className="text-sm text-slate-600">
-              ⭐ Pin stays on top. 🧠 Daily picks stay the same all day.
+              ⭐ Pin stays on top. 🧠 Daily picks are stable today. 🎲 Random 5 when you need it.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={getRandom5}
+              className="inline-flex rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100"
+            >
+              {loadingRandom ? "🎲 Rolling…" : "🎲 Random 5"}
+            </button>
+
             <a
               href="/games/new"
               className="inline-flex rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100"
@@ -443,20 +474,11 @@ export default function Home() {
               />
             </label>
 
-            {/* Game search combobox */}
-            <GameFilterCombobox
-              games={games}
-              selectedGameId={gameId}
-              onChange={setGameId}
-            />
+            <GameFilterCombobox games={games} selectedGameId={gameId} onChange={setGameId} />
 
             <label className="grid gap-1">
               <span className="text-sm font-medium text-slate-800">Type</span>
-              <select
-                className={selectClass}
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-              >
+              <select className={selectClass} value={type} onChange={(e) => setType(e.target.value)}>
                 <option value="">All types</option>
                 <option value="small_detail">Small detail</option>
                 <option value="easter_egg">Easter egg</option>
@@ -472,9 +494,7 @@ export default function Home() {
               <select
                 className={selectClass}
                 value={priority}
-                onChange={(e) =>
-                  setPriority(e.target.value ? Number(e.target.value) : "")
-                }
+                onChange={(e) => setPriority(e.target.value ? Number(e.target.value) : "")}
               >
                 <option value="">All priorities</option>
                 <option value={1}>High</option>
@@ -515,6 +535,28 @@ export default function Home() {
             </div>
           )}
         </section>
+
+        {/* Random 5 section */}
+        {random5.length > 0 && (
+          <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-base font-semibold text-slate-900">🎲 Random 5</h2>
+              <button
+                type="button"
+                className="text-sm font-semibold text-slate-700 hover:text-slate-900"
+                onClick={() => setRandom5([])}
+              >
+                Clear
+              </button>
+            </div>
+
+            <ul className="space-y-2">
+              {random5.map((r) => (
+                <IdeaItem key={r.id} r={r} />
+              ))}
+            </ul>
+          </section>
+        )}
 
         {/* Content */}
         {isDefaultView ? (
