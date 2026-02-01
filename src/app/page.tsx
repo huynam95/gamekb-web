@@ -1,0 +1,578 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
+
+type Game = { id: number; title: string };
+
+type DetailRow = {
+  id: number;
+  title: string;
+  priority: number;
+  detail_type: string;
+  game_id: number;
+  pinned?: boolean;
+  pinned_at?: string | null;
+};
+
+const pillClass =
+  "rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-700";
+
+function Pill({ text }: { text: string }) {
+  return <span className={pillClass}>{text}</span>;
+}
+
+function typeLabel(t: string) {
+  switch (t) {
+    case "small_detail":
+      return "Small detail";
+    case "easter_egg":
+      return "Easter egg";
+    case "npc_reaction":
+      return "NPC reaction";
+    case "physics":
+      return "Physics";
+    case "troll":
+      return "Troll";
+    case "punish":
+      return "Punish";
+    default:
+      return t;
+  }
+}
+
+function priorityLabel(p: number) {
+  if (p === 1) return "High";
+  if (p === 3) return "Normal";
+  return "Low";
+}
+
+const inputClass =
+  "h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400";
+
+const selectClass =
+  "h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400";
+
+function yyyyMmDdLocal(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function GameFilterCombobox({
+  games,
+  selectedGameId,
+  onChange,
+}: {
+  games: Game[];
+  selectedGameId: number | "";
+  onChange: (id: number | "") => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const boxRef = useRef<HTMLDivElement | null>(null);
+
+  const selected = useMemo(() => {
+    if (!selectedGameId) return null;
+    return games.find((g) => g.id === selectedGameId) ?? null;
+  }, [games, selectedGameId]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return games.slice(0, 50);
+    return games
+      .filter((g) => g.title.toLowerCase().includes(q))
+      .slice(0, 50);
+  }, [games, query]);
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!boxRef.current) return;
+      if (!boxRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  return (
+    <div ref={boxRef} className="relative grid gap-1">
+      <span className="text-sm font-medium text-slate-800">Game</span>
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-left text-sm text-slate-900 outline-none hover:bg-slate-50 focus:border-slate-400"
+          onClick={() => setOpen((v) => !v)}
+        >
+          {selected ? selected.title : "All games"}
+        </button>
+
+        {selectedGameId && (
+          <button
+            type="button"
+            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 hover:bg-slate-100"
+            onClick={() => {
+              onChange("");
+              setQuery("");
+              setOpen(false);
+            }}
+            title="Clear game filter"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <div className="absolute z-20 mt-12 w-full rounded-2xl border border-slate-200 bg-white shadow-lg">
+          <div className="p-2">
+            <input
+              className={inputClass}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Type to search games…"
+              autoFocus
+            />
+          </div>
+
+          <div className="max-h-64 overflow-auto p-2 pt-0">
+            <button
+              type="button"
+              className="mb-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-100"
+              onClick={() => {
+                onChange("");
+                setOpen(false);
+                setQuery("");
+              }}
+            >
+              All games
+            </button>
+
+            {filtered.length === 0 ? (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+                No matches.
+              </div>
+            ) : (
+              <ul className="space-y-1">
+                {filtered.map((g) => (
+                  <li key={g.id}>
+                    <button
+                      type="button"
+                      className="w-full rounded-xl px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-100"
+                      onClick={() => {
+                        onChange(g.id);
+                        setOpen(false);
+                        setQuery("");
+                      }}
+                    >
+                      {g.title}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <div className="border-t border-slate-200 p-2 text-xs text-slate-500">
+            Showing up to 50 results
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function Home() {
+  const [games, setGames] = useState<Game[]>([]);
+  const [err, setErr] = useState<string | null>(null);
+
+  // Filtered view list
+  const [ideas, setIdeas] = useState<DetailRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Default view: pinned + daily seed
+  const [pinned, setPinned] = useState<DetailRow[]>([]);
+  const [daily, setDaily] = useState<DetailRow[]>([]);
+  const [loadingDefault, setLoadingDefault] = useState(true);
+
+  // Filters
+  const [q, setQ] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
+  const [gameId, setGameId] = useState<number | "">("");
+  const [type, setType] = useState<string | "">("");
+  const [priority, setPriority] = useState<number | "">("");
+
+  const isDefaultView = useMemo(() => {
+    return !debouncedQ.trim() && !gameId && !type && !priority;
+  }, [debouncedQ, gameId, type, priority]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(q), 300);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  useEffect(() => {
+    supabase
+      .from("games")
+      .select("id,title")
+      .order("title")
+      .then(({ data, error }) => {
+        if (error) setErr(error.message);
+        setGames((data ?? []) as Game[]);
+      });
+  }, []);
+
+  const gameMap = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const g of games) m.set(g.id, g.title);
+    return m;
+  }, [games]);
+
+  async function loadDefaultView() {
+    setLoadingDefault(true);
+    setErr(null);
+
+    const { data: p, error: e1 } = await supabase
+      .from("details")
+      .select("id,title,priority,detail_type,game_id,pinned,pinned_at")
+      .eq("status", "idea")
+      .eq("pinned", true)
+      .order("pinned_at", { ascending: false })
+      .order("id", { ascending: false });
+
+    if (e1) {
+      setErr(e1.message);
+      setPinned([]);
+      setDaily([]);
+      setLoadingDefault(false);
+      return;
+    }
+
+    const seedDate = yyyyMmDdLocal(new Date());
+
+    const { data: d, error: e2 } = await supabase.rpc("get_daily_seed_ideas", {
+      seed_date: seedDate,
+      take_count: 5,
+    });
+
+    if (e2) {
+      setErr(e2.message);
+      setPinned((p ?? []) as DetailRow[]);
+      setDaily([]);
+      setLoadingDefault(false);
+      return;
+    }
+
+    setPinned((p ?? []) as DetailRow[]);
+    setDaily((d ?? []) as DetailRow[]);
+    setLoadingDefault(false);
+  }
+
+  async function loadFilteredIdeas() {
+    setLoading(true);
+    setErr(null);
+
+    let query = supabase
+      .from("details")
+      .select("id,title,priority,detail_type,game_id,pinned,pinned_at")
+      .eq("status", "idea");
+
+    if (gameId) query = query.eq("game_id", gameId);
+    if (type) query = query.eq("detail_type", type);
+    if (priority) query = query.eq("priority", priority);
+    if (debouncedQ.trim()) query = query.ilike("title", `%${debouncedQ.trim()}%`);
+
+    const { data, error } = await query
+      .order("pinned", { ascending: false })
+      .order("priority", { ascending: true })
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      setErr(error.message);
+      setIdeas([]);
+      setLoading(false);
+      return;
+    }
+
+    setIdeas((data ?? []) as DetailRow[]);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    if (isDefaultView) loadDefaultView();
+    else loadFilteredIdeas();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDefaultView, debouncedQ, gameId, type, priority]);
+
+  async function togglePin(idea: DetailRow) {
+    setErr(null);
+
+    const newPinned = !idea.pinned;
+    const { error } = await supabase
+      .from("details")
+      .update({
+        pinned: newPinned,
+        pinned_at: newPinned ? new Date().toISOString() : null,
+      })
+      .eq("id", idea.id);
+
+    if (error) {
+      setErr(error.message);
+      return;
+    }
+
+    if (isDefaultView) await loadDefaultView();
+    else await loadFilteredIdeas();
+  }
+
+  async function deleteIdea(idea: DetailRow) {
+    const ok = confirm(
+      `Delete this idea?\n\n"${idea.title}"\n\nFootage and sources will be deleted too.`
+    );
+    if (!ok) return;
+
+    setErr(null);
+
+    const { error } = await supabase.from("details").delete().eq("id", idea.id);
+    if (error) {
+      setErr(error.message);
+      return;
+    }
+
+    if (isDefaultView) await loadDefaultView();
+    else await loadFilteredIdeas();
+  }
+
+  function IdeaItem({ r }: { r: DetailRow }) {
+    return (
+      <li key={r.id}>
+        <a
+          href={`/idea/${r.id}`}
+          className="block rounded-xl border border-slate-200 bg-slate-50 p-3 hover:bg-slate-100"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate font-medium text-slate-900">{r.title}</p>
+              <div className="mt-1 flex flex-wrap gap-2">
+                <Pill text={gameMap.get(r.game_id) ?? "Unknown game"} />
+                <Pill text={typeLabel(r.detail_type)} />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="shrink-0 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-800">
+                {priorityLabel(r.priority)}
+              </div>
+
+              <button
+                type="button"
+                title={r.pinned ? "Unpin" : "Pin"}
+                className={
+                  "shrink-0 rounded-xl border px-3 py-2 text-sm font-semibold " +
+                  (r.pinned
+                    ? "border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100"
+                    : "border-slate-200 bg-white text-slate-800 hover:bg-slate-100")
+                }
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  togglePin(r);
+                }}
+              >
+                {r.pinned ? "⭐" : "☆"}
+              </button>
+
+              <button
+                type="button"
+                title="Delete"
+                className="shrink-0 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-900 hover:bg-rose-100"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  deleteIdea(r);
+                }}
+              >
+                🗑
+              </button>
+            </div>
+          </div>
+        </a>
+      </li>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-slate-50">
+      <div className="mx-auto max-w-6xl px-4 py-8">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Ideas</h1>
+            <p className="text-sm text-slate-600">
+              ⭐ Pin stays on top. 🧠 Daily picks stay the same all day.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <a
+              href="/games/new"
+              className="inline-flex rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100"
+            >
+              + Add game
+            </a>
+
+            <a
+              href="/add"
+              className="inline-flex rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+            >
+              + Add idea
+            </a>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="grid gap-3 md:grid-cols-4">
+            <label className="grid gap-1">
+              <span className="text-sm font-medium text-slate-800">Search</span>
+              <input
+                className={inputClass}
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Type keywords…"
+              />
+            </label>
+
+            {/* Game search combobox */}
+            <GameFilterCombobox
+              games={games}
+              selectedGameId={gameId}
+              onChange={setGameId}
+            />
+
+            <label className="grid gap-1">
+              <span className="text-sm font-medium text-slate-800">Type</span>
+              <select
+                className={selectClass}
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+              >
+                <option value="">All types</option>
+                <option value="small_detail">Small detail</option>
+                <option value="easter_egg">Easter egg</option>
+                <option value="npc_reaction">NPC reaction</option>
+                <option value="physics">Physics</option>
+                <option value="troll">Troll</option>
+                <option value="punish">Punish</option>
+              </select>
+            </label>
+
+            <label className="grid gap-1">
+              <span className="text-sm font-medium text-slate-800">Priority</span>
+              <select
+                className={selectClass}
+                value={priority}
+                onChange={(e) =>
+                  setPriority(e.target.value ? Number(e.target.value) : "")
+                }
+              >
+                <option value="">All priorities</option>
+                <option value={1}>High</option>
+                <option value={3}>Normal</option>
+                <option value={5}>Low</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between">
+            <div className="text-sm text-slate-600">
+              {isDefaultView
+                ? loadingDefault
+                  ? "Loading…"
+                  : `⭐ ${pinned.length} pinned · 🧠 5 daily picks`
+                : loading
+                ? "Loading…"
+                : `${ideas.length} result(s)`}
+            </div>
+
+            <button
+              type="button"
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100"
+              onClick={() => {
+                setQ("");
+                setGameId("");
+                setType("");
+                setPriority("");
+              }}
+            >
+              Reset
+            </button>
+          </div>
+
+          {err && (
+            <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900">
+              {err}
+            </div>
+          )}
+        </section>
+
+        {/* Content */}
+        {isDefaultView ? (
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="mb-2 flex items-center justify-between">
+                <h2 className="text-base font-semibold text-slate-900">⭐ Pinned</h2>
+                <span className="text-xs text-slate-500">{pinned.length}</span>
+              </div>
+
+              {loadingDefault ? (
+                <p className="text-sm text-slate-500">Loading…</p>
+              ) : pinned.length === 0 ? (
+                <p className="text-sm text-slate-500">No pinned ideas.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {pinned.map((r) => (
+                    <IdeaItem key={r.id} r={r} />
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="mb-2 flex items-center justify-between">
+                <h2 className="text-base font-semibold text-slate-900">🧠 Today’s picks</h2>
+                <span className="text-xs text-slate-500">5</span>
+              </div>
+
+              {loadingDefault ? (
+                <p className="text-sm text-slate-500">Loading…</p>
+              ) : daily.length === 0 ? (
+                <p className="text-sm text-slate-500">No ideas available.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {daily.map((r) => (
+                    <IdeaItem key={r.id} r={r} />
+                  ))}
+                </ul>
+              )}
+            </section>
+          </div>
+        ) : (
+          <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            {loading ? (
+              <p className="text-sm text-slate-500">Loading ideas…</p>
+            ) : ideas.length === 0 ? (
+              <p className="text-sm text-slate-500">No matching ideas.</p>
+            ) : (
+              <ul className="space-y-2">
+                {ideas.map((r) => (
+                  <IdeaItem key={r.id} r={r} />
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
+      </div>
+    </main>
+  );
+}
