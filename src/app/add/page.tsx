@@ -19,17 +19,17 @@ type SimilarIdea = {
 };
 
 type StagedFootage = {
-  file_path: string;
-  start_ts: string;
-  end_ts: string;
-  label: string;
-  notes: string;
+  file_path: string;      // required only to create an entry
+  start_ts?: string;
+  end_ts?: string;
+  label?: string;
+  notes?: string;
 };
 
 type StagedSource = {
-  url: string;
-  note: string;
-  reliability: number; // 1..5
+  url: string;            // required only to create an entry
+  note?: string;
+  reliability: number;    // 1..5
 };
 
 const inputClass =
@@ -106,9 +106,7 @@ function GameCombobox({
   return (
     <div ref={boxRef} className="relative">
       <label className="grid gap-1">
-        <span className="text-sm font-medium text-slate-800">
-          Game <span className="text-rose-600">*</span>
-        </span>
+        <span className="text-sm font-medium text-slate-800">Game</span>
 
         <button
           type="button"
@@ -180,11 +178,11 @@ function GameCombobox({
   );
 }
 
-export default function AddIdeaFullRequiredPage() {
+export default function AddIdeaRelaxedPage() {
   const [games, setGames] = useState<Game[]>([]);
   const [gameId, setGameId] = useState<number | "">("");
 
-  // Required core fields
+  // Core fields (required)
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [detailType, setDetailType] = useState("small_detail");
@@ -204,7 +202,7 @@ export default function AddIdeaFullRequiredPage() {
   const [newGameGenres, setNewGameGenres] = useState("");
   const [savingGame, setSavingGame] = useState(false);
 
-  // Footage staging (required >= 1)
+  // Footage staging (optional)
   const [fp, setFp] = useState("");
   const [startTs, setStartTs] = useState("");
   const [endTs, setEndTs] = useState("");
@@ -212,7 +210,7 @@ export default function AddIdeaFullRequiredPage() {
   const [fNotes, setFNotes] = useState("");
   const [stagedFootage, setStagedFootage] = useState<StagedFootage[]>([]);
 
-  // Sources staging (required >= 1)
+  // Sources staging (optional)
   const [srcUrl, setSrcUrl] = useState("");
   const [srcNote, setSrcNote] = useState("");
   const [srcReliability, setSrcReliability] = useState(3);
@@ -248,13 +246,13 @@ export default function AddIdeaFullRequiredPage() {
     loadGames();
   }, []);
 
-  // Debounce title typing for duplicate check
+  // debounce title
   useEffect(() => {
     const t = setTimeout(() => setDebouncedTitle(title), 300);
     return () => clearTimeout(t);
   }, [title]);
 
-  // Fetch similar ideas (RPC must exist)
+  // duplicate RPC
   useEffect(() => {
     async function run() {
       const q = debouncedTitle.trim();
@@ -331,21 +329,10 @@ export default function AddIdeaFullRequiredPage() {
     setMessage({ kind: "ok", text: "Game created ✔" });
   }
 
+  // Optional: add footage entry only if file_path exists
   function addStagedFootage() {
     if (!fp.trim()) {
-      setMessage({ kind: "err", text: "Footage link/path is required." });
-      return;
-    }
-    if (!startTs.trim() || !endTs.trim()) {
-      setMessage({ kind: "err", text: "Footage start and end timestamps are required." });
-      return;
-    }
-    if (!fLabel.trim()) {
-      setMessage({ kind: "err", text: "Footage label is required (e.g., thumbnail / best take)." });
-      return;
-    }
-    if (!fNotes.trim()) {
-      setMessage({ kind: "err", text: "Footage notes are required (mission/setup/conditions)." });
+      setMessage({ kind: "err", text: "Footage link/path is required to add an entry." });
       return;
     }
 
@@ -353,10 +340,10 @@ export default function AddIdeaFullRequiredPage() {
     setStagedFootage((prev) => [
       {
         file_path: fp.trim(),
-        start_ts: startTs.trim(),
-        end_ts: endTs.trim(),
-        label: fLabel.trim(),
-        notes: fNotes.trim(),
+        start_ts: startTs.trim() || undefined,
+        end_ts: endTs.trim() || undefined,
+        label: fLabel.trim() || undefined,
+        notes: fNotes.trim() || undefined,
       },
       ...prev,
     ]);
@@ -372,19 +359,16 @@ export default function AddIdeaFullRequiredPage() {
     setStagedFootage((prev) => prev.filter((_, i) => i !== idx));
   }
 
+  // Optional: add source entry only if url exists
   function addStagedSource() {
     if (!srcUrl.trim()) {
-      setMessage({ kind: "err", text: "Source URL is required." });
-      return;
-    }
-    if (!srcNote.trim()) {
-      setMessage({ kind: "err", text: "Source note is required (what does it prove?)." });
+      setMessage({ kind: "err", text: "Source URL is required to add an entry." });
       return;
     }
 
     setMessage(null);
     setStagedSources((prev) => [
-      { url: srcUrl.trim(), note: srcNote.trim(), reliability: srcReliability },
+      { url: srcUrl.trim(), note: srcNote.trim() || undefined, reliability: srcReliability },
       ...prev,
     ]);
 
@@ -402,11 +386,9 @@ export default function AddIdeaFullRequiredPage() {
       Boolean(gameId) &&
       title.trim().length > 0 &&
       description.trim().length > 0 &&
-      stagedFootage.length >= 1 &&
-      stagedSources.length >= 1 &&
       !savingIdea
     );
-  }, [gameId, title, description, stagedFootage.length, stagedSources.length, savingIdea]);
+  }, [gameId, title, description, savingIdea]);
 
   async function saveIdea(e: React.FormEvent) {
     e.preventDefault();
@@ -423,19 +405,10 @@ export default function AddIdeaFullRequiredPage() {
       setMessage({ kind: "err", text: "Description is required." });
       return;
     }
-    if (stagedFootage.length < 1) {
-      setMessage({ kind: "err", text: "Add at least 1 footage entry." });
-      return;
-    }
-    if (stagedSources.length < 1) {
-      setMessage({ kind: "err", text: "Add at least 1 source." });
-      return;
-    }
 
     setSavingIdea(true);
     setMessage(null);
 
-    // 1) create detail
     const { data: inserted, error: e1 } = await supabase
       .from("details")
       .insert({
@@ -459,40 +432,43 @@ export default function AddIdeaFullRequiredPage() {
 
     const detailId = inserted.id as number;
 
-    // 2) insert footage rows
-    const footagePayload = stagedFootage.map((f) => ({
-      detail_id: detailId,
-      file_path: f.file_path,
-      start_ts: f.start_ts,
-      end_ts: f.end_ts,
-      label: f.label,
-      notes: f.notes,
-    }));
-
-    const { error: e2 } = await supabase.from("footage").insert(footagePayload);
-    if (e2) {
-      setMessage({ kind: "err", text: `Idea saved, but footage insert failed: ${e2.message}` });
-      setSavingIdea(false);
-      return;
+    // Insert optional footage
+    if (stagedFootage.length > 0) {
+      const payload = stagedFootage.map((f) => ({
+        detail_id: detailId,
+        file_path: f.file_path,
+        start_ts: f.start_ts ?? null,
+        end_ts: f.end_ts ?? null,
+        label: f.label ?? null,
+        notes: f.notes ?? null,
+      }));
+      const { error: e2 } = await supabase.from("footage").insert(payload);
+      if (e2) {
+        setMessage({ kind: "err", text: `Idea saved, but footage insert failed: ${e2.message}` });
+        setSavingIdea(false);
+        return;
+      }
     }
 
-    // 3) insert source rows
-    const sourcePayload = stagedSources.map((s) => ({
-      detail_id: detailId,
-      url: s.url,
-      note: s.note,
-      reliability: s.reliability,
-    }));
-
-    const { error: e3 } = await supabase.from("sources").insert(sourcePayload);
-    if (e3) {
-      setMessage({ kind: "err", text: `Idea saved, but sources insert failed: ${e3.message}` });
-      setSavingIdea(false);
-      return;
+    // Insert optional sources
+    if (stagedSources.length > 0) {
+      const payload = stagedSources.map((s) => ({
+        detail_id: detailId,
+        url: s.url,
+        note: s.note ?? null,
+        reliability: s.reliability,
+      }));
+      const { error: e3 } = await supabase.from("sources").insert(payload);
+      if (e3) {
+        setMessage({ kind: "err", text: `Idea saved, but sources insert failed: ${e3.message}` });
+        setSavingIdea(false);
+        return;
+      }
     }
 
-    // Reset all
     setMessage({ kind: "ok", text: `Saved ✔ (Idea #${detailId})` });
+
+    // reset
     setTitle("");
     setDescription("");
     setDetailType("small_detail");
@@ -512,7 +488,7 @@ export default function AddIdeaFullRequiredPage() {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Add Idea</h1>
             <p className="mt-1 text-sm text-slate-600">
-              Full required entry. You must fill everything before saving.
+              Core fields required. Footage and sources are optional.
             </p>
           </div>
 
@@ -525,7 +501,6 @@ export default function AddIdeaFullRequiredPage() {
           onSubmit={saveIdea}
           className="mt-6 grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
         >
-          {/* Game */}
           <GameCombobox
             games={games}
             selectedGameId={gameId}
@@ -533,7 +508,6 @@ export default function AddIdeaFullRequiredPage() {
             onCreateGame={openCreateGame}
           />
 
-          {/* Inline create game panel */}
           {showCreateGame && (
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="flex items-center justify-between gap-3">
@@ -552,14 +526,11 @@ export default function AddIdeaFullRequiredPage() {
 
               <div className="mt-3 grid gap-3">
                 <label className="grid gap-1">
-                  <span className="text-sm font-medium text-slate-800">
-                    Title <span className="text-rose-600">*</span>
-                  </span>
+                  <span className="text-sm font-medium text-slate-800">Title *</span>
                   <input
                     className={inputClass}
                     value={newGameTitle}
                     onChange={(e) => setNewGameTitle(e.target.value)}
-                    placeholder="God of War Ragnarök"
                   />
                 </label>
 
@@ -599,15 +570,8 @@ export default function AddIdeaFullRequiredPage() {
 
           {/* Title */}
           <label className="grid gap-1">
-            <span className="text-sm font-medium text-slate-800">
-              Title <span className="text-rose-600">*</span>
-            </span>
-            <input
-              className={inputClass}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Thor's tooth stays on the ground"
-            />
+            <span className="text-sm font-medium text-slate-800">Title *</span>
+            <input className={inputClass} value={title} onChange={(e) => setTitle(e.target.value)} />
           </label>
 
           {/* Duplicate suggestions */}
@@ -619,12 +583,8 @@ export default function AddIdeaFullRequiredPage() {
 
           {!loadingSimilar && similar.length > 0 && (
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <div className="text-sm font-semibold text-amber-900">
-                Possible duplicates
-              </div>
-              <div className="mt-1 text-xs text-amber-800">
-                Review before saving.
-              </div>
+              <div className="text-sm font-semibold text-amber-900">Possible duplicates</div>
+              <div className="mt-1 text-xs text-amber-800">Review before saving.</div>
 
               <ul className="mt-3 space-y-2">
                 {similar.map((s) => (
@@ -635,9 +595,7 @@ export default function AddIdeaFullRequiredPage() {
                       target="_blank"
                       rel="noreferrer"
                     >
-                      <div className="text-sm font-semibold text-slate-900">
-                        {s.title}
-                      </div>
+                      <div className="text-sm font-semibold text-slate-900">{s.title}</div>
                       <div className="mt-1 flex flex-wrap gap-2 text-xs text-slate-700">
                         <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">
                           {gameMap.get(s.game_id) ?? "Unknown game"}
@@ -658,26 +616,15 @@ export default function AddIdeaFullRequiredPage() {
 
           {/* Description */}
           <label className="grid gap-1">
-            <span className="text-sm font-medium text-slate-800">
-              Description <span className="text-rose-600">*</span>
-            </span>
-            <textarea
-              className={textareaClass}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Explain the detail, conditions, why it matters…"
-            />
+            <span className="text-sm font-medium text-slate-800">Description *</span>
+            <textarea className={textareaClass} value={description} onChange={(e) => setDescription(e.target.value)} />
           </label>
 
           {/* Type + Priority */}
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="grid gap-1">
               <span className="text-sm font-medium text-slate-800">Type</span>
-              <select
-                className={selectClass}
-                value={detailType}
-                onChange={(e) => setDetailType(e.target.value)}
-              >
+              <select className={selectClass} value={detailType} onChange={(e) => setDetailType(e.target.value)}>
                 <option value="small_detail">Small detail</option>
                 <option value="easter_egg">Easter egg</option>
                 <option value="npc_reaction">NPC reaction</option>
@@ -689,11 +636,7 @@ export default function AddIdeaFullRequiredPage() {
 
             <label className="grid gap-1">
               <span className="text-sm font-medium text-slate-800">Priority</span>
-              <select
-                className={selectClass}
-                value={priority}
-                onChange={(e) => setPriority(Number(e.target.value))}
-              >
+              <select className={selectClass} value={priority} onChange={(e) => setPriority(Number(e.target.value))}>
                 <option value={1}>High</option>
                 <option value={3}>Normal</option>
                 <option value={5}>Low</option>
@@ -705,11 +648,7 @@ export default function AddIdeaFullRequiredPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="grid gap-1">
               <span className="text-sm font-medium text-slate-800">Spoiler</span>
-              <select
-                className={selectClass}
-                value={spoiler}
-                onChange={(e) => setSpoiler(Number(e.target.value))}
-              >
+              <select className={selectClass} value={spoiler} onChange={(e) => setSpoiler(Number(e.target.value))}>
                 <option value={0}>0 – None</option>
                 <option value={1}>1 – Mild</option>
                 <option value={2}>2 – Story</option>
@@ -719,11 +658,7 @@ export default function AddIdeaFullRequiredPage() {
 
             <label className="grid gap-1">
               <span className="text-sm font-medium text-slate-800">Confidence</span>
-              <select
-                className={selectClass}
-                value={confidence}
-                onChange={(e) => setConfidence(Number(e.target.value))}
-              >
+              <select className={selectClass} value={confidence} onChange={(e) => setConfidence(Number(e.target.value))}>
                 <option value={1}>1 – Low</option>
                 <option value={2}>2</option>
                 <option value={3}>3 – Medium</option>
@@ -733,77 +668,39 @@ export default function AddIdeaFullRequiredPage() {
             </label>
           </div>
 
-          {/* Footage required */}
+          {/* Footage optional */}
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div className="text-base font-semibold text-slate-900">
-              Footage <span className="text-rose-600">*</span>
-            </div>
-            <div className="mt-1 text-sm text-slate-600">
-              You must add at least 1 footage entry.
-            </div>
+            <div className="text-base font-semibold text-slate-900">Footage (optional)</div>
 
             <div className="mt-3 grid gap-3">
               <label className="grid gap-1">
-                <span className="text-sm font-medium text-slate-800">
-                  Link or file path <span className="text-rose-600">*</span>
-                </span>
-                <input
-                  className={inputClass}
-                  value={fp}
-                  onChange={(e) => setFp(e.target.value)}
-                  placeholder="https://drive... or D:\captures\gow.mp4"
-                />
+                <span className="text-sm font-medium text-slate-800">Link or file path</span>
+                <input className={inputClass} value={fp} onChange={(e) => setFp(e.target.value)} />
               </label>
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="grid gap-1">
-                  <span className="text-sm font-medium text-slate-800">
-                    Start <span className="text-rose-600">*</span>
-                  </span>
-                  <input
-                    className={inputClass}
-                    value={startTs}
-                    onChange={(e) => setStartTs(e.target.value)}
-                    placeholder="00:01:23"
-                  />
+                  <span className="text-sm font-medium text-slate-800">Start</span>
+                  <input className={inputClass} value={startTs} onChange={(e) => setStartTs(e.target.value)} placeholder="00:01:23" />
                 </label>
 
                 <label className="grid gap-1">
-                  <span className="text-sm font-medium text-slate-800">
-                    End <span className="text-rose-600">*</span>
-                  </span>
-                  <input
-                    className={inputClass}
-                    value={endTs}
-                    onChange={(e) => setEndTs(e.target.value)}
-                    placeholder="00:01:40"
-                  />
+                  <span className="text-sm font-medium text-slate-800">End</span>
+                  <input className={inputClass} value={endTs} onChange={(e) => setEndTs(e.target.value)} placeholder="00:01:40" />
                 </label>
               </div>
 
-              <label className="grid gap-1">
-                <span className="text-sm font-medium text-slate-800">
-                  Label <span className="text-rose-600">*</span>
-                </span>
-                <input
-                  className={inputClass}
-                  value={fLabel}
-                  onChange={(e) => setFLabel(e.target.value)}
-                  placeholder="thumbnail / best take / alt angle"
-                />
-              </label>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="grid gap-1">
+                  <span className="text-sm font-medium text-slate-800">Label</span>
+                  <input className={inputClass} value={fLabel} onChange={(e) => setFLabel(e.target.value)} />
+                </label>
 
-              <label className="grid gap-1">
-                <span className="text-sm font-medium text-slate-800">
-                  Notes <span className="text-rose-600">*</span>
-                </span>
-                <input
-                  className={inputClass}
-                  value={fNotes}
-                  onChange={(e) => setFNotes(e.target.value)}
-                  placeholder="mission name, conditions, save slot…"
-                />
-              </label>
+                <label className="grid gap-1">
+                  <span className="text-sm font-medium text-slate-800">Notes</span>
+                  <input className={inputClass} value={fNotes} onChange={(e) => setFNotes(e.target.value)} />
+                </label>
+              </div>
 
               <button type="button" className={ghostButtonClass} onClick={addStagedFootage}>
                 + Add footage entry
@@ -815,19 +712,14 @@ export default function AddIdeaFullRequiredPage() {
                     <li key={idx} className="rounded-xl border border-slate-200 bg-white p-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="break-words text-sm font-semibold text-slate-900">
-                            {f.file_path}
-                          </div>
+                          <div className="break-words text-sm font-semibold text-slate-900">{f.file_path}</div>
                           <div className="mt-1 text-xs text-slate-700">
-                            {f.start_ts} → {f.end_ts} · {f.label}
+                            {(f.start_ts || "—") + " → " + (f.end_ts || "—")}
+                            {f.label ? ` · ${f.label}` : ""}
                           </div>
-                          <div className="mt-1 text-sm text-slate-700">{f.notes}</div>
+                          {f.notes ? <div className="mt-1 text-sm text-slate-700">{f.notes}</div> : null}
                         </div>
-                        <button
-                          type="button"
-                          className={ghostButtonClass}
-                          onClick={() => removeStagedFootage(idx)}
-                        >
+                        <button type="button" className={ghostButtonClass} onClick={() => removeStagedFootage(idx)}>
                           Remove
                         </button>
                       </div>
@@ -838,47 +730,24 @@ export default function AddIdeaFullRequiredPage() {
             </div>
           </div>
 
-          {/* Sources required */}
+          {/* Sources optional */}
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div className="text-base font-semibold text-slate-900">
-              Sources <span className="text-rose-600">*</span>
-            </div>
-            <div className="mt-1 text-sm text-slate-600">
-              You must add at least 1 source.
-            </div>
+            <div className="text-base font-semibold text-slate-900">Sources (optional)</div>
 
             <div className="mt-3 grid gap-3">
               <label className="grid gap-1">
-                <span className="text-sm font-medium text-slate-800">
-                  URL <span className="text-rose-600">*</span>
-                </span>
-                <input
-                  className={inputClass}
-                  value={srcUrl}
-                  onChange={(e) => setSrcUrl(e.target.value)}
-                  placeholder="https://..."
-                />
+                <span className="text-sm font-medium text-slate-800">URL</span>
+                <input className={inputClass} value={srcUrl} onChange={(e) => setSrcUrl(e.target.value)} placeholder="https://..." />
               </label>
 
               <label className="grid gap-1">
-                <span className="text-sm font-medium text-slate-800">
-                  Note <span className="text-rose-600">*</span>
-                </span>
-                <input
-                  className={inputClass}
-                  value={srcNote}
-                  onChange={(e) => setSrcNote(e.target.value)}
-                  placeholder="What does this source prove?"
-                />
+                <span className="text-sm font-medium text-slate-800">Note</span>
+                <input className={inputClass} value={srcNote} onChange={(e) => setSrcNote(e.target.value)} placeholder="What does it prove?" />
               </label>
 
               <label className="grid gap-1">
                 <span className="text-sm font-medium text-slate-800">Reliability</span>
-                <select
-                  className={selectClass}
-                  value={srcReliability}
-                  onChange={(e) => setSrcReliability(Number(e.target.value))}
-                >
+                <select className={selectClass} value={srcReliability} onChange={(e) => setSrcReliability(Number(e.target.value))}>
                   <option value={1}>1 – Low</option>
                   <option value={2}>2</option>
                   <option value={3}>3 – Medium</option>
@@ -897,18 +766,13 @@ export default function AddIdeaFullRequiredPage() {
                     <li key={idx} className="rounded-xl border border-slate-200 bg-white p-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="break-words text-sm font-semibold text-slate-900">
-                            {s.url}
-                          </div>
+                          <div className="break-words text-sm font-semibold text-slate-900">{s.url}</div>
                           <div className="mt-1 text-xs text-slate-700">
-                            Reliability: {s.reliability} · {s.note}
+                            Reliability: {s.reliability}
+                            {s.note ? ` · ${s.note}` : ""}
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          className={ghostButtonClass}
-                          onClick={() => removeStagedSource(idx)}
-                        >
+                        <button type="button" className={ghostButtonClass} onClick={() => removeStagedSource(idx)}>
                           Remove
                         </button>
                       </div>
