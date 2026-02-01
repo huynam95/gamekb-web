@@ -17,7 +17,6 @@ type Detail = {
   status: string | null;
   game_id: number;
   created_at: string | null;
-
   pinned: boolean;
   pinned_at: string | null;
 };
@@ -54,72 +53,49 @@ type Group = {
   description: string | null;
 };
 
-type IdeaGroupItem = {
-  group_id: number;
-  detail_id: number;
-  position: number;
-};
-
-/* ================= UI CLASSES ================= */
+/* ================= STYLES ================= */
 
 const inputClass =
-  "h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400";
-const selectClass =
-  "h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400";
+  "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition";
+
 const textareaClass =
-  "min-h-[120px] w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400";
+  "min-h-[120px] w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition resize-y";
 
-// ĐÃ SỬA: Thêm inline-flex, items-center, justify-center, cursor-pointer
-const buttonClass =
-  "inline-flex items-center justify-center cursor-pointer h-10 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed";
+const selectClass =
+  "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition cursor-pointer";
 
-// ĐÃ SỬA: Thêm inline-flex, items-center, justify-center, cursor-pointer
-const ghostButtonClass =
-  "inline-flex items-center justify-center cursor-pointer h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-100";
+const btnBase =
+  "inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold whitespace-nowrap cursor-pointer transition active:scale-[0.98]";
+
+const btnPrimary =
+  btnBase + " bg-slate-900 text-white shadow-sm hover:bg-slate-800 disabled:opacity-70";
+
+const btnGhost =
+  btnBase + " border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900";
+
+const cardClass = "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm";
 
 /* ================= HELPERS ================= */
 
-function typeLabel(t: string) {
-  switch (t) {
-    case "small_detail":
-      return "Small detail";
-    case "easter_egg":
-      return "Easter egg";
-    case "npc_reaction":
-      return "NPC reaction";
-    case "physics":
-      return "Physics";
-    case "troll":
-      return "Troll";
-    case "punish":
-      return "Punish";
-    default:
-      return t;
-  }
+function PriorityBadge({ p }: { p: number }) {
+  if (p === 1) return <span className="inline-flex items-center rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700">High Priority</span>;
+  if (p === 5) return <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-100 px-2 py-1 text-xs font-medium text-slate-500">Low</span>;
+  return <span className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">Normal</span>;
 }
 
-function priorityLabel(p: number) {
-  if (p === 1) return "High";
-  if (p === 3) return "Normal";
-  return "Low";
+function TypeBadge({ t }: { t: string }) {
+  const map: Record<string, string> = {
+    small_detail: "Small Detail",
+    easter_egg: "Easter Egg",
+    npc_reaction: "NPC Reaction",
+    physics: "Physics",
+    troll: "Troll",
+    punish: "Punish",
+  };
+  return <span className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">{map[t] || t}</span>;
 }
 
-function spoilerLabel(s: number | null) {
-  if (s === null || s === 0) return "0 – None";
-  if (s === 1) return "1 – Mild";
-  if (s === 2) return "2 – Story";
-  return "3 – Ending";
-}
-
-function confidenceLabel(c: number | null) {
-  if (c === null || c === 3) return "3 – Medium";
-  if (c <= 1) return "1 – Low";
-  if (c === 2) return "2";
-  if (c === 4) return "4";
-  return "5 – Verified";
-}
-
-/* ================= GROUP PICKER ================= */
+/* ================= COMPONENTS ================= */
 
 function GroupAddPicker({
   groups,
@@ -153,35 +129,30 @@ function GroupAddPicker({
     <div ref={boxRef} className="relative">
       <button
         type="button"
-        className={ghostButtonClass}
+        className="text-xs font-medium text-blue-600 hover:underline"
         onClick={() => setOpen((v) => !v)}
       >
-        + Add to group
+        + Add Group
       </button>
 
       {open && (
-        <div className="absolute z-20 mt-2 w-[420px] max-w-[90vw] rounded-2xl border border-slate-200 bg-white shadow-lg">
+        <div className="absolute right-0 top-full z-20 mt-2 w-64 rounded-xl border border-slate-200 bg-white shadow-xl">
           <div className="p-2">
             <input
               className={inputClass}
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search groups…"
+              placeholder="Search groups..."
               autoFocus
             />
           </div>
 
-          <div className="max-h-64 overflow-auto p-2 pt-0">
+          <div className="max-h-48 overflow-auto p-1 pt-0">
             {filtered.length === 0 ? (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                <div className="font-semibold text-slate-900">No matches</div>
-                <div className="mt-1 text-xs text-slate-600">
-                  Create a new group with this name.
-                </div>
-
+              <div className="p-2 text-center">
                 <button
                   type="button"
-                  className="mt-3 h-10 w-full rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800"
+                  className="w-full rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-900 hover:bg-slate-200"
                   onClick={() => {
                     const name = q.trim();
                     if (name) onCreate(name);
@@ -189,16 +160,16 @@ function GroupAddPicker({
                     setQ("");
                   }}
                 >
-                  + Create group
+                  + Create "{q}"
                 </button>
               </div>
             ) : (
-              <ul className="space-y-1">
+              <ul>
                 {filtered.map((g) => (
                   <li key={g.id}>
                     <button
                       type="button"
-                      className="w-full rounded-xl px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-100"
+                      className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-100"
                       onClick={() => {
                         onAdd(g.id);
                         setOpen(false);
@@ -211,10 +182,6 @@ function GroupAddPicker({
                 ))}
               </ul>
             )}
-          </div>
-
-          <div className="border-t border-slate-200 p-2 text-xs text-slate-500">
-            Showing up to 50
           </div>
         </div>
       )}
@@ -240,18 +207,16 @@ export default function IdeaDetailPage() {
   const [footage, setFootage] = useState<FootageRow[]>([]);
   const [sources, setSources] = useState<SourceRow[]>([]);
 
-  // Groups
   const [allGroups, setAllGroups] = useState<Group[]>([]);
   const [ideaGroups, setIdeaGroups] = useState<Group[]>([]);
-  const [savingGroup, setSavingGroup] = useState(false);
-
+  
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  /* -------- Core edit -------- */
+  /* Edit States */
   const [editingCore, setEditingCore] = useState(false);
   const [savingCore, setSavingCore] = useState(false);
-
+  
   const [draftTitle, setDraftTitle] = useState("");
   const [draftDesc, setDraftDesc] = useState("");
   const [draftType, setDraftType] = useState("small_detail");
@@ -259,115 +224,44 @@ export default function IdeaDetailPage() {
   const [draftSpoiler, setDraftSpoiler] = useState(0);
   const [draftConfidence, setDraftConfidence] = useState(3);
 
-  /* -------- Add footage form -------- */
+  /* Footage/Source Forms */
   const [fp, setFp] = useState("");
-  const [startTs, setStartTs] = useState("");
-  const [endTs, setEndTs] = useState("");
-  const [fLabel, setFLabel] = useState("");
-  const [fNotes, setFNotes] = useState("");
-  const [savingFootage, setSavingFootage] = useState(false);
-
-  /* -------- Add source form -------- */
   const [srcUrl, setSrcUrl] = useState("");
-  const [srcNote, setSrcNote] = useState("");
-  const [srcReliability, setSrcReliability] = useState(3);
-  const [savingSource, setSavingSource] = useState(false);
-
-  /* -------- Row editing (footage/sources) -------- */
-  const [editingFootageId, setEditingFootageId] = useState<number | null>(null);
-  const [savingFootageEdit, setSavingFootageEdit] = useState(false);
-  const [fEdit, setFEdit] = useState<{
-    file_path: string;
-    start_ts: string;
-    end_ts: string;
-    label: string;
-    notes: string;
-  }>({ file_path: "", start_ts: "", end_ts: "", label: "", notes: "" });
-
-  const [editingSourceId, setEditingSourceId] = useState<number | null>(null);
-  const [savingSourceEdit, setSavingSourceEdit] = useState(false);
-  const [sEdit, setSEdit] = useState<{ url: string; note: string; reliability: number }>({
-    url: "",
-    note: "",
-    reliability: 3,
-  });
+  const [savingItem, setSavingItem] = useState(false);
 
   async function loadGroups() {
-    const { data, error } = await supabase
-      .from("idea_groups")
-      .select("id,name,description,created_at")
-      .order("name");
-
-    if (error) {
-      setErr(error.message);
-      return;
-    }
+    const { data } = await supabase.from("idea_groups").select("*").order("name");
     setAllGroups((data ?? []) as Group[]);
   }
 
   async function loadIdeaGroups(detailId: number) {
-    const { data: links, error: e1 } = await supabase
-      .from("idea_group_items")
-      .select("group_id,detail_id,position")
-      .eq("detail_id", detailId);
-
-    if (e1) {
-      setErr(e1.message);
+    const { data: links } = await supabase.from("idea_group_items").select("group_id").eq("detail_id", detailId);
+    if (!links || links.length === 0) {
       setIdeaGroups([]);
       return;
     }
-
-    const groupIds = (links ?? []).map((x: any) => Number(x.group_id));
-    if (groupIds.length === 0) {
-      setIdeaGroups([]);
-      return;
-    }
-
-    const { data: gs, error: e2 } = await supabase
-      .from("idea_groups")
-      .select("id,name,description")
-      .in("id", groupIds)
-      .order("name");
-
-    if (e2) {
-      setErr(e2.message);
-      setIdeaGroups([]);
-      return;
-    }
-
+    const ids = links.map((x: any) => x.group_id);
+    const { data: gs } = await supabase.from("idea_groups").select("*").in("id", ids).order("name");
     setIdeaGroups((gs ?? []) as Group[]);
   }
 
   async function loadAll() {
     setLoading(true);
     setErr(null);
-
-    if (!Number.isFinite(id)) {
-      setErr("Invalid id");
-      setLoading(false);
-      return;
-    }
+    if (!Number.isFinite(id)) return;
 
     await loadGroups();
 
-    const { data: d, error: e1 } = await supabase
-      .from("details")
-      .select(
-        "id,title,description,detail_type,priority,spoiler_level,confidence,status,game_id,created_at,pinned,pinned_at"
-      )
-      .eq("id", id)
-      .single();
-
-    if (e1) {
-      setErr(e1.message);
+    const { data: d, error } = await supabase.from("details").select("*").eq("id", id).single();
+    if (error) {
+      setErr(error.message);
       setLoading(false);
       return;
     }
-
     const detailRow = d as Detail;
     setDetail(detailRow);
 
-    // sync core drafts
+    // Sync drafts
     setDraftTitle(detailRow.title);
     setDraftDesc(detailRow.description ?? "");
     setDraftType(detailRow.detail_type);
@@ -375,905 +269,379 @@ export default function IdeaDetailPage() {
     setDraftSpoiler(detailRow.spoiler_level ?? 0);
     setDraftConfidence(detailRow.confidence ?? 3);
 
-    const { data: g, error: e2 } = await supabase
-      .from("games")
-      .select("id,title,release_year")
-      .eq("id", detailRow.game_id)
-      .single();
-
-    if (e2) {
-      setErr(e2.message);
-      setLoading(false);
-      return;
-    }
+    // Load related
+    const { data: g } = await supabase.from("games").select("*").eq("id", detailRow.game_id).single();
     setGame(g as Game);
 
-    const { data: f, error: e3 } = await supabase
-      .from("footage")
-      .select("id,detail_id,file_path,start_ts,end_ts,label,notes,created_at")
-      .eq("detail_id", id)
-      .order("created_at", { ascending: false });
-
-    if (e3) {
-      setErr(e3.message);
-      setLoading(false);
-      return;
-    }
+    const { data: f } = await supabase.from("footage").select("*").eq("detail_id", id).order("created_at", { ascending: false });
     setFootage((f ?? []) as FootageRow[]);
 
-    const { data: s, error: e4 } = await supabase
-      .from("sources")
-      .select("id,detail_id,url,note,reliability,created_at")
-      .eq("detail_id", id)
-      .order("created_at", { ascending: false });
-
-    if (e4) {
-      setErr(e4.message);
-      setLoading(false);
-      return;
-    }
+    const { data: s } = await supabase.from("sources").select("*").eq("detail_id", id).order("created_at", { ascending: false });
     setSources((s ?? []) as SourceRow[]);
 
     await loadIdeaGroups(detailRow.id);
-
     setLoading(false);
   }
 
-  useEffect(() => {
-    loadAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  useEffect(() => { loadAll(); }, [id]);
 
-  /* ================= Core actions ================= */
+  /* ACTIONS */
 
-  async function togglePinHere() {
+  async function togglePin() {
     if (!detail) return;
-
     const newPinned = !detail.pinned;
-    setErr(null);
-
-    const { error } = await supabase
-      .from("details")
-      .update({
-        pinned: newPinned,
-        pinned_at: newPinned ? new Date().toISOString() : null,
-      })
-      .eq("id", detail.id);
-
-    if (error) {
-      setErr(error.message);
-      return;
-    }
-
+    await supabase.from("details").update({ pinned: newPinned, pinned_at: newPinned ? new Date().toISOString() : null }).eq("id", detail.id);
     await loadAll();
   }
 
   async function deleteIdea() {
-    if (!detail) return;
-
-    const ok = confirm(
-      `Delete this idea?\n\n"${detail.title}"\n\nFootage, sources, and group links will be deleted too.`
-    );
-    if (!ok) return;
-
-    setErr(null);
-    setLoading(true);
-
-    const { error } = await supabase.from("details").delete().eq("id", detail.id);
-
-    if (error) {
-      setErr(error.message);
-      setLoading(false);
-      return;
-    }
-
+    if (!detail || !confirm("Delete this idea completely?")) return;
+    await supabase.from("details").delete().eq("id", detail.id);
     router.push("/");
-    router.refresh();
   }
 
   async function saveCore() {
     if (!detail) return;
-
-    if (!draftTitle.trim()) {
-      setErr("Title cannot be empty.");
-      return;
-    }
-    if (!draftDesc.trim()) {
-      setErr("Description cannot be empty.");
-      return;
-    }
-
     setSavingCore(true);
-    setErr(null);
-
-    const { error } = await supabase
-      .from("details")
-      .update({
-        title: draftTitle.trim(),
-        description: draftDesc.trim(),
-        detail_type: draftType,
-        priority: draftPriority,
-        spoiler_level: draftSpoiler,
-        confidence: draftConfidence,
-      })
-      .eq("id", detail.id);
-
+    const { error } = await supabase.from("details").update({
+      title: draftTitle.trim(),
+      description: draftDesc.trim(),
+      detail_type: draftType,
+      priority: draftPriority,
+      spoiler_level: draftSpoiler,
+      confidence: draftConfidence,
+    }).eq("id", detail.id);
     setSavingCore(false);
-
-    if (error) {
-      setErr(error.message);
-      return;
+    if (!error) {
+      setEditingCore(false);
+      await loadAll();
     }
-
-    setEditingCore(false);
-    await loadAll();
   }
-
-  function cancelCore() {
-    if (!detail) return;
-    setEditingCore(false);
-    setDraftTitle(detail.title);
-    setDraftDesc(detail.description ?? "");
-    setDraftType(detail.detail_type);
-    setDraftPriority(detail.priority);
-    setDraftSpoiler(detail.spoiler_level ?? 0);
-    setDraftConfidence(detail.confidence ?? 3);
-  }
-
-  /* ================= Group actions ================= */
-
-  async function addToGroup(groupId: number) {
-    if (!detail) return;
-
-    // avoid duplicates: try insert, ignore if already exists (PK will block)
-    setSavingGroup(true);
-    setErr(null);
-
-    const { error } = await supabase.from("idea_group_items").insert({
-      group_id: groupId,
-      detail_id: detail.id,
-      position: 0,
-    } satisfies IdeaGroupItem);
-
-    setSavingGroup(false);
-
-    if (error) {
-      // If it's duplicate key, ignore; else show error
-      const msg = error.message.toLowerCase();
-      if (!msg.includes("duplicate") && !msg.includes("already exists")) {
-        setErr(error.message);
-        return;
-      }
-    }
-
-    await loadIdeaGroups(detail.id);
-  }
-
-  async function removeFromGroup(groupId: number) {
-    if (!detail) return;
-
-    const ok = confirm("Remove this idea from the group?");
-    if (!ok) return;
-
-    setSavingGroup(true);
-    setErr(null);
-
-    const { error } = await supabase
-      .from("idea_group_items")
-      .delete()
-      .eq("group_id", groupId)
-      .eq("detail_id", detail.id);
-
-    setSavingGroup(false);
-
-    if (error) {
-      setErr(error.message);
-      return;
-    }
-
-    await loadIdeaGroups(detail.id);
-  }
-
-  async function createGroupHere(name: string) {
-    if (!detail) return;
-
-    const groupName = name.trim();
-    if (!groupName) return;
-
-    setSavingGroup(true);
-    setErr(null);
-
-    const { data, error } = await supabase
-      .from("idea_groups")
-      .insert({ name: groupName })
-      .select("id,name,description")
-      .single();
-
-    if (error) {
-      setSavingGroup(false);
-      setErr(error.message);
-      return;
-    }
-
-    // refresh list + auto add
-    await loadGroups();
-    const newId = data?.id as number;
-    await addToGroup(newId);
-    setSavingGroup(false);
-  }
-
-  /* ================= Footage actions (optional fields) ================= */
 
   async function addFootage() {
-    if (!detail) return;
-
-    if (!fp.trim()) {
-      setErr("Footage link/path is required.");
-      return;
-    }
-
-    setSavingFootage(true);
-    setErr(null);
-
-    const { error } = await supabase.from("footage").insert({
-      detail_id: detail.id,
-      file_path: fp.trim(),
-      start_ts: startTs.trim() || null,
-      end_ts: endTs.trim() || null,
-      label: fLabel.trim() || null,
-      notes: fNotes.trim() || null,
-    });
-
-    setSavingFootage(false);
-
-    if (error) {
-      setErr(error.message);
-      return;
-    }
-
+    if (!detail || !fp.trim()) return;
+    setSavingItem(true);
+    await supabase.from("footage").insert({ detail_id: detail.id, file_path: fp.trim() });
     setFp("");
-    setStartTs("");
-    setEndTs("");
-    setFLabel("");
-    setFNotes("");
-
+    setSavingItem(false);
     await loadAll();
   }
 
-  async function deleteFootage(footageId: number) {
-    const ok = confirm("Delete this footage entry?");
-    if (!ok) return;
-
-    const { error } = await supabase.from("footage").delete().eq("id", footageId);
-    if (error) {
-      setErr(error.message);
-      return;
-    }
+  async function deleteFootage(fid: number) {
+    if (!confirm("Remove this footage?")) return;
+    await supabase.from("footage").delete().eq("id", fid);
     await loadAll();
   }
-
-  function startEditFootage(row: FootageRow) {
-    setEditingFootageId(row.id);
-    setFEdit({
-      file_path: row.file_path ?? "",
-      start_ts: row.start_ts ?? "",
-      end_ts: row.end_ts ?? "",
-      label: row.label ?? "",
-      notes: row.notes ?? "",
-    });
-  }
-
-  function cancelEditFootage() {
-    setEditingFootageId(null);
-    setFEdit({ file_path: "", start_ts: "", end_ts: "", label: "", notes: "" });
-  }
-
-  async function saveEditFootage() {
-    if (!editingFootageId) return;
-
-    if (!fEdit.file_path.trim()) {
-      setErr("Footage link/path is required.");
-      return;
-    }
-
-    setSavingFootageEdit(true);
-    setErr(null);
-
-    const { error } = await supabase
-      .from("footage")
-      .update({
-        file_path: fEdit.file_path.trim(),
-        start_ts: fEdit.start_ts.trim() || null,
-        end_ts: fEdit.end_ts.trim() || null,
-        label: fEdit.label.trim() || null,
-        notes: fEdit.notes.trim() || null,
-      })
-      .eq("id", editingFootageId);
-
-    setSavingFootageEdit(false);
-
-    if (error) {
-      setErr(error.message);
-      return;
-    }
-
-    setEditingFootageId(null);
-    await loadAll();
-  }
-
-  /* ================= Source actions (optional note) ================= */
 
   async function addSource() {
-    if (!detail) return;
-
-    if (!srcUrl.trim()) {
-      setErr("Source URL is required.");
-      return;
-    }
-
-    setSavingSource(true);
-    setErr(null);
-
-    const { error } = await supabase.from("sources").insert({
-      detail_id: detail.id,
-      url: srcUrl.trim(),
-      note: srcNote.trim() || null,
-      reliability: srcReliability,
-    });
-
-    setSavingSource(false);
-
-    if (error) {
-      setErr(error.message);
-      return;
-    }
-
+    if (!detail || !srcUrl.trim()) return;
+    setSavingItem(true);
+    await supabase.from("sources").insert({ detail_id: detail.id, url: srcUrl.trim(), reliability: 3 });
     setSrcUrl("");
-    setSrcNote("");
-    setSrcReliability(3);
+    setSavingItem(false);
     await loadAll();
   }
 
-  async function deleteSource(sourceId: number) {
-    const ok = confirm("Delete this source?");
-    if (!ok) return;
-
-    const { error } = await supabase.from("sources").delete().eq("id", sourceId);
-    if (error) {
-      setErr(error.message);
-      return;
-    }
+  async function deleteSource(sid: number) {
+    if (!confirm("Remove this source?")) return;
+    await supabase.from("sources").delete().eq("id", sid);
     await loadAll();
   }
 
-  function startEditSource(row: SourceRow) {
-    setEditingSourceId(row.id);
-    setSEdit({
-      url: row.url ?? "",
-      note: row.note ?? "",
-      reliability: row.reliability ?? 3,
-    });
+  async function addToGroup(gid: number) {
+    if (!detail) return;
+    await supabase.from("idea_group_items").insert({ group_id: gid, detail_id: detail.id, position: 0 });
+    await loadIdeaGroups(detail.id);
   }
 
-  function cancelEditSource() {
-    setEditingSourceId(null);
-    setSEdit({ url: "", note: "", reliability: 3 });
+  async function removeFromGroup(gid: number) {
+    if (!detail) return;
+    await supabase.from("idea_group_items").delete().eq("group_id", gid).eq("detail_id", detail.id);
+    await loadIdeaGroups(detail.id);
   }
 
-  async function saveEditSource() {
-    if (!editingSourceId) return;
-
-    if (!sEdit.url.trim()) {
-      setErr("Source URL is required.");
-      return;
+  async function createGroup(name: string) {
+    const { data } = await supabase.from("idea_groups").insert({ name }).select().single();
+    if (data) {
+      await loadGroups();
+      await addToGroup(data.id);
     }
-
-    setSavingSourceEdit(true);
-    setErr(null);
-
-    const { error } = await supabase
-      .from("sources")
-      .update({
-        url: sEdit.url.trim(),
-        note: sEdit.note.trim() || null,
-        reliability: sEdit.reliability,
-      })
-      .eq("id", editingSourceId);
-
-    setSavingSourceEdit(false);
-
-    if (error) {
-      setErr(error.message);
-      return;
-    }
-
-    setEditingSourceId(null);
-    await loadAll();
   }
 
-  /* ================= RENDER ================= */
+  if (loading) return <div className="p-8 text-center text-slate-500">Loading details...</div>;
+  if (!detail) return <div className="p-8 text-center text-slate-500">Idea not found.</div>;
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <div className="mx-auto max-w-3xl px-4 py-8">
-        {/* Top actions */}
-        <div className="flex items-center justify-between gap-4">
-          <a href="/" className={ghostButtonClass}>
-            Back
-          </a>
+    <main className="min-h-screen bg-slate-50 pb-20">
+      <div className="mx-auto max-w-6xl px-4 py-8">
+        
+        {/* HEADER */}
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <a href="/" className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm hover:text-slate-900">
+              ←
+            </a>
+            <div className="flex items-baseline gap-2">
+              <span className="text-sm font-medium text-slate-500">{game?.title} /</span>
+              <span className="text-sm font-bold text-slate-900">Idea #{detail.id}</span>
+            </div>
+          </div>
 
           <div className="flex items-center gap-2">
-            {detail && (
-              <button
-                type="button"
-                onClick={togglePinHere}
-                // ĐÃ SỬA: Thêm inline-flex items-center justify-center cursor-pointer
-                className={
-                  "inline-flex items-center justify-center cursor-pointer h-10 rounded-xl border px-4 text-sm font-semibold shadow-sm " +
-                  (detail.pinned
-                    ? "border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100"
-                    : "border-slate-200 bg-white text-slate-800 hover:bg-slate-100")
-                }
-              >
-                {detail.pinned ? "⭐ Pinned" : "☆ Pin"}
-              </button>
+            {!editingCore && (
+              <>
+                 <button
+                  onClick={togglePin}
+                  className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-semibold shadow-sm transition ${
+                    detail.pinned
+                      ? "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  {detail.pinned ? "⭐ Pinned" : "☆ Pin"}
+                </button>
+                <button onClick={() => setEditingCore(true)} className={btnGhost}>
+                  ✏️ Edit
+                </button>
+                <button onClick={deleteIdea} className="inline-flex h-9 items-center justify-center rounded-lg border border-transparent px-3 text-sm font-medium text-rose-600 hover:bg-rose-50">
+                  Delete
+                </button>
+              </>
             )}
-
-            <button
-              type="button"
-              onClick={deleteIdea}
-              // ĐÃ SỬA: Thêm inline-flex items-center justify-center cursor-pointer
-              className="inline-flex items-center justify-center cursor-pointer h-10 rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-900 shadow-sm hover:bg-rose-100"
-            >
-              Delete
-            </button>
-
-            <a href="/add" className={buttonClass}>
-              + Add idea
-            </a>
+             {editingCore && (
+               <>
+                <button onClick={saveCore} disabled={savingCore} className={btnPrimary}>
+                  {savingCore ? "Saving..." : "Save Changes"}
+                </button>
+                <button onClick={() => setEditingCore(false)} className={btnGhost}>
+                  Cancel
+                </button>
+               </>
+             )}
           </div>
         </div>
 
-        <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          {loading ? (
-            <p className="text-sm text-slate-600">Loading…</p>
-          ) : err ? (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900">
-              {err}
-            </div>
-          ) : !detail ? (
-            <p className="text-sm text-slate-600">Not found.</p>
-          ) : (
-            <>
-              {/* CORE HEADER */}
-              <div className="flex items-start justify-between gap-3">
-                {editingCore ? (
-                  <input
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-2xl font-bold text-slate-900 outline-none focus:border-slate-400"
-                    value={draftTitle}
-                    onChange={(e) => setDraftTitle(e.target.value)}
-                  />
-                ) : (
-                  <h1 className="text-2xl font-bold text-slate-900">{detail.title}</h1>
-                )}
-
-                {!editingCore ? (
-                  <button
-                    type="button"
-                    className={ghostButtonClass}
-                    onClick={() => setEditingCore(true)}
-                  >
-                    Edit
-                  </button>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      className={buttonClass}
-                      onClick={saveCore}
-                      disabled={savingCore}
-                    >
-                      {savingCore ? "Saving…" : "Save"}
-                    </button>
-                    <button type="button" className={ghostButtonClass} onClick={cancelCore}>
-                      Cancel
-                    </button>
+        {/* MAIN LAYOUT */}
+        <div className="grid gap-6 lg:grid-cols-3">
+          
+          {/* LEFT COLUMN: CONTENT */}
+          <div className="space-y-6 lg:col-span-2">
+            
+            {/* CORE CARD */}
+            <div className={cardClass}>
+              {editingCore ? (
+                <div className="space-y-4">
+                  <label className="block">
+                     <span className="mb-1 block text-xs font-bold uppercase text-slate-400">Title</span>
+                     <input className={inputClass} value={draftTitle} onChange={e => setDraftTitle(e.target.value)} />
+                  </label>
+                  <label className="block">
+                     <span className="mb-1 block text-xs font-bold uppercase text-slate-400">Description</span>
+                     <textarea className={textareaClass} value={draftDesc} onChange={e => setDraftDesc(e.target.value)} />
+                  </label>
+                </div>
+              ) : (
+                <div>
+                  <h1 className="mb-4 text-2xl font-bold leading-tight text-slate-900">{detail.title}</h1>
+                  <div className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+                    {detail.description || <span className="italic text-slate-400">No description provided.</span>}
                   </div>
-                )}
+                </div>
+              )}
+            </div>
+
+            {/* FOOTAGE CARD */}
+            <div className={cardClass}>
+              <h3 className="mb-3 text-base font-bold text-slate-900">🎬 Footage</h3>
+              
+              <div className="mb-4 flex gap-2">
+                <input 
+                  className={inputClass} 
+                  placeholder="Paste file path or link..." 
+                  value={fp} 
+                  onChange={e => setFp(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addFootage()}
+                />
+                <button onClick={addFootage} disabled={savingItem} className={btnGhost}>+</button>
               </div>
 
-              {/* META */}
-              <div className="mt-3 flex flex-wrap gap-2 text-sm">
-                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-800">
-                  {game ? `${game.title}${game.release_year ? ` (${game.release_year})` : ""}` : "Game"}
-                </span>
+              {footage.length === 0 ? (
+                <p className="text-sm text-slate-400 italic">No footage added.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {footage.map(f => (
+                    <li key={f.id} className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm">
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-500">
+                          ▶
+                        </span>
+                        <div className="min-w-0">
+                          <div className="truncate font-medium text-slate-900">{f.file_path}</div>
+                          {f.notes && <div className="truncate text-xs text-slate-500">{f.notes}</div>}
+                        </div>
+                      </div>
+                      <button onClick={() => deleteFootage(f.id)} className="text-slate-400 hover:text-rose-600">×</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
 
-                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-800">
-                  {typeLabel(detail.detail_type)}
-                </span>
-
-                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-800">
-                  Priority: {priorityLabel(detail.priority)}
-                </span>
-
-                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-800">
-                  Spoiler: {spoilerLabel(detail.spoiler_level)}
-                </span>
-
-                <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-800">
-                  Confidence: {confidenceLabel(detail.confidence)}
-                </span>
+            {/* SOURCES CARD */}
+            <div className={cardClass}>
+              <h3 className="mb-3 text-base font-bold text-slate-900">🔗 Sources</h3>
+              
+              <div className="mb-4 flex gap-2">
+                <input 
+                  className={inputClass} 
+                  placeholder="Paste source URL..." 
+                  value={srcUrl} 
+                  onChange={e => setSrcUrl(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addSource()}
+                />
+                <button onClick={addSource} disabled={savingItem} className={btnGhost}>+</button>
               </div>
 
-              {/* GROUPS */}
-              <div className="mt-6">
-                <div className="flex items-center justify-between gap-3">
+              {sources.length === 0 ? (
+                <p className="text-sm text-slate-400 italic">No sources added.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {sources.map(s => (
+                    <li key={s.id} className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm">
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-500">
+                          🌍
+                        </span>
+                        <div className="min-w-0">
+                          <a href={s.url} target="_blank" className="truncate font-medium text-blue-700 hover:underline">{s.url}</a>
+                          <div className="flex gap-2 text-xs text-slate-500">
+                             <span>Reliability: {s.reliability}/5</span>
+                             {s.note && <span>• {s.note}</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <button onClick={() => deleteSource(s.id)} className="text-slate-400 hover:text-rose-600">×</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+          </div>
+
+          {/* RIGHT COLUMN: META & SIDEBAR */}
+          <div className="space-y-6 lg:col-span-1">
+            
+            {/* META INFO */}
+            <div className={cardClass}>
+              <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-slate-400">Properties</h3>
+              
+              {editingCore ? (
+                <div className="space-y-3">
+                   <label className="block">
+                     <span className="text-xs font-semibold text-slate-700">Type</span>
+                     <select className={selectClass} value={draftType} onChange={e => setDraftType(e.target.value)}>
+                       <option value="small_detail">Small detail</option>
+                       <option value="easter_egg">Easter egg</option>
+                       <option value="npc_reaction">NPC reaction</option>
+                       <option value="physics">Physics</option>
+                       <option value="troll">Troll</option>
+                       <option value="punish">Punish</option>
+                     </select>
+                   </label>
+                   <label className="block">
+                     <span className="text-xs font-semibold text-slate-700">Priority</span>
+                     <select className={selectClass} value={draftPriority} onChange={e => setDraftPriority(Number(e.target.value))}>
+                       <option value={1}>High</option>
+                       <option value={3}>Normal</option>
+                       <option value={5}>Low</option>
+                     </select>
+                   </label>
+                   <label className="block">
+                     <span className="text-xs font-semibold text-slate-700">Confidence</span>
+                     <select className={selectClass} value={draftConfidence} onChange={e => setDraftConfidence(Number(e.target.value))}>
+                       <option value={1}>Low</option>
+                       <option value={3}>Medium</option>
+                       <option value={5}>Verified</option>
+                     </select>
+                   </label>
+                   <label className="block">
+                     <span className="text-xs font-semibold text-slate-700">Spoiler</span>
+                     <select className={selectClass} value={draftSpoiler} onChange={e => setDraftSpoiler(Number(e.target.value))}>
+                       <option value={0}>None</option>
+                       <option value={1}>Mild</option>
+                       <option value={2}>Story</option>
+                       <option value={3}>Ending</option>
+                     </select>
+                   </label>
+                </div>
+              ) : (
+                <div className="space-y-4">
                   <div>
-                    <div className="text-base font-semibold text-slate-900">Groups</div>
-                    <div className="text-sm text-slate-600">
-                      Add or remove this idea from video topic groups.
+                    <div className="mb-1 text-xs text-slate-500">Game</div>
+                    <div className="font-semibold text-slate-900">{game?.title || "Unknown"}</div>
+                  </div>
+                  
+                  <div className="flex justify-between border-t border-slate-100 pt-3">
+                    <div>
+                      <div className="mb-1 text-xs text-slate-500">Type</div>
+                      <TypeBadge t={detail.detail_type} />
+                    </div>
+                    <div className="text-right">
+                      <div className="mb-1 text-xs text-slate-500">Priority</div>
+                      <PriorityBadge p={detail.priority} />
                     </div>
                   </div>
 
-                  <GroupAddPicker
-                    groups={allGroups}
-                    onAdd={(gid) => addToGroup(gid)}
-                    onCreate={(name) => createGroupHere(name)}
-                  />
-                </div>
-
-                {savingGroup && (
-                  <div className="mt-2 text-sm text-slate-600">Updating groups…</div>
-                )}
-
-                {ideaGroups.length === 0 ? (
-                  <p className="mt-2 text-sm text-slate-600">No groups yet.</p>
-                ) : (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {ideaGroups.map((g) => (
-                      <div
-                        key={g.id}
-                        className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm text-slate-800"
-                      >
-                        <span>{g.name}</span>
-                        <button
-                          type="button"
-                          className="text-slate-500 hover:text-slate-900"
-                          title="Remove from group"
-                          onClick={() => removeFromGroup(g.id)}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
+                  <div className="flex justify-between border-t border-slate-100 pt-3">
+                    <div>
+                      <div className="mb-1 text-xs text-slate-500">Confidence</div>
+                      <span className="text-sm font-medium text-slate-900">{detail.confidence}/5</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="mb-1 text-xs text-slate-500">Spoiler</div>
+                      <span className={`text-sm font-medium ${detail.spoiler_level ? "text-amber-600" : "text-slate-900"}`}>
+                        {detail.spoiler_level === 0 ? "None" : `Level ${detail.spoiler_level}`}
+                      </span>
+                    </div>
                   </div>
-                )}
+                </div>
+              )}
+            </div>
+
+            {/* GROUPS */}
+            <div className={cardClass}>
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Groups</h3>
+                <GroupAddPicker 
+                  groups={allGroups} 
+                  onAdd={addToGroup} 
+                  onCreate={createGroup}
+                />
               </div>
 
-              {/* CORE EDIT FIELDS */}
-              <div className="mt-6 grid gap-4">
-                <div>
-                  <div className="text-sm font-semibold text-slate-800">Description</div>
-                  {editingCore ? (
-                    <textarea
-                      className={textareaClass}
-                      value={draftDesc}
-                      onChange={(e) => setDraftDesc(e.target.value)}
-                      placeholder="Write the full description…"
-                    />
-                  ) : (
-                    <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">
-                      {detail.description?.trim() ? detail.description : "No description yet."}
-                    </p>
-                  )}
+              {ideaGroups.length === 0 ? (
+                <p className="text-sm text-slate-400">Not in any group.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {ideaGroups.map(g => (
+                    <span key={g.id} className="inline-flex items-center gap-1 rounded-md border border-blue-100 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
+                      {g.name}
+                      <button onClick={() => removeFromGroup(g.id)} className="ml-1 text-blue-400 hover:text-blue-900">×</button>
+                    </span>
+                  ))}
                 </div>
+              )}
+            </div>
 
-                {editingCore && (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <label className="grid gap-1">
-                      <span className="text-sm font-medium text-slate-800">Type</span>
-                      <select className={selectClass} value={draftType} onChange={(e) => setDraftType(e.target.value)}>
-                        <option value="small_detail">Small detail</option>
-                        <option value="easter_egg">Easter egg</option>
-                        <option value="npc_reaction">NPC reaction</option>
-                        <option value="physics">Physics</option>
-                        <option value="troll">Troll</option>
-                        <option value="punish">Punish</option>
-                      </select>
-                    </label>
+            {/* TIMESTAMPS */}
+            <div className="rounded-xl border border-transparent px-4 text-xs text-slate-400">
+              <p>Created: {new Date(detail.created_at || "").toLocaleDateString()}</p>
+              {detail.pinned_at && <p>Pinned: {new Date(detail.pinned_at).toLocaleDateString()}</p>}
+            </div>
 
-                    <label className="grid gap-1">
-                      <span className="text-sm font-medium text-slate-800">Priority</span>
-                      <select className={selectClass} value={draftPriority} onChange={(e) => setDraftPriority(Number(e.target.value))}>
-                        <option value={1}>High</option>
-                        <option value={3}>Normal</option>
-                        <option value={5}>Low</option>
-                      </select>
-                    </label>
-
-                    <label className="grid gap-1">
-                      <span className="text-sm font-medium text-slate-800">Spoiler</span>
-                      <select className={selectClass} value={draftSpoiler} onChange={(e) => setDraftSpoiler(Number(e.target.value))}>
-                        <option value={0}>0 – None</option>
-                        <option value={1}>1 – Mild</option>
-                        <option value={2}>2 – Story</option>
-                        <option value={3}>3 – Ending</option>
-                      </select>
-                    </label>
-
-                    <label className="grid gap-1">
-                      <span className="text-sm font-medium text-slate-800">Confidence</span>
-                      <select className={selectClass} value={draftConfidence} onChange={(e) => setDraftConfidence(Number(e.target.value))}>
-                        <option value={1}>1 – Low</option>
-                        <option value={2}>2</option>
-                        <option value={3}>3 – Medium</option>
-                        <option value={4}>4</option>
-                        <option value={5}>5 – Verified</option>
-                      </select>
-                    </label>
-                  </div>
-                )}
-              </div>
-
-              {/* FOOTAGE */}
-              <div className="mt-10">
-                <div className="text-base font-semibold text-slate-900">Footage</div>
-                <p className="mt-1 text-sm text-slate-600">
-                  Link/path required. Start/end/label/notes optional.
-                </p>
-
-                <div className="mt-3 grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <label className="grid gap-1">
-                    <span className="text-sm font-medium text-slate-800">Link or file path *</span>
-                    <input className={inputClass} value={fp} onChange={(e) => setFp(e.target.value)} />
-                  </label>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="grid gap-1">
-                      <span className="text-sm font-medium text-slate-800">Start</span>
-                      <input className={inputClass} value={startTs} onChange={(e) => setStartTs(e.target.value)} placeholder="00:01:23" />
-                    </label>
-
-                    <label className="grid gap-1">
-                      <span className="text-sm font-medium text-slate-800">End</span>
-                      <input className={inputClass} value={endTs} onChange={(e) => setEndTs(e.target.value)} placeholder="00:01:40" />
-                    </label>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="grid gap-1">
-                      <span className="text-sm font-medium text-slate-800">Label</span>
-                      <input className={inputClass} value={fLabel} onChange={(e) => setFLabel(e.target.value)} />
-                    </label>
-
-                    <label className="grid gap-1">
-                      <span className="text-sm font-medium text-slate-800">Notes</span>
-                      <input className={inputClass} value={fNotes} onChange={(e) => setFNotes(e.target.value)} />
-                    </label>
-                  </div>
-
-                  <button type="button" className={buttonClass} onClick={addFootage} disabled={savingFootage}>
-                    {savingFootage ? "Saving…" : "Add footage"}
-                  </button>
-                </div>
-
-                <div className="mt-4">
-                  {footage.length === 0 ? (
-                    <p className="text-sm text-slate-600">No footage yet.</p>
-                  ) : (
-                    <ul className="space-y-2">
-                      {footage.map((f) => (
-                        <li key={f.id} className="rounded-2xl border border-slate-200 bg-white p-4">
-                          {editingFootageId === f.id ? (
-                            <div className="grid gap-3">
-                              <label className="grid gap-1">
-                                <span className="text-sm font-medium text-slate-800">Link/path *</span>
-                                <input
-                                  className={inputClass}
-                                  value={fEdit.file_path}
-                                  onChange={(e) => setFEdit((p) => ({ ...p, file_path: e.target.value }))}
-                                />
-                              </label>
-
-                              <div className="grid gap-3 sm:grid-cols-2">
-                                <label className="grid gap-1">
-                                  <span className="text-sm font-medium text-slate-800">Start</span>
-                                  <input
-                                    className={inputClass}
-                                    value={fEdit.start_ts}
-                                    onChange={(e) => setFEdit((p) => ({ ...p, start_ts: e.target.value }))}
-                                  />
-                                </label>
-                                <label className="grid gap-1">
-                                  <span className="text-sm font-medium text-slate-800">End</span>
-                                  <input
-                                    className={inputClass}
-                                    value={fEdit.end_ts}
-                                    onChange={(e) => setFEdit((p) => ({ ...p, end_ts: e.target.value }))}
-                                  />
-                                </label>
-                              </div>
-
-                              <div className="grid gap-3 sm:grid-cols-2">
-                                <label className="grid gap-1">
-                                  <span className="text-sm font-medium text-slate-800">Label</span>
-                                  <input
-                                    className={inputClass}
-                                    value={fEdit.label}
-                                    onChange={(e) => setFEdit((p) => ({ ...p, label: e.target.value }))}
-                                  />
-                                </label>
-                                <label className="grid gap-1">
-                                  <span className="text-sm font-medium text-slate-800">Notes</span>
-                                  <input
-                                    className={inputClass}
-                                    value={fEdit.notes}
-                                    onChange={(e) => setFEdit((p) => ({ ...p, notes: e.target.value }))}
-                                  />
-                                </label>
-                              </div>
-
-                              <div className="flex items-center gap-2">
-                                <button type="button" className={buttonClass} onClick={saveEditFootage} disabled={savingFootageEdit}>
-                                  {savingFootageEdit ? "Saving…" : "Save"}
-                                </button>
-                                <button type="button" className={ghostButtonClass} onClick={cancelEditFootage}>
-                                  Cancel
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="break-words text-sm font-medium text-slate-900">{f.file_path}</div>
-                                <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-700">
-                                  {(f.start_ts || f.end_ts) && (
-                                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">
-                                      {f.start_ts ?? "—"} → {f.end_ts ?? "—"}
-                                    </span>
-                                  )}
-                                  {f.label && (
-                                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">
-                                      {f.label}
-                                    </span>
-                                  )}
-                                </div>
-                                {f.notes && <div className="mt-2 text-sm text-slate-700">{f.notes}</div>}
-                              </div>
-
-                              <div className="flex items-center gap-2">
-                                <button type="button" className={ghostButtonClass} onClick={() => startEditFootage(f)}>
-                                  Edit
-                                </button>
-                                <button type="button" className={ghostButtonClass} onClick={() => deleteFootage(f.id)}>
-                                  Delete
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-
-              {/* SOURCES */}
-              <div className="mt-10">
-                <div className="text-base font-semibold text-slate-900">Sources</div>
-                <p className="mt-1 text-sm text-slate-600">
-                  URL required. Note optional.
-                </p>
-
-                <div className="mt-3 grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <label className="grid gap-1">
-                    <span className="text-sm font-medium text-slate-800">URL *</span>
-                    <input className={inputClass} value={srcUrl} onChange={(e) => setSrcUrl(e.target.value)} placeholder="https://..." />
-                  </label>
-
-                  <label className="grid gap-1">
-                    <span className="text-sm font-medium text-slate-800">Note</span>
-                    <input className={inputClass} value={srcNote} onChange={(e) => setSrcNote(e.target.value)} placeholder="What does it prove?" />
-                  </label>
-
-                  <label className="grid gap-1">
-                    <span className="text-sm font-medium text-slate-800">Reliability</span>
-                    <select className={selectClass} value={srcReliability} onChange={(e) => setSrcReliability(Number(e.target.value))}>
-                      <option value={1}>1 – Low</option>
-                      <option value={2}>2</option>
-                      <option value={3}>3 – Medium</option>
-                      <option value={4}>4</option>
-                      <option value={5}>5 – Verified</option>
-                    </select>
-                  </label>
-
-                  <button type="button" className={buttonClass} onClick={addSource} disabled={savingSource}>
-                    {savingSource ? "Saving…" : "Add source"}
-                  </button>
-                </div>
-
-                <div className="mt-4">
-                  {sources.length === 0 ? (
-                    <p className="text-sm text-slate-600">No sources yet.</p>
-                  ) : (
-                    <ul className="space-y-2">
-                      {sources.map((s) => (
-                        <li key={s.id} className="rounded-2xl border border-slate-200 bg-white p-4">
-                          {editingSourceId === s.id ? (
-                            <div className="grid gap-3">
-                              <label className="grid gap-1">
-                                <span className="text-sm font-medium text-slate-800">URL *</span>
-                                <input
-                                  className={inputClass}
-                                  value={sEdit.url}
-                                  onChange={(e) => setSEdit((p) => ({ ...p, url: e.target.value }))}
-                                />
-                              </label>
-
-                              <label className="grid gap-1">
-                                <span className="text-sm font-medium text-slate-800">Note</span>
-                                <input
-                                  className={inputClass}
-                                  value={sEdit.note}
-                                  onChange={(e) => setSEdit((p) => ({ ...p, note: e.target.value }))}
-                                />
-                              </label>
-
-                              <label className="grid gap-1">
-                                <span className="text-sm font-medium text-slate-800">Reliability</span>
-                                <select
-                                  className={selectClass}
-                                  value={sEdit.reliability}
-                                  onChange={(e) => setSEdit((p) => ({ ...p, reliability: Number(e.target.value) }))}
-                                >
-                                  <option value={1}>1 – Low</option>
-                                  <option value={2}>2</option>
-                                  <option value={3}>3 – Medium</option>
-                                  <option value={4}>4</option>
-                                  <option value={5}>5 – Verified</option>
-                                </select>
-                              </label>
-
-                              <div className="flex items-center gap-2">
-                                <button type="button" className={buttonClass} onClick={saveEditSource} disabled={savingSourceEdit}>
-                                  {savingSourceEdit ? "Saving…" : "Save"}
-                                </button>
-                                <button type="button" className={ghostButtonClass} onClick={cancelEditSource}>
-                                  Cancel
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="break-words text-sm font-medium text-slate-900">{s.url}</div>
-                                <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-700">
-                                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">
-                                    Reliability: {s.reliability}
-                                  </span>
-                                </div>
-                                {s.note && <div className="mt-2 text-sm text-slate-700">{s.note}</div>}
-                              </div>
-
-                              <div className="flex items-center gap-2">
-                                <button type="button" className={ghostButtonClass} onClick={() => startEditSource(s)}>
-                                  Edit
-                                </button>
-                                <button type="button" className={ghostButtonClass} onClick={() => deleteSource(s.id)}>
-                                  Delete
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
-        </section>
+          </div>
+        </div>
       </div>
     </main>
   );
