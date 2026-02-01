@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 type Game = { id: number; title: string };
+type Group = { id: number; name: string };
 
 type DetailRow = {
   id: number;
@@ -49,9 +50,12 @@ function priorityLabel(p: number) {
 
 const inputClass =
   "h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400";
-
 const selectClass =
   "h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400";
+const buttonClass =
+  "h-10 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50";
+const ghostButtonClass =
+  "h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 hover:bg-slate-100";
 
 function yyyyMmDdLocal(d: Date) {
   const y = d.getFullYear();
@@ -60,31 +64,35 @@ function yyyyMmDdLocal(d: Date) {
   return `${y}-${m}-${day}`;
 }
 
-function GameFilterCombobox({
-  games,
-  selectedGameId,
+function ComboBox({
+  label,
+  placeholder,
+  items,
+  selectedId,
   onChange,
+  allowAllLabel,
 }: {
-  games: Game[];
-  selectedGameId: number | "";
+  label: string;
+  placeholder: string;
+  items: { id: number; name: string }[];
+  selectedId: number | "";
   onChange: (id: number | "") => void;
+  allowAllLabel: string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const boxRef = useRef<HTMLDivElement | null>(null);
 
   const selected = useMemo(() => {
-    if (!selectedGameId) return null;
-    return games.find((g) => g.id === selectedGameId) ?? null;
-  }, [games, selectedGameId]);
+    if (!selectedId) return null;
+    return items.find((x) => x.id === selectedId) ?? null;
+  }, [items, selectedId]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return games.slice(0, 50);
-    return games
-      .filter((g) => g.title.toLowerCase().includes(q))
-      .slice(0, 50);
-  }, [games, query]);
+    const s = query.trim().toLowerCase();
+    if (!s) return items.slice(0, 50);
+    return items.filter((x) => x.name.toLowerCase().includes(s)).slice(0, 50);
+  }, [items, query]);
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
@@ -97,27 +105,27 @@ function GameFilterCombobox({
 
   return (
     <div ref={boxRef} className="relative grid gap-1">
-      <span className="text-sm font-medium text-slate-800">Game</span>
+      <span className="text-sm font-medium text-slate-800">{label}</span>
 
       <div className="flex items-center gap-2">
         <button
           type="button"
-          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-left text-sm text-slate-900 outline-none hover:bg-slate-50 focus:border-slate-400"
+          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-left text-sm text-slate-900 hover:bg-slate-50"
           onClick={() => setOpen((v) => !v)}
         >
-          {selected ? selected.title : "All games"}
+          {selected ? selected.name : allowAllLabel}
         </button>
 
-        {selectedGameId && (
+        {selectedId && (
           <button
             type="button"
-            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 hover:bg-slate-100"
+            className={ghostButtonClass}
             onClick={() => {
               onChange("");
               setQuery("");
               setOpen(false);
             }}
-            title="Clear game filter"
+            title="Clear"
           >
             Clear
           </button>
@@ -131,7 +139,7 @@ function GameFilterCombobox({
               className={inputClass}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Type to search games…"
+              placeholder={placeholder}
               autoFocus
             />
           </div>
@@ -146,7 +154,7 @@ function GameFilterCombobox({
                 setQuery("");
               }}
             >
-              All games
+              {allowAllLabel}
             </button>
 
             {filtered.length === 0 ? (
@@ -155,18 +163,18 @@ function GameFilterCombobox({
               </div>
             ) : (
               <ul className="space-y-1">
-                {filtered.map((g) => (
-                  <li key={g.id}>
+                {filtered.map((x) => (
+                  <li key={x.id}>
                     <button
                       type="button"
                       className="w-full rounded-xl px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-100"
                       onClick={() => {
-                        onChange(g.id);
+                        onChange(x.id);
                         setOpen(false);
                         setQuery("");
                       }}
                     >
-                      {g.title}
+                      {x.name}
                     </button>
                   </li>
                 ))}
@@ -185,36 +193,44 @@ function GameFilterCombobox({
 
 export default function Home() {
   const [games, setGames] = useState<Game[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [err, setErr] = useState<string | null>(null);
 
-  // Filtered view list
-  const [ideas, setIdeas] = useState<DetailRow[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Default view: pinned + daily seed
+  // default view
   const [pinned, setPinned] = useState<DetailRow[]>([]);
   const [daily, setDaily] = useState<DetailRow[]>([]);
   const [loadingDefault, setLoadingDefault] = useState(true);
 
-  // Random 5
+  // filtered view
+  const [ideas, setIdeas] = useState<DetailRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // random 5
   const [random5, setRandom5] = useState<DetailRow[]>([]);
   const [loadingRandom, setLoadingRandom] = useState(false);
 
-  // Filters
+  // filters
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [gameId, setGameId] = useState<number | "">("");
+  const [groupId, setGroupId] = useState<number | "">("");
   const [type, setType] = useState<string | "">("");
   const [priority, setPriority] = useState<number | "">("");
 
-  const isDefaultView = useMemo(() => {
-    return !debouncedQ.trim() && !gameId && !type && !priority;
-  }, [debouncedQ, gameId, type, priority]);
+  // create group on home
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupDesc, setNewGroupDesc] = useState("");
+  const [savingGroup, setSavingGroup] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQ(q), 300);
     return () => clearTimeout(t);
   }, [q]);
+
+  const isDefaultView = useMemo(() => {
+    return !debouncedQ.trim() && !gameId && !groupId && !type && !priority;
+  }, [debouncedQ, gameId, groupId, type, priority]);
 
   useEffect(() => {
     supabase
@@ -225,7 +241,23 @@ export default function Home() {
         if (error) setErr(error.message);
         setGames((data ?? []) as Game[]);
       });
+
+    loadGroups();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function loadGroups() {
+    const { data, error } = await supabase
+      .from("idea_groups")
+      .select("id,name")
+      .order("name");
+
+    if (error) {
+      setErr(error.message);
+      return;
+    }
+    setGroups((data ?? []) as Group[]);
+  }
 
   const gameMap = useMemo(() => {
     const m = new Map<number, string>();
@@ -254,7 +286,6 @@ export default function Home() {
     }
 
     const seedDate = yyyyMmDdLocal(new Date());
-
     const { data: d, error: e2 } = await supabase.rpc("get_daily_seed_ideas", {
       seed_date: seedDate,
       take_count: 5,
@@ -277,11 +308,34 @@ export default function Home() {
     setLoading(true);
     setErr(null);
 
+    let groupDetailIds: number[] | null = null;
+    if (groupId) {
+      const { data: gi, error: eG } = await supabase
+        .from("idea_group_items")
+        .select("detail_id")
+        .eq("group_id", groupId);
+
+      if (eG) {
+        setErr(eG.message);
+        setIdeas([]);
+        setLoading(false);
+        return;
+      }
+
+      groupDetailIds = (gi ?? []).map((x: any) => Number(x.detail_id));
+      if (groupDetailIds.length === 0) {
+        setIdeas([]);
+        setLoading(false);
+        return;
+      }
+    }
+
     let query = supabase
       .from("details")
       .select("id,title,priority,detail_type,game_id,pinned,pinned_at")
       .eq("status", "idea");
 
+    if (groupDetailIds) query = query.in("id", groupDetailIds);
     if (gameId) query = query.eq("game_id", gameId);
     if (type) query = query.eq("detail_type", type);
     if (priority) query = query.eq("priority", priority);
@@ -307,7 +361,7 @@ export default function Home() {
     if (isDefaultView) loadDefaultView();
     else loadFilteredIdeas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDefaultView, debouncedQ, gameId, type, priority]);
+  }, [isDefaultView, debouncedQ, gameId, groupId, type, priority]);
 
   async function togglePin(idea: DetailRow) {
     setErr(null);
@@ -331,9 +385,7 @@ export default function Home() {
   }
 
   async function deleteIdea(idea: DetailRow) {
-    const ok = confirm(
-      `Delete this idea?\n\n"${idea.title}"\n\nFootage and sources will be deleted too.`
-    );
+    const ok = confirm(`Delete this idea?\n\n"${idea.title}"`);
     if (!ok) return;
 
     setErr(null);
@@ -363,8 +415,34 @@ export default function Home() {
       setErr(error.message);
       return;
     }
-
     setRandom5((data ?? []) as DetailRow[]);
+  }
+
+  async function createGroupOnHome() {
+    const name = newGroupName.trim();
+    if (!name) {
+      setErr("Group name is required.");
+      return;
+    }
+
+    setSavingGroup(true);
+    setErr(null);
+
+    const { error } = await supabase
+      .from("idea_groups")
+      .insert({ name, description: newGroupDesc.trim() || null });
+
+    setSavingGroup(false);
+
+    if (error) {
+      setErr(error.message);
+      return;
+    }
+
+    setShowCreateGroup(false);
+    setNewGroupName("");
+    setNewGroupDesc("");
+    await loadGroups();
   }
 
   function IdeaItem({ r }: { r: DetailRow }) {
@@ -432,49 +510,86 @@ export default function Home() {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Ideas</h1>
             <p className="text-sm text-slate-600">
-              ⭐ Pin stays on top. 🧠 Daily picks are stable today. 🎲 Random 5 when you need it.
+              Use Group filter to build video topic lists.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={getRandom5}
-              className="inline-flex rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100"
-            >
+            <button type="button" onClick={getRandom5} className={ghostButtonClass}>
               {loadingRandom ? "🎲 Rolling…" : "🎲 Random 5"}
             </button>
 
-            <a
-              href="/games/new"
-              className="inline-flex rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100"
+            <button
+              type="button"
+              onClick={() => setShowCreateGroup(true)}
+              className={ghostButtonClass}
             >
+              + Create group
+            </button>
+
+            <a href="/games/new" className={ghostButtonClass}>
               + Add game
             </a>
 
-            <a
-              href="/add"
-              className="inline-flex rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
-            >
+            <a href="/add" className={buttonClass}>
               + Add idea
             </a>
           </div>
         </div>
 
+        {/* Create group panel */}
+        {showCreateGroup && (
+          <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="text-base font-semibold text-slate-900">Create group</div>
+              <button type="button" className={ghostButtonClass} onClick={() => setShowCreateGroup(false)}>
+                Close
+              </button>
+            </div>
+
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <label className="grid gap-1">
+                <span className="text-sm font-medium text-slate-800">Name</span>
+                <input className={inputClass} value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} placeholder="Water physics compilation" />
+              </label>
+
+              <label className="grid gap-1">
+                <span className="text-sm font-medium text-slate-800">Description</span>
+                <input className={inputClass} value={newGroupDesc} onChange={(e) => setNewGroupDesc(e.target.value)} placeholder="Optional notes about this video topic" />
+              </label>
+
+              <button type="button" className={buttonClass} disabled={savingGroup} onClick={createGroupOnHome}>
+                {savingGroup ? "Saving…" : "Create"}
+              </button>
+            </div>
+          </section>
+        )}
+
         {/* Filters */}
         <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="grid gap-3 md:grid-cols-4">
-            <label className="grid gap-1">
+          <div className="grid gap-3 md:grid-cols-5">
+            <label className="grid gap-1 md:col-span-2">
               <span className="text-sm font-medium text-slate-800">Search</span>
-              <input
-                className={inputClass}
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Type keywords…"
-              />
+              <input className={inputClass} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Type keywords…" />
             </label>
 
-            <GameFilterCombobox games={games} selectedGameId={gameId} onChange={setGameId} />
+            <ComboBox
+              label="Game"
+              placeholder="Search games…"
+              items={games.map((g) => ({ id: g.id, name: g.title }))}
+              selectedId={gameId}
+              onChange={setGameId}
+              allowAllLabel="All games"
+            />
+
+            <ComboBox
+              label="Group"
+              placeholder="Search groups…"
+              items={groups.map((g) => ({ id: g.id, name: g.name }))}
+              selectedId={groupId}
+              onChange={setGroupId}
+              allowAllLabel="All groups"
+            />
 
             <label className="grid gap-1">
               <span className="text-sm font-medium text-slate-800">Type</span>
@@ -488,14 +603,14 @@ export default function Home() {
                 <option value="punish">Punish</option>
               </select>
             </label>
+          </div>
+
+          <div className="mt-3 grid gap-3 md:grid-cols-5">
+            <div className="md:col-span-4" />
 
             <label className="grid gap-1">
               <span className="text-sm font-medium text-slate-800">Priority</span>
-              <select
-                className={selectClass}
-                value={priority}
-                onChange={(e) => setPriority(e.target.value ? Number(e.target.value) : "")}
-              >
+              <select className={selectClass} value={priority} onChange={(e) => setPriority(e.target.value ? Number(e.target.value) : "")}>
                 <option value="">All priorities</option>
                 <option value={1}>High</option>
                 <option value={3}>Normal</option>
@@ -517,10 +632,11 @@ export default function Home() {
 
             <button
               type="button"
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100"
+              className={ghostButtonClass}
               onClick={() => {
                 setQ("");
                 setGameId("");
+                setGroupId("");
                 setType("");
                 setPriority("");
               }}
@@ -536,16 +652,12 @@ export default function Home() {
           )}
         </section>
 
-        {/* Random 5 section */}
+        {/* Random 5 */}
         {random5.length > 0 && (
           <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-base font-semibold text-slate-900">🎲 Random 5</h2>
-              <button
-                type="button"
-                className="text-sm font-semibold text-slate-700 hover:text-slate-900"
-                onClick={() => setRandom5([])}
-              >
+              <button type="button" className="text-sm font-semibold text-slate-700 hover:text-slate-900" onClick={() => setRandom5([])}>
                 Clear
               </button>
             </div>
