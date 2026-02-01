@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
+/* ================= TYPES ================= */
+
 type Game = {
   id: number;
   title: string;
@@ -18,61 +20,35 @@ type SimilarIdea = {
   priority: number;
 };
 
-type StagedFootage = {
-  file_path: string;
-  start_ts?: string;
-  end_ts?: string;
-  label?: string;
-  notes?: string;
-};
-
-type StagedSource = {
-  url: string;
-  note?: string;
-  reliability: number;
-};
-
 type IdeaGroup = {
   id: number;
   name: string;
   description: string | null;
 };
 
+/* ================= STYLES (MATCHING HOME) ================= */
+
 const inputClass =
-  "h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400";
-const selectClass =
-  "h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400";
+  "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition";
+
 const textareaClass =
-  "min-h-[120px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400";
-const buttonClass =
-  "h-10 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50";
-const ghostButtonClass =
-  "h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-100";
+  "min-h-[140px] w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition resize-y";
 
-function typeLabel(t: string) {
-  switch (t) {
-    case "small_detail":
-      return "Small detail";
-    case "easter_egg":
-      return "Easter egg";
-    case "npc_reaction":
-      return "NPC reaction";
-    case "physics":
-      return "Physics";
-    case "troll":
-      return "Troll";
-    case "punish":
-      return "Punish";
-    default:
-      return t;
-  }
-}
+const selectClass =
+  "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition cursor-pointer";
 
-function priorityLabel(p: number) {
-  if (p === 1) return "High";
-  if (p === 3) return "Normal";
-  return "Low";
-}
+const btnBase =
+  "inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold whitespace-nowrap cursor-pointer transition active:scale-[0.98]";
+
+const btnPrimary =
+  btnBase + " bg-slate-900 text-white shadow-md shadow-slate-900/10 hover:bg-slate-800 disabled:opacity-70 disabled:cursor-not-allowed";
+
+const btnGhost =
+  btnBase + " border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900";
+
+const cardClass = "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm";
+
+/* ================= HELPERS ================= */
 
 function GameCombobox({
   games,
@@ -111,56 +87,54 @@ function GameCombobox({
 
   return (
     <div ref={boxRef} className="relative">
-      <label className="grid gap-1">
-        <span className="text-sm font-medium text-slate-800">Game</span>
-
-        <button
-          type="button"
-          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-left text-sm text-slate-900 outline-none hover:bg-slate-50 focus:border-slate-400"
-          onClick={() => setOpen((v) => !v)}
-        >
-          {selectedGame ? selectedGame.title : "— Select a game —"}
-        </button>
-      </label>
+      <label className="mb-1 block text-sm font-semibold text-slate-900">Game *</label>
+      <button
+        type="button"
+        className={`flex w-full items-center justify-between text-left ${inputClass} ${
+          !selectedGame ? "text-slate-500" : ""
+        }`}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="truncate">{selectedGame ? selectedGame.title : "Select a game..."}</span>
+        <svg className="h-4 w-4 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
 
       {open && (
-        <div className="absolute z-20 mt-2 w-full rounded-2xl border border-slate-200 bg-white shadow-lg">
+        <div className="absolute z-20 mt-1 w-full rounded-xl border border-slate-200 bg-white shadow-xl">
           <div className="p-2">
             <input
               className={inputClass}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Type to search games…"
+              placeholder="Search game..."
               autoFocus
             />
           </div>
 
-          <div className="max-h-64 overflow-auto p-2 pt-0">
+          <div className="max-h-60 overflow-auto p-1 pt-0">
             {filtered.length === 0 ? (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                <div className="font-semibold text-slate-900">No matches</div>
-                <div className="mt-1 text-sm text-slate-600">
-                  Create a new game with this name.
-                </div>
-
+              <div className="p-3 text-center">
+                <div className="text-xs text-slate-500">No game found.</div>
                 <button
                   type="button"
-                  className="mt-3 h-10 w-full rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800"
+                  className="mt-2 w-full rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-200"
                   onClick={() => {
                     setOpen(false);
                     onCreateGame(query.trim());
                   }}
                 >
-                  + Add new game
+                  + Create "{query}"
                 </button>
               </div>
             ) : (
-              <ul className="space-y-1">
+              <ul>
                 {filtered.map((g) => (
                   <li key={g.id}>
                     <button
                       type="button"
-                      className="w-full rounded-xl px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-100"
+                      className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-900 hover:bg-blue-50 hover:text-blue-700"
                       onClick={() => {
                         onSelect(g);
                         setOpen(false);
@@ -173,10 +147,6 @@ function GameCombobox({
                 ))}
               </ul>
             )}
-          </div>
-
-          <div className="border-t border-slate-200 p-2 text-xs text-slate-500">
-            Showing up to 50 results
           </div>
         </div>
       )}
@@ -205,11 +175,6 @@ function GroupPicker({
     return groups.filter((g) => g.name.toLowerCase().includes(s)).slice(0, 50);
   }, [groups, q]);
 
-  const selectedNames = useMemo(() => {
-    const set = new Set(selectedIds);
-    return groups.filter((g) => set.has(g.id)).map((g) => g.name);
-  }, [groups, selectedIds]);
-
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
       if (!boxRef.current) return;
@@ -221,61 +186,81 @@ function GroupPicker({
 
   return (
     <div ref={boxRef} className="relative">
-      <label className="grid gap-1">
-        <span className="text-sm font-medium text-slate-800">Groups</span>
-
+      <div className="mb-2 flex items-center justify-between">
+        <label className="text-sm font-semibold text-slate-900">Groups</label>
         <button
           type="button"
-          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-left text-sm text-slate-900 outline-none hover:bg-slate-50 focus:border-slate-400"
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => setOpen(!open)}
+          className="text-xs font-medium text-blue-600 hover:underline"
         >
-          {selectedNames.length > 0 ? selectedNames.join(", ") : "— None —"}
+          {open ? "Done" : "+ Add"}
         </button>
-      </label>
+      </div>
+
+      {/* Selected Tags */}
+      <div className="flex flex-wrap gap-2">
+        {selectedIds.length === 0 && !open && (
+          <span className="text-xs text-slate-400 italic">No groups selected</span>
+        )}
+        {selectedIds.map((id) => {
+          const g = groups.find((x) => x.id === id);
+          if (!g) return null;
+          return (
+            <span
+              key={id}
+              className="inline-flex items-center gap-1 rounded-md border border-blue-100 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700"
+            >
+              {g.name}
+              <button
+                type="button"
+                onClick={() => onToggle(id)}
+                className="ml-1 text-blue-400 hover:text-blue-900"
+              >
+                ×
+              </button>
+            </span>
+          );
+        })}
+      </div>
 
       {open && (
-        <div className="absolute z-20 mt-2 w-full rounded-2xl border border-slate-200 bg-white shadow-lg">
+        <div className="absolute right-0 top-full z-20 mt-2 w-64 rounded-xl border border-slate-200 bg-white shadow-xl">
           <div className="p-2">
             <input
               className={inputClass}
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search groups…"
+              placeholder="Search groups..."
               autoFocus
             />
           </div>
-
-          <div className="max-h-64 overflow-auto p-2 pt-0">
+          <div className="max-h-48 overflow-auto p-1 pt-0">
             {filtered.length === 0 ? (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                <div className="font-semibold text-slate-900">No matches</div>
+              <div className="p-2 text-center">
                 <button
                   type="button"
-                  className="mt-3 h-10 w-full rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800"
+                  className="w-full rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-900 hover:bg-slate-200"
                   onClick={() => {
-                    const name = q.trim();
-                    if (name) onCreateGroup(name);
+                    if (q.trim()) onCreateGroup(q.trim());
                     setQ("");
                   }}
                 >
-                  + Create group
+                  + Create "{q}"
                 </button>
               </div>
             ) : (
-              <ul className="space-y-1">
+              <ul>
                 {filtered.map((g) => {
-                  const checked = selectedIds.includes(g.id);
+                  const isActive = selectedIds.includes(g.id);
                   return (
                     <li key={g.id}>
                       <button
                         type="button"
-                        className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-100"
+                        className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-100"
                         onClick={() => onToggle(g.id)}
                       >
                         <span>{g.name}</span>
-                        <span className="text-xs text-slate-500">
-                          {checked ? "✓" : ""}
-                        </span>
+                        {isActive && <span className="text-blue-600">✓</span>}
                       </button>
                     </li>
                   );
@@ -283,284 +268,111 @@ function GroupPicker({
               </ul>
             )}
           </div>
-
-          <div className="border-t border-slate-200 p-2 text-xs text-slate-500">
-            Multi-select · Showing up to 50
-          </div>
         </div>
       )}
     </div>
   );
 }
 
+/* ================= MAIN COMPONENT ================= */
+
 export default function AddIdeaPage() {
   const [games, setGames] = useState<Game[]>([]);
   const [groups, setGroups] = useState<IdeaGroup[]>([]);
   const [gameId, setGameId] = useState<number | "">("");
 
-  // Core fields (required)
+  // Core fields
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [detailType, setDetailType] = useState("small_detail");
   const [priority, setPriority] = useState(3);
   const [spoiler, setSpoiler] = useState(0);
   const [confidence, setConfidence] = useState(3);
-
-  // Selected groups
   const [selectedGroupIds, setSelectedGroupIds] = useState<number[]>([]);
 
-  // Duplicate detection
+  // Helpers
   const [debouncedTitle, setDebouncedTitle] = useState("");
   const [similar, setSimilar] = useState<SimilarIdea[]>([]);
   const [loadingSimilar, setLoadingSimilar] = useState(false);
 
-  // Inline create game
+  // Modals / Inline forms
   const [showCreateGame, setShowCreateGame] = useState(false);
   const [newGameTitle, setNewGameTitle] = useState("");
-  const [newGameYear, setNewGameYear] = useState("");
-  const [newGameGenres, setNewGameGenres] = useState("");
   const [savingGame, setSavingGame] = useState(false);
 
-  // Footage staging (optional)
+  // Staging
   const [fp, setFp] = useState("");
-  const [startTs, setStartTs] = useState("");
-  const [endTs, setEndTs] = useState("");
-  const [fLabel, setFLabel] = useState("");
-  const [fNotes, setFNotes] = useState("");
-  const [stagedFootage, setStagedFootage] = useState<StagedFootage[]>([]);
-
-  // Sources staging (optional)
+  const [stagedFootage, setStagedFootage] = useState<{ file_path: string; notes?: string }[]>([]);
   const [srcUrl, setSrcUrl] = useState("");
-  const [srcNote, setSrcNote] = useState("");
-  const [srcReliability, setSrcReliability] = useState(3);
-  const [stagedSources, setStagedSources] = useState<StagedSource[]>([]);
+  const [stagedSources, setStagedSources] = useState<{ url: string; reliability: number }[]>([]);
 
   const [savingIdea, setSavingIdea] = useState(false);
   const [message, setMessage] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
-  const gameMap = useMemo(() => {
-    const m = new Map<number, string>();
-    for (const g of games) m.set(g.id, g.title);
-    return m;
-  }, [games]);
-
-  async function loadGames() {
-    const { data, error } = await supabase
-      .from("games")
-      .select("id,title,release_year,genres_text")
-      .order("title");
-
-    if (error) {
-      setMessage({ kind: "err", text: error.message });
-      return;
-    }
-    setGames((data ?? []) as Game[]);
-  }
-
-  async function loadGroups() {
-    const { data, error } = await supabase
-      .from("idea_groups")
-      .select("id,name,description,created_at")
-      .order("name");
-
-    if (error) {
-      setMessage({ kind: "err", text: error.message });
-      return;
-    }
-    setGroups((data ?? []) as IdeaGroup[]);
-  }
-
+  // Data Loading
   useEffect(() => {
-    loadGames();
-    loadGroups();
+    supabase.from("games").select("*").order("title").then(({ data }) => setGames((data ?? []) as Game[]));
+    supabase.from("idea_groups").select("*").order("name").then(({ data }) => setGroups((data ?? []) as IdeaGroup[]));
   }, []);
 
-  // debounce title
+  // Duplicate Check
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedTitle(title), 300);
+    const t = setTimeout(() => setDebouncedTitle(title), 500);
     return () => clearTimeout(t);
   }, [title]);
 
-  // duplicate RPC
   useEffect(() => {
-    async function run() {
-      const q = debouncedTitle.trim();
-      if (q.length < 4) {
-        setSimilar([]);
-        return;
-      }
-
-      setLoadingSimilar(true);
-
-      const { data, error } = await supabase.rpc("search_similar_ideas", {
-        q,
-        gid: gameId ? Number(gameId) : null,
-      });
-
-      if (error) {
-        setSimilar([]);
-        setLoadingSimilar(false);
-        return;
-      }
-
-      setSimilar((data ?? []) as SimilarIdea[]);
-      setLoadingSimilar(false);
+    if (debouncedTitle.trim().length < 4) {
+      setSimilar([]);
+      return;
     }
-
-    run();
+    setLoadingSimilar(true);
+    supabase.rpc("search_similar_ideas", { q: debouncedTitle.trim(), gid: gameId ? Number(gameId) : null })
+      .then(({ data }) => {
+        setSimilar((data ?? []) as SimilarIdea[]);
+        setLoadingSimilar(false);
+      });
   }, [debouncedTitle, gameId]);
 
-  function openCreateGame(prefillTitle: string) {
-    setShowCreateGame(true);
-    setNewGameTitle(prefillTitle || "");
-    setNewGameYear("");
-    setNewGameGenres("");
-    setMessage(null);
-  }
-
+  // Actions
   async function createGameInline() {
-    if (!newGameTitle.trim()) {
-      setMessage({ kind: "err", text: "Game title is required." });
-      return;
-    }
-
+    if (!newGameTitle.trim()) return;
     setSavingGame(true);
-    setMessage(null);
-
-    const yearNum = newGameYear.trim() ? Number(newGameYear.trim()) : null;
-    if (yearNum !== null && !Number.isFinite(yearNum)) {
-      setMessage({ kind: "err", text: "Release year must be a number (or empty)." });
-      setSavingGame(false);
-      return;
-    }
-
     const { data, error } = await supabase
       .from("games")
-      .insert({
-        title: newGameTitle.trim(),
-        release_year: yearNum,
-        genres_text: newGameGenres.trim() || null,
-      })
+      .insert({ title: newGameTitle.trim() })
       .select("id")
       .single();
-
-    if (error) {
-      setMessage({ kind: "err", text: error.message });
-      setSavingGame(false);
-      return;
-    }
-
-    setGameId(data?.id as number);
-    setShowCreateGame(false);
     setSavingGame(false);
-    await loadGames();
-    setMessage({ kind: "ok", text: "Game created ✔" });
+    if (!error && data) {
+      setGameId(data.id);
+      setShowCreateGame(false);
+      // reload games
+      const { data: gs } = await supabase.from("games").select("*").order("title");
+      setGames((gs ?? []) as Game[]);
+    }
   }
 
   async function createGroupInline(name: string) {
-    const n = name.trim();
-    if (!n) return;
-
-    setMessage(null);
-
-    const { data, error } = await supabase
-      .from("idea_groups")
-      .insert({ name: n })
-      .select("id,name,description")
-      .single();
-
-    if (error) {
-      setMessage({ kind: "err", text: error.message });
-      return;
+    const { data } = await supabase.from("idea_groups").insert({ name }).select().single();
+    if (data) {
+      setGroups((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+      setSelectedGroupIds((prev) => [...prev, data.id]);
     }
-
-    const newId = data?.id as number;
-    await loadGroups();
-    setSelectedGroupIds((prev) => (prev.includes(newId) ? prev : [newId, ...prev]));
-    setMessage({ kind: "ok", text: "Group created ✔" });
   }
-
-  function toggleGroup(id: number) {
-    setSelectedGroupIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  }
-
-  function addStagedFootage() {
-    if (!fp.trim()) {
-      setMessage({ kind: "err", text: "Footage link/path is required to add an entry." });
-      return;
-    }
-
-    setMessage(null);
-    setStagedFootage((prev) => [
-      {
-        file_path: fp.trim(),
-        start_ts: startTs.trim() || undefined,
-        end_ts: endTs.trim() || undefined,
-        label: fLabel.trim() || undefined,
-        notes: fNotes.trim() || undefined,
-      },
-      ...prev,
-    ]);
-
-    setFp("");
-    setStartTs("");
-    setEndTs("");
-    setFLabel("");
-    setFNotes("");
-  }
-
-  function removeStagedFootage(idx: number) {
-    setStagedFootage((prev) => prev.filter((_, i) => i !== idx));
-  }
-
-  function addStagedSource() {
-    if (!srcUrl.trim()) {
-      setMessage({ kind: "err", text: "Source URL is required to add an entry." });
-      return;
-    }
-
-    setMessage(null);
-    setStagedSources((prev) => [
-      { url: srcUrl.trim(), note: srcNote.trim() || undefined, reliability: srcReliability },
-      ...prev,
-    ]);
-
-    setSrcUrl("");
-    setSrcNote("");
-    setSrcReliability(3);
-  }
-
-  function removeStagedSource(idx: number) {
-    setStagedSources((prev) => prev.filter((_, i) => i !== idx));
-  }
-
-  const canSaveIdea = useMemo(() => {
-    return Boolean(gameId) && title.trim().length > 0 && description.trim().length > 0 && !savingIdea;
-  }, [gameId, title, description, savingIdea]);
 
   async function saveIdea(e: React.FormEvent) {
     e.preventDefault();
-
-    if (!gameId) {
-      setMessage({ kind: "err", text: "Game is required." });
-      return;
-    }
-    if (!title.trim()) {
-      setMessage({ kind: "err", text: "Title is required." });
-      return;
-    }
-    if (!description.trim()) {
-      setMessage({ kind: "err", text: "Description is required." });
+    if (!gameId || !title.trim() || !description.trim()) {
+      setMessage({ kind: "err", text: "Please fill in Game, Title, and Description." });
       return;
     }
 
     setSavingIdea(true);
     setMessage(null);
 
-    // 1) insert detail
-    const { data: inserted, error: e1 } = await supabase
+    // 1. Insert Detail
+    const { data: idea, error } = await supabase
       .from("details")
       .insert({
         game_id: gameId,
@@ -575,379 +387,281 @@ export default function AddIdeaPage() {
       .select("id")
       .single();
 
-    if (e1 || !inserted?.id) {
-      setMessage({ kind: "err", text: e1?.message ?? "Failed to create idea." });
+    if (error || !idea) {
+      setMessage({ kind: "err", text: error?.message || "Error saving." });
       setSavingIdea(false);
       return;
     }
 
-    const detailId = inserted.id as number;
+    const detailId = idea.id;
 
-    // 2) optional: group items
-    if (selectedGroupIds.length > 0) {
-      const payload = selectedGroupIds.map((gid) => ({
-        group_id: gid,
-        detail_id: detailId,
-        position: 0,
-      }));
-
-      const { error: eG } = await supabase.from("idea_group_items").insert(payload);
-      if (eG) {
-        setMessage({ kind: "err", text: `Idea saved, but group linking failed: ${eG.message}` });
-        setSavingIdea(false);
-        return;
-      }
+    // 2. Parallel Inserts
+    const promises = [];
+    if (selectedGroupIds.length) {
+      promises.push(
+        supabase.from("idea_group_items").insert(
+          selectedGroupIds.map((gid) => ({ group_id: gid, detail_id: detailId, position: 0 }))
+        )
+      );
+    }
+    if (stagedFootage.length) {
+      promises.push(
+        supabase.from("footage").insert(
+          stagedFootage.map((f) => ({ detail_id: detailId, file_path: f.file_path, notes: f.notes }))
+        )
+      );
+    }
+    if (stagedSources.length) {
+      promises.push(
+        supabase.from("sources").insert(
+          stagedSources.map((s) => ({ detail_id: detailId, url: s.url, reliability: s.reliability }))
+        )
+      );
     }
 
-    // 3) optional: footage
-    if (stagedFootage.length > 0) {
-      const payload = stagedFootage.map((f) => ({
-        detail_id: detailId,
-        file_path: f.file_path,
-        start_ts: f.start_ts ?? null,
-        end_ts: f.end_ts ?? null,
-        label: f.label ?? null,
-        notes: f.notes ?? null,
-      }));
-      const { error: e2 } = await supabase.from("footage").insert(payload);
-      if (e2) {
-        setMessage({ kind: "err", text: `Idea saved, but footage insert failed: ${e2.message}` });
-        setSavingIdea(false);
-        return;
-      }
-    }
-
-    // 4) optional: sources
-    if (stagedSources.length > 0) {
-      const payload = stagedSources.map((s) => ({
-        detail_id: detailId,
-        url: s.url,
-        note: s.note ?? null,
-        reliability: s.reliability,
-      }));
-      const { error: e3 } = await supabase.from("sources").insert(payload);
-      if (e3) {
-        setMessage({ kind: "err", text: `Idea saved, but sources insert failed: ${e3.message}` });
-        setSavingIdea(false);
-        return;
-      }
-    }
-
-    setMessage({ kind: "ok", text: `Saved ✔ (Idea #${detailId})` });
-
-    // reset
+    await Promise.all(promises);
+    setSavingIdea(false);
+    setMessage({ kind: "ok", text: "Idea saved successfully!" });
+    
+    // Reset form
     setTitle("");
     setDescription("");
-    setDetailType("small_detail");
-    setPriority(3);
-    setSpoiler(0);
-    setConfidence(3);
-    setSelectedGroupIds([]);
     setStagedFootage([]);
     setStagedSources([]);
     setSimilar([]);
-    setSavingIdea(false);
   }
 
   return (
-    <main className="min-h-screen bg-slate-50">
-      <div className="mx-auto max-w-3xl px-4 py-8">
-        <div className="flex items-end justify-between gap-4">
+    <main className="min-h-screen bg-slate-50 pb-20">
+      <div className="mx-auto max-w-5xl px-4 py-8">
+        
+        {/* HEADER */}
+        <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Add Idea</h1>
-            <p className="mt-1 text-sm text-slate-600">
-              Groups let you build video topics. One idea can be in multiple groups.
-            </p>
+            <h1 className="text-2xl font-bold text-slate-900">Add New Idea</h1>
+            <p className="text-sm text-slate-500">Document a detail, easter egg, or mechanic.</p>
           </div>
-
-          <a href="/" className={ghostButtonClass}>
-            Back
-          </a>
+          <div className="flex gap-3">
+            <a href="/" className={btnGhost}>Cancel</a>
+          </div>
         </div>
 
-        <form
-          onSubmit={saveIdea}
-          className="mt-6 grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-        >
-          <GameCombobox
-            games={games}
-            selectedGameId={gameId}
-            onSelect={(g) => setGameId(g.id)}
-            onCreateGame={openCreateGame}
-          />
+        {/* FEEDBACK MSG */}
+        {message && (
+          <div className={`mb-6 rounded-xl border px-4 py-3 text-sm ${message.kind === "ok" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-rose-200 bg-rose-50 text-rose-900"}`}>
+            {message.text}
+          </div>
+        )}
 
-          {showCreateGame && (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-center justify-between gap-3">
+        <form onSubmit={saveIdea} className="grid gap-6 lg:grid-cols-3">
+          
+          {/* LEFT COLUMN: CONTENT */}
+          <div className="space-y-6 lg:col-span-2">
+            
+            {/* Main Info Card */}
+            <div className={cardClass}>
+              <div className="space-y-5">
+                
+                {/* Game Select */}
+                <GameCombobox
+                  games={games}
+                  selectedGameId={gameId}
+                  onSelect={(g) => setGameId(g.id)}
+                  onCreateGame={(t) => {
+                    setNewGameTitle(t);
+                    setShowCreateGame(true);
+                  }}
+                />
+
+                {/* Create Game Modal (Inline) */}
+                {showCreateGame && (
+                  <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
+                    <h4 className="mb-2 text-sm font-bold text-blue-900">New Game</h4>
+                    <div className="flex gap-2">
+                      <input 
+                        className={inputClass} 
+                        value={newGameTitle} 
+                        onChange={(e) => setNewGameTitle(e.target.value)} 
+                        placeholder="Game Title"
+                      />
+                      <button type="button" onClick={createGameInline} disabled={savingGame} className={btnPrimary}>
+                        {savingGame ? "Saving..." : "Create"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Title */}
+                <label className="block">
+                  <span className="mb-1 block text-sm font-semibold text-slate-900">Title *</span>
+                  <input
+                    className={inputClass}
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="e.g. NPC reactions to rain"
+                  />
+                </label>
+
+                {/* Duplicates Warning */}
+                {!loadingSimilar && similar.length > 0 && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                    <div className="mb-2 text-xs font-bold uppercase tracking-wide text-amber-800">Possible Duplicates</div>
+                    <ul className="space-y-1">
+                      {similar.map(s => (
+                        <li key={s.id} className="text-sm text-amber-900">
+                          • <a href={`/idea/${s.id}`} target="_blank" className="hover:underline">{s.title}</a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Description */}
+                <label className="block">
+                  <span className="mb-1 block text-sm font-semibold text-slate-900">Description *</span>
+                  <textarea
+                    className={textareaClass}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Describe the detail thoroughly..."
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* Media & Sources Card */}
+            <div className={cardClass}>
+              <h3 className="mb-4 text-base font-bold text-slate-900">Attachments</h3>
+              
+              <div className="grid gap-6 md:grid-cols-2">
+                {/* Footage */}
                 <div>
-                  <div className="text-sm font-semibold text-slate-900">Create new game</div>
-                  <div className="text-xs text-slate-600">Title required. Year/genres optional.</div>
-                </div>
-                <button
-                  type="button"
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100"
-                  onClick={() => setShowCreateGame(false)}
-                >
-                  Close
-                </button>
-              </div>
-
-              <div className="mt-3 grid gap-3">
-                <label className="grid gap-1">
-                  <span className="text-sm font-medium text-slate-800">Title *</span>
-                  <input className={inputClass} value={newGameTitle} onChange={(e) => setNewGameTitle(e.target.value)} />
-                </label>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="grid gap-1">
-                    <span className="text-sm font-medium text-slate-800">Release year</span>
-                    <input className={inputClass} value={newGameYear} onChange={(e) => setNewGameYear(e.target.value)} placeholder="2022" />
-                  </label>
-
-                  <label className="grid gap-1">
-                    <span className="text-sm font-medium text-slate-800">Genres</span>
-                    <input className={inputClass} value={newGameGenres} onChange={(e) => setNewGameGenres(e.target.value)} placeholder="action, adventure" />
-                  </label>
+                  <div className="mb-2 text-sm font-semibold text-slate-700">Footage / Files</div>
+                  <div className="mb-3 flex gap-2">
+                    <input 
+                      className={inputClass} 
+                      placeholder="Link or path..." 
+                      value={fp} 
+                      onChange={(e) => setFp(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') { e.preventDefault(); if(fp) { setStagedFootage([...stagedFootage, { file_path: fp }]); setFp(""); } }
+                      }}
+                    />
+                    <button type="button" className={btnGhost} onClick={() => { if(fp) { setStagedFootage([...stagedFootage, { file_path: fp }]); setFp(""); } }}>+</button>
+                  </div>
+                  <ul className="space-y-2">
+                    {stagedFootage.map((f, i) => (
+                      <li key={i} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs">
+                        <span className="truncate font-medium text-slate-700">{f.file_path}</span>
+                        <button type="button" onClick={() => setStagedFootage(stagedFootage.filter((_, idx) => idx !== i))} className="text-slate-400 hover:text-rose-500">×</button>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
 
-                <button type="button" className={buttonClass} disabled={savingGame} onClick={createGameInline}>
-                  {savingGame ? "Saving..." : "Create game"}
-                </button>
+                {/* Sources */}
+                <div>
+                  <div className="mb-2 text-sm font-semibold text-slate-700">Sources / URLs</div>
+                  <div className="mb-3 flex gap-2">
+                    <input 
+                      className={inputClass} 
+                      placeholder="Source URL..." 
+                      value={srcUrl} 
+                      onChange={(e) => setSrcUrl(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') { e.preventDefault(); if(srcUrl) { setStagedSources([...stagedSources, { url: srcUrl, reliability: 3 }]); setSrcUrl(""); } }
+                      }}
+                    />
+                    <button type="button" className={btnGhost} onClick={() => { if(srcUrl) { setStagedSources([...stagedSources, { url: srcUrl, reliability: 3 }]); setSrcUrl(""); } }}>+</button>
+                  </div>
+                  <ul className="space-y-2">
+                    {stagedSources.map((s, i) => (
+                      <li key={i} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs">
+                        <span className="truncate font-medium text-slate-700">{s.url}</span>
+                        <button type="button" onClick={() => setStagedSources(stagedSources.filter((_, idx) => idx !== i))} className="text-slate-400 hover:text-rose-500">×</button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
             </div>
-          )}
-
-          {/* Groups */}
-          <GroupPicker
-            groups={groups}
-            selectedIds={selectedGroupIds}
-            onToggle={toggleGroup}
-            onCreateGroup={createGroupInline}
-          />
-
-          {/* Title */}
-          <label className="grid gap-1">
-            <span className="text-sm font-medium text-slate-800">Title *</span>
-            <input className={inputClass} value={title} onChange={(e) => setTitle(e.target.value)} />
-          </label>
-
-          {/* Duplicate suggestions */}
-          {loadingSimilar && (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-              Checking duplicates…
-            </div>
-          )}
-
-          {!loadingSimilar && similar.length > 0 && (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <div className="text-sm font-semibold text-amber-900">Possible duplicates</div>
-              <div className="mt-1 text-xs text-amber-800">Review before saving.</div>
-
-              <ul className="mt-3 space-y-2">
-                {similar.map((s) => (
-                  <li key={s.id}>
-                    <a
-                      href={`/idea/${s.id}`}
-                      className="block rounded-xl border border-amber-200 bg-white p-3 hover:bg-amber-100"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <div className="text-sm font-semibold text-slate-900">{s.title}</div>
-                      <div className="mt-1 flex flex-wrap gap-2 text-xs text-slate-700">
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">
-                          {gameMap.get(s.game_id) ?? "Unknown game"}
-                        </span>
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">
-                          {typeLabel(s.detail_type)}
-                        </span>
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">
-                          {priorityLabel(s.priority)}
-                        </span>
-                      </div>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Description */}
-          <label className="grid gap-1">
-            <span className="text-sm font-medium text-slate-800">Description *</span>
-            <textarea className={textareaClass} value={description} onChange={(e) => setDescription(e.target.value)} />
-          </label>
-
-          {/* Type + Priority */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="grid gap-1">
-              <span className="text-sm font-medium text-slate-800">Type</span>
-              <select className={selectClass} value={detailType} onChange={(e) => setDetailType(e.target.value)}>
-                <option value="small_detail">Small detail</option>
-                <option value="easter_egg">Easter egg</option>
-                <option value="npc_reaction">NPC reaction</option>
-                <option value="physics">Physics</option>
-                <option value="troll">Troll</option>
-                <option value="punish">Punish</option>
-              </select>
-            </label>
-
-            <label className="grid gap-1">
-              <span className="text-sm font-medium text-slate-800">Priority</span>
-              <select className={selectClass} value={priority} onChange={(e) => setPriority(Number(e.target.value))}>
-                <option value={1}>High</option>
-                <option value={3}>Normal</option>
-                <option value={5}>Low</option>
-              </select>
-            </label>
           </div>
 
-          {/* Spoiler + Confidence */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="grid gap-1">
-              <span className="text-sm font-medium text-slate-800">Spoiler</span>
-              <select className={selectClass} value={spoiler} onChange={(e) => setSpoiler(Number(e.target.value))}>
-                <option value={0}>0 – None</option>
-                <option value={1}>1 – Mild</option>
-                <option value={2}>2 – Story</option>
-                <option value={3}>3 – Ending</option>
-              </select>
-            </label>
-
-            <label className="grid gap-1">
-              <span className="text-sm font-medium text-slate-800">Confidence</span>
-              <select className={selectClass} value={confidence} onChange={(e) => setConfidence(Number(e.target.value))}>
-                <option value={1}>1 – Low</option>
-                <option value={2}>2</option>
-                <option value={3}>3 – Medium</option>
-                <option value={4}>4</option>
-                <option value={5}>5 – Verified</option>
-              </select>
-            </label>
-          </div>
-
-          {/* Footage optional */}
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div className="text-base font-semibold text-slate-900">Footage (optional)</div>
-            <div className="mt-3 grid gap-3">
-              <label className="grid gap-1">
-                <span className="text-sm font-medium text-slate-800">Link or file path</span>
-                <input className={inputClass} value={fp} onChange={(e) => setFp(e.target.value)} />
-              </label>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="grid gap-1">
-                  <span className="text-sm font-medium text-slate-800">Start</span>
-                  <input className={inputClass} value={startTs} onChange={(e) => setStartTs(e.target.value)} placeholder="00:01:23" />
-                </label>
-                <label className="grid gap-1">
-                  <span className="text-sm font-medium text-slate-800">End</span>
-                  <input className={inputClass} value={endTs} onChange={(e) => setEndTs(e.target.value)} placeholder="00:01:40" />
-                </label>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="grid gap-1">
-                  <span className="text-sm font-medium text-slate-800">Label</span>
-                  <input className={inputClass} value={fLabel} onChange={(e) => setFLabel(e.target.value)} />
-                </label>
-                <label className="grid gap-1">
-                  <span className="text-sm font-medium text-slate-800">Notes</span>
-                  <input className={inputClass} value={fNotes} onChange={(e) => setFNotes(e.target.value)} />
-                </label>
-              </div>
-
-              <button type="button" className={ghostButtonClass} onClick={addStagedFootage}>
-                + Add footage entry
+          {/* RIGHT COLUMN: META & ACTIONS */}
+          <div className="space-y-6">
+            
+            {/* Publish Actions */}
+            <div className={cardClass}>
+              <div className="mb-4 text-sm font-bold text-slate-900">Publishing</div>
+              <button 
+                type="submit" 
+                disabled={!gameId || !title || savingIdea} 
+                className={`${btnPrimary} w-full h-12 text-base`}
+              >
+                {savingIdea ? "Saving..." : "Save Idea"}
               </button>
-
-              {stagedFootage.length > 0 && (
-                <ul className="mt-2 space-y-2">
-                  {stagedFootage.map((f, idx) => (
-                    <li key={idx} className="rounded-xl border border-slate-200 bg-white p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="break-words text-sm font-semibold text-slate-900">{f.file_path}</div>
-                          <div className="mt-1 text-xs text-slate-700">
-                            {(f.start_ts || "—") + " → " + (f.end_ts || "—")}
-                            {f.label ? ` · ${f.label}` : ""}
-                          </div>
-                          {f.notes ? <div className="mt-1 text-sm text-slate-700">{f.notes}</div> : null}
-                        </div>
-                        <button type="button" className={ghostButtonClass} onClick={() => removeStagedFootage(idx)}>
-                          Remove
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
             </div>
+
+            {/* Properties */}
+            <div className={cardClass}>
+              <h3 className="mb-4 text-sm font-bold text-slate-900">Properties</h3>
+              <div className="space-y-4">
+                
+                <label className="block">
+                  <span className="mb-1 block text-xs font-semibold text-slate-500 uppercase">Type</span>
+                  <select className={selectClass} value={detailType} onChange={(e) => setDetailType(e.target.value)}>
+                    <option value="small_detail">Small detail</option>
+                    <option value="easter_egg">Easter egg</option>
+                    <option value="npc_reaction">NPC reaction</option>
+                    <option value="physics">Physics</option>
+                    <option value="troll">Troll</option>
+                    <option value="punish">Punish</option>
+                  </select>
+                </label>
+
+                <label className="block">
+                  <span className="mb-1 block text-xs font-semibold text-slate-500 uppercase">Priority</span>
+                  <select className={selectClass} value={priority} onChange={(e) => setPriority(Number(e.target.value))}>
+                    <option value={1}>High (Must do)</option>
+                    <option value={3}>Normal</option>
+                    <option value={5}>Low</option>
+                  </select>
+                </label>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-semibold text-slate-500 uppercase">Spoiler</span>
+                    <select className={selectClass} value={spoiler} onChange={(e) => setSpoiler(Number(e.target.value))}>
+                      <option value={0}>None</option>
+                      <option value={1}>Mild</option>
+                      <option value={2}>Story</option>
+                      <option value={3}>Ending</option>
+                    </select>
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-semibold text-slate-500 uppercase">Confidence</span>
+                    <select className={selectClass} value={confidence} onChange={(e) => setConfidence(Number(e.target.value))}>
+                      <option value={1}>Low</option>
+                      <option value={3}>Medium</option>
+                      <option value={5}>Verified</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Groups */}
+            <div className={cardClass}>
+              <GroupPicker
+                groups={groups}
+                selectedIds={selectedGroupIds}
+                onToggle={(id) => setSelectedGroupIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])}
+                onCreateGroup={createGroupInline}
+              />
+            </div>
+
           </div>
-
-          {/* Sources optional */}
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div className="text-base font-semibold text-slate-900">Sources (optional)</div>
-            <div className="mt-3 grid gap-3">
-              <label className="grid gap-1">
-                <span className="text-sm font-medium text-slate-800">URL</span>
-                <input className={inputClass} value={srcUrl} onChange={(e) => setSrcUrl(e.target.value)} placeholder="https://..." />
-              </label>
-              <label className="grid gap-1">
-                <span className="text-sm font-medium text-slate-800">Note</span>
-                <input className={inputClass} value={srcNote} onChange={(e) => setSrcNote(e.target.value)} />
-              </label>
-              <label className="grid gap-1">
-                <span className="text-sm font-medium text-slate-800">Reliability</span>
-                <select className={selectClass} value={srcReliability} onChange={(e) => setSrcReliability(Number(e.target.value))}>
-                  <option value={1}>1 – Low</option>
-                  <option value={2}>2</option>
-                  <option value={3}>3 – Medium</option>
-                  <option value={4}>4</option>
-                  <option value={5}>5 – Verified</option>
-                </select>
-              </label>
-
-              <button type="button" className={ghostButtonClass} onClick={addStagedSource}>
-                + Add source
-              </button>
-
-              {stagedSources.length > 0 && (
-                <ul className="mt-2 space-y-2">
-                  {stagedSources.map((s, idx) => (
-                    <li key={idx} className="rounded-xl border border-slate-200 bg-white p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="break-words text-sm font-semibold text-slate-900">{s.url}</div>
-                          <div className="mt-1 text-xs text-slate-700">
-                            Reliability: {s.reliability}
-                            {s.note ? ` · ${s.note}` : ""}
-                          </div>
-                        </div>
-                        <button type="button" className={ghostButtonClass} onClick={() => removeStagedSource(idx)}>
-                          Remove
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-
-          <button disabled={!canSaveIdea} className={buttonClass}>
-            {savingIdea ? "Saving..." : "Save idea"}
-          </button>
-
-          {message && (
-            <div
-              className={
-                "rounded-xl border px-3 py-2 text-sm " +
-                (message.kind === "ok"
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-                  : "border-rose-200 bg-rose-50 text-rose-900")
-              }
-            >
-              {message.text}
-            </div>
-          )}
         </form>
       </div>
     </main>
