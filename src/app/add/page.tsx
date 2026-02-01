@@ -19,7 +19,7 @@ type SimilarIdea = {
 };
 
 type StagedFootage = {
-  file_path: string;      // required only to create an entry
+  file_path: string;
   start_ts?: string;
   end_ts?: string;
   label?: string;
@@ -27,9 +27,15 @@ type StagedFootage = {
 };
 
 type StagedSource = {
-  url: string;            // required only to create an entry
+  url: string;
   note?: string;
-  reliability: number;    // 1..5
+  reliability: number;
+};
+
+type IdeaGroup = {
+  id: number;
+  name: string;
+  description: string | null;
 };
 
 const inputClass =
@@ -178,8 +184,118 @@ function GameCombobox({
   );
 }
 
-export default function AddIdeaRelaxedPage() {
+function GroupPicker({
+  groups,
+  selectedIds,
+  onToggle,
+  onCreateGroup,
+}: {
+  groups: IdeaGroup[];
+  selectedIds: number[];
+  onToggle: (id: number) => void;
+  onCreateGroup: (name: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const boxRef = useRef<HTMLDivElement | null>(null);
+
+  const filtered = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    if (!s) return groups.slice(0, 50);
+    return groups.filter((g) => g.name.toLowerCase().includes(s)).slice(0, 50);
+  }, [groups, q]);
+
+  const selectedNames = useMemo(() => {
+    const set = new Set(selectedIds);
+    return groups.filter((g) => set.has(g.id)).map((g) => g.name);
+  }, [groups, selectedIds]);
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (!boxRef.current) return;
+      if (!boxRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
+
+  return (
+    <div ref={boxRef} className="relative">
+      <label className="grid gap-1">
+        <span className="text-sm font-medium text-slate-800">Groups</span>
+
+        <button
+          type="button"
+          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-left text-sm text-slate-900 outline-none hover:bg-slate-50 focus:border-slate-400"
+          onClick={() => setOpen((v) => !v)}
+        >
+          {selectedNames.length > 0 ? selectedNames.join(", ") : "— None —"}
+        </button>
+      </label>
+
+      {open && (
+        <div className="absolute z-20 mt-2 w-full rounded-2xl border border-slate-200 bg-white shadow-lg">
+          <div className="p-2">
+            <input
+              className={inputClass}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search groups…"
+              autoFocus
+            />
+          </div>
+
+          <div className="max-h-64 overflow-auto p-2 pt-0">
+            {filtered.length === 0 ? (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                <div className="font-semibold text-slate-900">No matches</div>
+                <button
+                  type="button"
+                  className="mt-3 h-10 w-full rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white hover:bg-slate-800"
+                  onClick={() => {
+                    const name = q.trim();
+                    if (name) onCreateGroup(name);
+                    setQ("");
+                  }}
+                >
+                  + Create group
+                </button>
+              </div>
+            ) : (
+              <ul className="space-y-1">
+                {filtered.map((g) => {
+                  const checked = selectedIds.includes(g.id);
+                  return (
+                    <li key={g.id}>
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-100"
+                        onClick={() => onToggle(g.id)}
+                      >
+                        <span>{g.name}</span>
+                        <span className="text-xs text-slate-500">
+                          {checked ? "✓" : ""}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
+          <div className="border-t border-slate-200 p-2 text-xs text-slate-500">
+            Multi-select · Showing up to 50
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function AddIdeaPage() {
   const [games, setGames] = useState<Game[]>([]);
+  const [groups, setGroups] = useState<IdeaGroup[]>([]);
   const [gameId, setGameId] = useState<number | "">("");
 
   // Core fields (required)
@@ -189,6 +305,9 @@ export default function AddIdeaRelaxedPage() {
   const [priority, setPriority] = useState(3);
   const [spoiler, setSpoiler] = useState(0);
   const [confidence, setConfidence] = useState(3);
+
+  // Selected groups
+  const [selectedGroupIds, setSelectedGroupIds] = useState<number[]>([]);
 
   // Duplicate detection
   const [debouncedTitle, setDebouncedTitle] = useState("");
@@ -225,7 +344,7 @@ export default function AddIdeaRelaxedPage() {
     return m;
   }, [games]);
 
-  async function loadGames(selectId?: number) {
+  async function loadGames() {
     const { data, error } = await supabase
       .from("games")
       .select("id,title,release_year,genres_text")
@@ -235,15 +354,25 @@ export default function AddIdeaRelaxedPage() {
       setMessage({ kind: "err", text: error.message });
       return;
     }
+    setGames((data ?? []) as Game[]);
+  }
 
-    const list = (data ?? []) as Game[];
-    setGames(list);
+  async function loadGroups() {
+    const { data, error } = await supabase
+      .from("idea_groups")
+      .select("id,name,description,created_at")
+      .order("name");
 
-    if (selectId) setGameId(selectId);
+    if (error) {
+      setMessage({ kind: "err", text: error.message });
+      return;
+    }
+    setGroups((data ?? []) as IdeaGroup[]);
   }
 
   useEffect(() => {
     loadGames();
+    loadGroups();
   }, []);
 
   // debounce title
@@ -321,15 +450,42 @@ export default function AddIdeaRelaxedPage() {
       return;
     }
 
-    const newId = data?.id as number;
-    await loadGames(newId);
-
+    setGameId(data?.id as number);
     setShowCreateGame(false);
     setSavingGame(false);
+    await loadGames();
     setMessage({ kind: "ok", text: "Game created ✔" });
   }
 
-  // Optional: add footage entry only if file_path exists
+  async function createGroupInline(name: string) {
+    const n = name.trim();
+    if (!n) return;
+
+    setMessage(null);
+
+    const { data, error } = await supabase
+      .from("idea_groups")
+      .insert({ name: n })
+      .select("id,name,description")
+      .single();
+
+    if (error) {
+      setMessage({ kind: "err", text: error.message });
+      return;
+    }
+
+    const newId = data?.id as number;
+    await loadGroups();
+    setSelectedGroupIds((prev) => (prev.includes(newId) ? prev : [newId, ...prev]));
+    setMessage({ kind: "ok", text: "Group created ✔" });
+  }
+
+  function toggleGroup(id: number) {
+    setSelectedGroupIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }
+
   function addStagedFootage() {
     if (!fp.trim()) {
       setMessage({ kind: "err", text: "Footage link/path is required to add an entry." });
@@ -359,7 +515,6 @@ export default function AddIdeaRelaxedPage() {
     setStagedFootage((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  // Optional: add source entry only if url exists
   function addStagedSource() {
     if (!srcUrl.trim()) {
       setMessage({ kind: "err", text: "Source URL is required to add an entry." });
@@ -382,12 +537,7 @@ export default function AddIdeaRelaxedPage() {
   }
 
   const canSaveIdea = useMemo(() => {
-    return (
-      Boolean(gameId) &&
-      title.trim().length > 0 &&
-      description.trim().length > 0 &&
-      !savingIdea
-    );
+    return Boolean(gameId) && title.trim().length > 0 && description.trim().length > 0 && !savingIdea;
   }, [gameId, title, description, savingIdea]);
 
   async function saveIdea(e: React.FormEvent) {
@@ -409,6 +559,7 @@ export default function AddIdeaRelaxedPage() {
     setSavingIdea(true);
     setMessage(null);
 
+    // 1) insert detail
     const { data: inserted, error: e1 } = await supabase
       .from("details")
       .insert({
@@ -432,7 +583,23 @@ export default function AddIdeaRelaxedPage() {
 
     const detailId = inserted.id as number;
 
-    // Insert optional footage
+    // 2) optional: group items
+    if (selectedGroupIds.length > 0) {
+      const payload = selectedGroupIds.map((gid) => ({
+        group_id: gid,
+        detail_id: detailId,
+        position: 0,
+      }));
+
+      const { error: eG } = await supabase.from("idea_group_items").insert(payload);
+      if (eG) {
+        setMessage({ kind: "err", text: `Idea saved, but group linking failed: ${eG.message}` });
+        setSavingIdea(false);
+        return;
+      }
+    }
+
+    // 3) optional: footage
     if (stagedFootage.length > 0) {
       const payload = stagedFootage.map((f) => ({
         detail_id: detailId,
@@ -450,7 +617,7 @@ export default function AddIdeaRelaxedPage() {
       }
     }
 
-    // Insert optional sources
+    // 4) optional: sources
     if (stagedSources.length > 0) {
       const payload = stagedSources.map((s) => ({
         detail_id: detailId,
@@ -475,6 +642,7 @@ export default function AddIdeaRelaxedPage() {
     setPriority(3);
     setSpoiler(0);
     setConfidence(3);
+    setSelectedGroupIds([]);
     setStagedFootage([]);
     setStagedSources([]);
     setSimilar([]);
@@ -488,7 +656,7 @@ export default function AddIdeaRelaxedPage() {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Add Idea</h1>
             <p className="mt-1 text-sm text-slate-600">
-              Core fields required. Footage and sources are optional.
+              Groups let you build video topics. One idea can be in multiple groups.
             </p>
           </div>
 
@@ -527,46 +695,35 @@ export default function AddIdeaRelaxedPage() {
               <div className="mt-3 grid gap-3">
                 <label className="grid gap-1">
                   <span className="text-sm font-medium text-slate-800">Title *</span>
-                  <input
-                    className={inputClass}
-                    value={newGameTitle}
-                    onChange={(e) => setNewGameTitle(e.target.value)}
-                  />
+                  <input className={inputClass} value={newGameTitle} onChange={(e) => setNewGameTitle(e.target.value)} />
                 </label>
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="grid gap-1">
                     <span className="text-sm font-medium text-slate-800">Release year</span>
-                    <input
-                      className={inputClass}
-                      value={newGameYear}
-                      onChange={(e) => setNewGameYear(e.target.value)}
-                      placeholder="2022"
-                    />
+                    <input className={inputClass} value={newGameYear} onChange={(e) => setNewGameYear(e.target.value)} placeholder="2022" />
                   </label>
 
                   <label className="grid gap-1">
                     <span className="text-sm font-medium text-slate-800">Genres</span>
-                    <input
-                      className={inputClass}
-                      value={newGameGenres}
-                      onChange={(e) => setNewGameGenres(e.target.value)}
-                      placeholder="action, adventure"
-                    />
+                    <input className={inputClass} value={newGameGenres} onChange={(e) => setNewGameGenres(e.target.value)} placeholder="action, adventure" />
                   </label>
                 </div>
 
-                <button
-                  type="button"
-                  className={buttonClass}
-                  disabled={savingGame}
-                  onClick={createGameInline}
-                >
+                <button type="button" className={buttonClass} disabled={savingGame} onClick={createGameInline}>
                   {savingGame ? "Saving..." : "Create game"}
                 </button>
               </div>
             </div>
           )}
+
+          {/* Groups */}
+          <GroupPicker
+            groups={groups}
+            selectedIds={selectedGroupIds}
+            onToggle={toggleGroup}
+            onCreateGroup={createGroupInline}
+          />
 
           {/* Title */}
           <label className="grid gap-1">
@@ -671,31 +828,26 @@ export default function AddIdeaRelaxedPage() {
           {/* Footage optional */}
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="text-base font-semibold text-slate-900">Footage (optional)</div>
-
             <div className="mt-3 grid gap-3">
               <label className="grid gap-1">
                 <span className="text-sm font-medium text-slate-800">Link or file path</span>
                 <input className={inputClass} value={fp} onChange={(e) => setFp(e.target.value)} />
               </label>
-
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="grid gap-1">
                   <span className="text-sm font-medium text-slate-800">Start</span>
                   <input className={inputClass} value={startTs} onChange={(e) => setStartTs(e.target.value)} placeholder="00:01:23" />
                 </label>
-
                 <label className="grid gap-1">
                   <span className="text-sm font-medium text-slate-800">End</span>
                   <input className={inputClass} value={endTs} onChange={(e) => setEndTs(e.target.value)} placeholder="00:01:40" />
                 </label>
               </div>
-
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="grid gap-1">
                   <span className="text-sm font-medium text-slate-800">Label</span>
                   <input className={inputClass} value={fLabel} onChange={(e) => setFLabel(e.target.value)} />
                 </label>
-
                 <label className="grid gap-1">
                   <span className="text-sm font-medium text-slate-800">Notes</span>
                   <input className={inputClass} value={fNotes} onChange={(e) => setFNotes(e.target.value)} />
@@ -733,18 +885,15 @@ export default function AddIdeaRelaxedPage() {
           {/* Sources optional */}
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="text-base font-semibold text-slate-900">Sources (optional)</div>
-
             <div className="mt-3 grid gap-3">
               <label className="grid gap-1">
                 <span className="text-sm font-medium text-slate-800">URL</span>
                 <input className={inputClass} value={srcUrl} onChange={(e) => setSrcUrl(e.target.value)} placeholder="https://..." />
               </label>
-
               <label className="grid gap-1">
                 <span className="text-sm font-medium text-slate-800">Note</span>
-                <input className={inputClass} value={srcNote} onChange={(e) => setSrcNote(e.target.value)} placeholder="What does it prove?" />
+                <input className={inputClass} value={srcNote} onChange={(e) => setSrcNote(e.target.value)} />
               </label>
-
               <label className="grid gap-1">
                 <span className="text-sm font-medium text-slate-800">Reliability</span>
                 <select className={selectClass} value={srcReliability} onChange={(e) => setSrcReliability(Number(e.target.value))}>
