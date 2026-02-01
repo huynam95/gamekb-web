@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 
+/* ================= TYPES ================= */
+
 type Detail = {
   id: number;
   title: string;
@@ -46,14 +48,20 @@ type SourceRow = {
   created_at: string | null;
 };
 
+/* ================= UI CLASSES ================= */
+
 const inputClass =
   "h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400";
 const selectClass =
   "h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400";
+const textareaClass =
+  "min-h-[120px] w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400";
 const buttonClass =
   "h-10 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 disabled:opacity-50";
 const ghostButtonClass =
   "h-10 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-100";
+
+/* ================= HELPERS ================= */
 
 function typeLabel(t: string) {
   switch (t) {
@@ -95,6 +103,8 @@ function confidenceLabel(c: number | null) {
   return "5 – Verified";
 }
 
+/* ================= PAGE ================= */
+
 export default function IdeaDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -114,7 +124,18 @@ export default function IdeaDetailPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  // Footage form
+  /* -------- Core edit -------- */
+  const [editingCore, setEditingCore] = useState(false);
+  const [savingCore, setSavingCore] = useState(false);
+
+  const [draftTitle, setDraftTitle] = useState("");
+  const [draftDesc, setDraftDesc] = useState("");
+  const [draftType, setDraftType] = useState("small_detail");
+  const [draftPriority, setDraftPriority] = useState(3);
+  const [draftSpoiler, setDraftSpoiler] = useState(0);
+  const [draftConfidence, setDraftConfidence] = useState(3);
+
+  /* -------- Add footage form -------- */
   const [fp, setFp] = useState("");
   const [startTs, setStartTs] = useState("");
   const [endTs, setEndTs] = useState("");
@@ -122,11 +143,30 @@ export default function IdeaDetailPage() {
   const [fNotes, setFNotes] = useState("");
   const [savingFootage, setSavingFootage] = useState(false);
 
-  // Source form
+  /* -------- Add source form -------- */
   const [srcUrl, setSrcUrl] = useState("");
   const [srcNote, setSrcNote] = useState("");
   const [srcReliability, setSrcReliability] = useState(3);
   const [savingSource, setSavingSource] = useState(false);
+
+  /* -------- Row editing (footage/sources) -------- */
+  const [editingFootageId, setEditingFootageId] = useState<number | null>(null);
+  const [savingFootageEdit, setSavingFootageEdit] = useState(false);
+  const [fEdit, setFEdit] = useState<{
+    file_path: string;
+    start_ts: string;
+    end_ts: string;
+    label: string;
+    notes: string;
+  }>({ file_path: "", start_ts: "", end_ts: "", label: "", notes: "" });
+
+  const [editingSourceId, setEditingSourceId] = useState<number | null>(null);
+  const [savingSourceEdit, setSavingSourceEdit] = useState(false);
+  const [sEdit, setSEdit] = useState<{ url: string; note: string; reliability: number }>({
+    url: "",
+    note: "",
+    reliability: 3,
+  });
 
   async function loadAll() {
     setLoading(true);
@@ -154,6 +194,14 @@ export default function IdeaDetailPage() {
 
     const detailRow = d as Detail;
     setDetail(detailRow);
+
+    // sync core drafts
+    setDraftTitle(detailRow.title);
+    setDraftDesc(detailRow.description ?? "");
+    setDraftType(detailRow.detail_type);
+    setDraftPriority(detailRow.priority);
+    setDraftSpoiler(detailRow.spoiler_level ?? 0);
+    setDraftConfidence(detailRow.confidence ?? 3);
 
     const { data: g, error: e2 } = await supabase
       .from("games")
@@ -202,11 +250,12 @@ export default function IdeaDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  /* ================= Core actions ================= */
+
   async function togglePinHere() {
     if (!detail) return;
 
     const newPinned = !detail.pinned;
-
     setErr(null);
 
     const { error } = await supabase
@@ -248,10 +297,63 @@ export default function IdeaDetailPage() {
     router.refresh();
   }
 
+  async function saveCore() {
+    if (!detail) return;
+
+    if (!draftTitle.trim()) {
+      setErr("Title cannot be empty.");
+      return;
+    }
+    if (!draftDesc.trim()) {
+      setErr("Description cannot be empty.");
+      return;
+    }
+
+    setSavingCore(true);
+    setErr(null);
+
+    const { error } = await supabase
+      .from("details")
+      .update({
+        title: draftTitle.trim(),
+        description: draftDesc.trim(),
+        detail_type: draftType,
+        priority: draftPriority,
+        spoiler_level: draftSpoiler,
+        confidence: draftConfidence,
+      })
+      .eq("id", detail.id);
+
+    setSavingCore(false);
+
+    if (error) {
+      setErr(error.message);
+      return;
+    }
+
+    setEditingCore(false);
+    await loadAll();
+  }
+
+  function cancelCore() {
+    if (!detail) return;
+    setEditingCore(false);
+    setDraftTitle(detail.title);
+    setDraftDesc(detail.description ?? "");
+    setDraftType(detail.detail_type);
+    setDraftPriority(detail.priority);
+    setDraftSpoiler(detail.spoiler_level ?? 0);
+    setDraftConfidence(detail.confidence ?? 3);
+  }
+
+  /* ================= Footage actions ================= */
+
   async function addFootage() {
     if (!detail) return;
-    if (!fp.trim()) {
-      setErr("Footage link/path is required.");
+
+    // enforce "full info" mindset
+    if (!fp.trim() || !startTs.trim() || !endTs.trim() || !fLabel.trim() || !fNotes.trim()) {
+      setErr("Footage requires: link/path, start, end, label, notes.");
       return;
     }
 
@@ -261,10 +363,10 @@ export default function IdeaDetailPage() {
     const { error } = await supabase.from("footage").insert({
       detail_id: detail.id,
       file_path: fp.trim(),
-      start_ts: startTs.trim() || null,
-      end_ts: endTs.trim() || null,
-      label: fLabel.trim() || null,
-      notes: fNotes.trim() || null,
+      start_ts: startTs.trim(),
+      end_ts: endTs.trim(),
+      label: fLabel.trim(),
+      notes: fNotes.trim(),
     });
 
     setSavingFootage(false);
@@ -279,6 +381,7 @@ export default function IdeaDetailPage() {
     setEndTs("");
     setFLabel("");
     setFNotes("");
+
     await loadAll();
   }
 
@@ -294,10 +397,62 @@ export default function IdeaDetailPage() {
     await loadAll();
   }
 
+  function startEditFootage(row: FootageRow) {
+    setEditingFootageId(row.id);
+    setFEdit({
+      file_path: row.file_path ?? "",
+      start_ts: row.start_ts ?? "",
+      end_ts: row.end_ts ?? "",
+      label: row.label ?? "",
+      notes: row.notes ?? "",
+    });
+  }
+
+  function cancelEditFootage() {
+    setEditingFootageId(null);
+    setFEdit({ file_path: "", start_ts: "", end_ts: "", label: "", notes: "" });
+  }
+
+  async function saveEditFootage() {
+    if (!editingFootageId) return;
+
+    if (!fEdit.file_path.trim() || !fEdit.start_ts.trim() || !fEdit.end_ts.trim() || !fEdit.label.trim() || !fEdit.notes.trim()) {
+      setErr("Footage requires: link/path, start, end, label, notes.");
+      return;
+    }
+
+    setSavingFootageEdit(true);
+    setErr(null);
+
+    const { error } = await supabase
+      .from("footage")
+      .update({
+        file_path: fEdit.file_path.trim(),
+        start_ts: fEdit.start_ts.trim(),
+        end_ts: fEdit.end_ts.trim(),
+        label: fEdit.label.trim(),
+        notes: fEdit.notes.trim(),
+      })
+      .eq("id", editingFootageId);
+
+    setSavingFootageEdit(false);
+
+    if (error) {
+      setErr(error.message);
+      return;
+    }
+
+    setEditingFootageId(null);
+    await loadAll();
+  }
+
+  /* ================= Source actions ================= */
+
   async function addSource() {
     if (!detail) return;
-    if (!srcUrl.trim()) {
-      setErr("Source URL is required.");
+
+    if (!srcUrl.trim() || !srcNote.trim()) {
+      setErr("Source requires: URL and note.");
       return;
     }
 
@@ -307,7 +462,7 @@ export default function IdeaDetailPage() {
     const { error } = await supabase.from("sources").insert({
       detail_id: detail.id,
       url: srcUrl.trim(),
-      note: srcNote.trim() || null,
+      note: srcNote.trim(),
       reliability: srcReliability,
     });
 
@@ -335,6 +490,53 @@ export default function IdeaDetailPage() {
     }
     await loadAll();
   }
+
+  function startEditSource(row: SourceRow) {
+    setEditingSourceId(row.id);
+    setSEdit({
+      url: row.url ?? "",
+      note: row.note ?? "",
+      reliability: row.reliability ?? 3,
+    });
+  }
+
+  function cancelEditSource() {
+    setEditingSourceId(null);
+    setSEdit({ url: "", note: "", reliability: 3 });
+  }
+
+  async function saveEditSource() {
+    if (!editingSourceId) return;
+
+    if (!sEdit.url.trim() || !sEdit.note.trim()) {
+      setErr("Source requires: URL and note.");
+      return;
+    }
+
+    setSavingSourceEdit(true);
+    setErr(null);
+
+    const { error } = await supabase
+      .from("sources")
+      .update({
+        url: sEdit.url.trim(),
+        note: sEdit.note.trim(),
+        reliability: sEdit.reliability,
+      })
+      .eq("id", editingSourceId);
+
+    setSavingSourceEdit(false);
+
+    if (error) {
+      setErr(error.message);
+      return;
+    }
+
+    setEditingSourceId(null);
+    await loadAll();
+  }
+
+  /* ================= RENDER ================= */
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -386,14 +588,47 @@ export default function IdeaDetailPage() {
             <p className="text-sm text-slate-600">Not found.</p>
           ) : (
             <>
-              {/* Header */}
-              <h1 className="text-2xl font-bold text-slate-900">{detail.title}</h1>
+              {/* CORE HEADER */}
+              <div className="flex items-start justify-between gap-3">
+                {editingCore ? (
+                  <input
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-2xl font-bold text-slate-900 outline-none focus:border-slate-400"
+                    value={draftTitle}
+                    onChange={(e) => setDraftTitle(e.target.value)}
+                  />
+                ) : (
+                  <h1 className="text-2xl font-bold text-slate-900">{detail.title}</h1>
+                )}
 
+                {!editingCore ? (
+                  <button
+                    type="button"
+                    className={ghostButtonClass}
+                    onClick={() => setEditingCore(true)}
+                  >
+                    Edit
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className={buttonClass}
+                      onClick={saveCore}
+                      disabled={savingCore}
+                    >
+                      {savingCore ? "Saving…" : "Save"}
+                    </button>
+                    <button type="button" className={ghostButtonClass} onClick={cancelCore}>
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* META */}
               <div className="mt-3 flex flex-wrap gap-2 text-sm">
                 <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-800">
-                  {game
-                    ? `${game.title}${game.release_year ? ` (${game.release_year})` : ""}`
-                    : "Game"}
+                  {game ? `${game.title}${game.release_year ? ` (${game.release_year})` : ""}` : "Game"}
                 </span>
 
                 <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-slate-800">
@@ -413,128 +648,232 @@ export default function IdeaDetailPage() {
                 </span>
               </div>
 
-              {/* Description */}
-              <div className="mt-5">
-                <div className="text-sm font-semibold text-slate-800">Description</div>
-                <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">
-                  {detail.description?.trim() ? detail.description : "No description yet."}
-                </p>
+              {/* CORE EDIT FIELDS */}
+              <div className="mt-5 grid gap-4">
+                <div>
+                  <div className="text-sm font-semibold text-slate-800">Description</div>
+                  {editingCore ? (
+                    <textarea
+                      className={textareaClass}
+                      value={draftDesc}
+                      onChange={(e) => setDraftDesc(e.target.value)}
+                      placeholder="Write the full description…"
+                    />
+                  ) : (
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">
+                      {detail.description?.trim() ? detail.description : "No description yet."}
+                    </p>
+                  )}
+                </div>
+
+                {editingCore && (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="grid gap-1">
+                      <span className="text-sm font-medium text-slate-800">Type</span>
+                      <select
+                        className={selectClass}
+                        value={draftType}
+                        onChange={(e) => setDraftType(e.target.value)}
+                      >
+                        <option value="small_detail">Small detail</option>
+                        <option value="easter_egg">Easter egg</option>
+                        <option value="npc_reaction">NPC reaction</option>
+                        <option value="physics">Physics</option>
+                        <option value="troll">Troll</option>
+                        <option value="punish">Punish</option>
+                      </select>
+                    </label>
+
+                    <label className="grid gap-1">
+                      <span className="text-sm font-medium text-slate-800">Priority</span>
+                      <select
+                        className={selectClass}
+                        value={draftPriority}
+                        onChange={(e) => setDraftPriority(Number(e.target.value))}
+                      >
+                        <option value={1}>High</option>
+                        <option value={3}>Normal</option>
+                        <option value={5}>Low</option>
+                      </select>
+                    </label>
+
+                    <label className="grid gap-1">
+                      <span className="text-sm font-medium text-slate-800">Spoiler</span>
+                      <select
+                        className={selectClass}
+                        value={draftSpoiler}
+                        onChange={(e) => setDraftSpoiler(Number(e.target.value))}
+                      >
+                        <option value={0}>0 – None</option>
+                        <option value={1}>1 – Mild</option>
+                        <option value={2}>2 – Story</option>
+                        <option value={3}>3 – Ending</option>
+                      </select>
+                    </label>
+
+                    <label className="grid gap-1">
+                      <span className="text-sm font-medium text-slate-800">Confidence</span>
+                      <select
+                        className={selectClass}
+                        value={draftConfidence}
+                        onChange={(e) => setDraftConfidence(Number(e.target.value))}
+                      >
+                        <option value={1}>1 – Low</option>
+                        <option value={2}>2</option>
+                        <option value={3}>3 – Medium</option>
+                        <option value={4}>4</option>
+                        <option value={5}>5 – Verified</option>
+                      </select>
+                    </label>
+                  </div>
+                )}
               </div>
 
               {/* FOOTAGE */}
-              <div className="mt-7">
+              <div className="mt-8">
                 <div className="text-base font-semibold text-slate-900">Footage</div>
                 <p className="mt-1 text-sm text-slate-600">
-                  Add multiple clips/links. Use timestamps like 00:01:23.
+                  Add, edit, or delete footage entries.
                 </p>
 
+                {/* Add footage */}
                 <div className="mt-3 grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <label className="grid gap-1">
                     <span className="text-sm font-medium text-slate-800">Link or file path</span>
-                    <input
-                      className={inputClass}
-                      value={fp}
-                      onChange={(e) => setFp(e.target.value)}
-                      placeholder="https://drive... or D:\captures\gow.mp4"
-                    />
+                    <input className={inputClass} value={fp} onChange={(e) => setFp(e.target.value)} />
                   </label>
 
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="grid gap-1">
                       <span className="text-sm font-medium text-slate-800">Start</span>
-                      <input
-                        className={inputClass}
-                        value={startTs}
-                        onChange={(e) => setStartTs(e.target.value)}
-                        placeholder="00:01:23"
-                      />
+                      <input className={inputClass} value={startTs} onChange={(e) => setStartTs(e.target.value)} placeholder="00:01:23" />
                     </label>
 
                     <label className="grid gap-1">
                       <span className="text-sm font-medium text-slate-800">End</span>
-                      <input
-                        className={inputClass}
-                        value={endTs}
-                        onChange={(e) => setEndTs(e.target.value)}
-                        placeholder="00:01:40"
-                      />
+                      <input className={inputClass} value={endTs} onChange={(e) => setEndTs(e.target.value)} placeholder="00:01:40" />
                     </label>
                   </div>
 
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="grid gap-1">
                       <span className="text-sm font-medium text-slate-800">Label</span>
-                      <input
-                        className={inputClass}
-                        value={fLabel}
-                        onChange={(e) => setFLabel(e.target.value)}
-                        placeholder="thumbnail / best take / alt angle"
-                      />
+                      <input className={inputClass} value={fLabel} onChange={(e) => setFLabel(e.target.value)} placeholder="thumbnail / best take" />
                     </label>
 
                     <label className="grid gap-1">
                       <span className="text-sm font-medium text-slate-800">Notes</span>
-                      <input
-                        className={inputClass}
-                        value={fNotes}
-                        onChange={(e) => setFNotes(e.target.value)}
-                        placeholder="mission, conditions, save slot…"
-                      />
+                      <input className={inputClass} value={fNotes} onChange={(e) => setFNotes(e.target.value)} placeholder="mission, setup, conditions..." />
                     </label>
                   </div>
 
-                  <button
-                    type="button"
-                    className={buttonClass}
-                    onClick={addFootage}
-                    disabled={savingFootage}
-                  >
+                  <button type="button" className={buttonClass} onClick={addFootage} disabled={savingFootage}>
                     {savingFootage ? "Saving…" : "Add footage"}
                   </button>
                 </div>
 
+                {/* Footage list */}
                 <div className="mt-4">
                   {footage.length === 0 ? (
                     <p className="text-sm text-slate-600">No footage yet.</p>
                   ) : (
                     <ul className="space-y-2">
                       {footage.map((f) => (
-                        <li
-                          key={f.id}
-                          className="rounded-2xl border border-slate-200 bg-white p-4"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="break-words text-sm font-medium text-slate-900">
-                                {f.file_path}
+                        <li key={f.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                          {editingFootageId === f.id ? (
+                            <>
+                              <div className="grid gap-3">
+                                <label className="grid gap-1">
+                                  <span className="text-sm font-medium text-slate-800">Link/path</span>
+                                  <input
+                                    className={inputClass}
+                                    value={fEdit.file_path}
+                                    onChange={(e) => setFEdit((p) => ({ ...p, file_path: e.target.value }))}
+                                  />
+                                </label>
+
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                  <label className="grid gap-1">
+                                    <span className="text-sm font-medium text-slate-800">Start</span>
+                                    <input
+                                      className={inputClass}
+                                      value={fEdit.start_ts}
+                                      onChange={(e) => setFEdit((p) => ({ ...p, start_ts: e.target.value }))}
+                                    />
+                                  </label>
+                                  <label className="grid gap-1">
+                                    <span className="text-sm font-medium text-slate-800">End</span>
+                                    <input
+                                      className={inputClass}
+                                      value={fEdit.end_ts}
+                                      onChange={(e) => setFEdit((p) => ({ ...p, end_ts: e.target.value }))}
+                                    />
+                                  </label>
+                                </div>
+
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                  <label className="grid gap-1">
+                                    <span className="text-sm font-medium text-slate-800">Label</span>
+                                    <input
+                                      className={inputClass}
+                                      value={fEdit.label}
+                                      onChange={(e) => setFEdit((p) => ({ ...p, label: e.target.value }))}
+                                    />
+                                  </label>
+                                  <label className="grid gap-1">
+                                    <span className="text-sm font-medium text-slate-800">Notes</span>
+                                    <input
+                                      className={inputClass}
+                                      value={fEdit.notes}
+                                      onChange={(e) => setFEdit((p) => ({ ...p, notes: e.target.value }))}
+                                    />
+                                  </label>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    className={buttonClass}
+                                    onClick={saveEditFootage}
+                                    disabled={savingFootageEdit}
+                                  >
+                                    {savingFootageEdit ? "Saving…" : "Save"}
+                                  </button>
+                                  <button type="button" className={ghostButtonClass} onClick={cancelEditFootage}>
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="break-words text-sm font-medium text-slate-900">{f.file_path}</div>
+                                <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-700">
+                                  {(f.start_ts || f.end_ts) && (
+                                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">
+                                      {f.start_ts ?? "—"} → {f.end_ts ?? "—"}
+                                    </span>
+                                  )}
+                                  {f.label && (
+                                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">
+                                      {f.label}
+                                    </span>
+                                  )}
+                                </div>
+                                {f.notes && <div className="mt-2 text-sm text-slate-700">{f.notes}</div>}
                               </div>
 
-                              <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-700">
-                                {(f.start_ts || f.end_ts) && (
-                                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">
-                                    {f.start_ts ?? "—"} → {f.end_ts ?? "—"}
-                                  </span>
-                                )}
-                                {f.label && (
-                                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">
-                                    {f.label}
-                                  </span>
-                                )}
+                              <div className="flex items-center gap-2">
+                                <button type="button" className={ghostButtonClass} onClick={() => startEditFootage(f)}>
+                                  Edit
+                                </button>
+                                <button type="button" className={ghostButtonClass} onClick={() => deleteFootage(f.id)}>
+                                  Delete
+                                </button>
                               </div>
-
-                              {f.notes && (
-                                <div className="mt-2 text-sm text-slate-700">{f.notes}</div>
-                              )}
                             </div>
-
-                            <button
-                              type="button"
-                              className={ghostButtonClass}
-                              onClick={() => deleteFootage(f.id)}
-                            >
-                              Delete
-                            </button>
-                          </div>
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -543,31 +882,22 @@ export default function IdeaDetailPage() {
               </div>
 
               {/* SOURCES */}
-              <div className="mt-8">
+              <div className="mt-10">
                 <div className="text-base font-semibold text-slate-900">Sources</div>
                 <p className="mt-1 text-sm text-slate-600">
-                  Reference links to verify the idea.
+                  Add, edit, or delete reference links.
                 </p>
 
+                {/* Add source */}
                 <div className="mt-3 grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                   <label className="grid gap-1">
                     <span className="text-sm font-medium text-slate-800">URL</span>
-                    <input
-                      className={inputClass}
-                      value={srcUrl}
-                      onChange={(e) => setSrcUrl(e.target.value)}
-                      placeholder="https://..."
-                    />
+                    <input className={inputClass} value={srcUrl} onChange={(e) => setSrcUrl(e.target.value)} placeholder="https://..." />
                   </label>
 
                   <label className="grid gap-1">
                     <span className="text-sm font-medium text-slate-800">Note</span>
-                    <input
-                      className={inputClass}
-                      value={srcNote}
-                      onChange={(e) => setSrcNote(e.target.value)}
-                      placeholder="What does this source prove?"
-                    />
+                    <input className={inputClass} value={srcNote} onChange={(e) => setSrcNote(e.target.value)} placeholder="What does it prove?" />
                   </label>
 
                   <label className="grid gap-1">
@@ -585,51 +915,90 @@ export default function IdeaDetailPage() {
                     </select>
                   </label>
 
-                  <button
-                    type="button"
-                    className={buttonClass}
-                    onClick={addSource}
-                    disabled={savingSource}
-                  >
+                  <button type="button" className={buttonClass} onClick={addSource} disabled={savingSource}>
                     {savingSource ? "Saving…" : "Add source"}
                   </button>
                 </div>
 
+                {/* Source list */}
                 <div className="mt-4">
                   {sources.length === 0 ? (
                     <p className="text-sm text-slate-600">No sources yet.</p>
                   ) : (
                     <ul className="space-y-2">
                       {sources.map((s) => (
-                        <li
-                          key={s.id}
-                          className="rounded-2xl border border-slate-200 bg-white p-4"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="break-words text-sm font-medium text-slate-900">
-                                {s.url}
-                              </div>
+                        <li key={s.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                          {editingSourceId === s.id ? (
+                            <div className="grid gap-3">
+                              <label className="grid gap-1">
+                                <span className="text-sm font-medium text-slate-800">URL</span>
+                                <input
+                                  className={inputClass}
+                                  value={sEdit.url}
+                                  onChange={(e) => setSEdit((p) => ({ ...p, url: e.target.value }))}
+                                />
+                              </label>
 
-                              <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-700">
-                                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">
-                                  Reliability: {s.reliability}
-                                </span>
-                              </div>
+                              <label className="grid gap-1">
+                                <span className="text-sm font-medium text-slate-800">Note</span>
+                                <input
+                                  className={inputClass}
+                                  value={sEdit.note}
+                                  onChange={(e) => setSEdit((p) => ({ ...p, note: e.target.value }))}
+                                />
+                              </label>
 
-                              {s.note && (
-                                <div className="mt-2 text-sm text-slate-700">{s.note}</div>
-                              )}
+                              <label className="grid gap-1">
+                                <span className="text-sm font-medium text-slate-800">Reliability</span>
+                                <select
+                                  className={selectClass}
+                                  value={sEdit.reliability}
+                                  onChange={(e) => setSEdit((p) => ({ ...p, reliability: Number(e.target.value) }))}
+                                >
+                                  <option value={1}>1 – Low</option>
+                                  <option value={2}>2</option>
+                                  <option value={3}>3 – Medium</option>
+                                  <option value={4}>4</option>
+                                  <option value={5}>5 – Verified</option>
+                                </select>
+                              </label>
+
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  className={buttonClass}
+                                  onClick={saveEditSource}
+                                  disabled={savingSourceEdit}
+                                >
+                                  {savingSourceEdit ? "Saving…" : "Save"}
+                                </button>
+                                <button type="button" className={ghostButtonClass} onClick={cancelEditSource}>
+                                  Cancel
+                                </button>
+                              </div>
                             </div>
+                          ) : (
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="break-words text-sm font-medium text-slate-900">{s.url}</div>
+                                <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-700">
+                                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">
+                                    Reliability: {s.reliability}
+                                  </span>
+                                </div>
+                                {s.note && <div className="mt-2 text-sm text-slate-700">{s.note}</div>}
+                              </div>
 
-                            <button
-                              type="button"
-                              className={ghostButtonClass}
-                              onClick={() => deleteSource(s.id)}
-                            >
-                              Delete
-                            </button>
-                          </div>
+                              <div className="flex items-center gap-2">
+                                <button type="button" className={ghostButtonClass} onClick={() => startEditSource(s)}>
+                                  Edit
+                                </button>
+                                <button type="button" className={ghostButtonClass} onClick={() => deleteSource(s.id)}>
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </li>
                       ))}
                     </ul>
