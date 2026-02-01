@@ -6,6 +6,8 @@ import { supabase } from "@/lib/supabaseClient";
 type Game = { id: number; title: string };
 type Group = { id: number; name: string };
 
+type GroupCountRow = { group_id: number; cnt: number };
+
 type DetailRow = {
   id: number;
   title: string;
@@ -194,6 +196,7 @@ function ComboBox({
 export default function Home() {
   const [games, setGames] = useState<Game[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [groupCounts, setGroupCounts] = useState<Map<number, number>>(new Map());
   const [err, setErr] = useState<string | null>(null);
 
   // default view
@@ -242,11 +245,17 @@ export default function Home() {
         setGames((data ?? []) as Game[]);
       });
 
-    loadGroups();
+    refreshGroups();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function loadGroups() {
+  const gameMap = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const g of games) m.set(g.id, g.title);
+    return m;
+  }, [games]);
+
+  async function refreshGroups() {
     const { data, error } = await supabase
       .from("idea_groups")
       .select("id,name")
@@ -256,14 +265,28 @@ export default function Home() {
       setErr(error.message);
       return;
     }
-    setGroups((data ?? []) as Group[]);
-  }
 
-  const gameMap = useMemo(() => {
-    const m = new Map<number, string>();
-    for (const g of games) m.set(g.id, g.title);
-    return m;
-  }, [games]);
+    const list = (data ?? []) as Group[];
+    setGroups(list);
+
+    // counts
+    const { data: items, error: e2 } = await supabase
+      .from("idea_group_items")
+      .select("group_id");
+
+    if (e2) {
+      setErr(e2.message);
+      setGroupCounts(new Map());
+      return;
+    }
+
+    const m = new Map<number, number>();
+    for (const row of items ?? []) {
+      const gid = Number((row as any).group_id);
+      m.set(gid, (m.get(gid) ?? 0) + 1);
+    }
+    setGroupCounts(m);
+  }
 
   async function loadDefaultView() {
     setLoadingDefault(true);
@@ -442,7 +465,25 @@ export default function Home() {
     setShowCreateGroup(false);
     setNewGroupName("");
     setNewGroupDesc("");
-    await loadGroups();
+    await refreshGroups();
+  }
+
+  async function deleteGroup(group: Group) {
+    const ok = confirm(
+      `Delete this group?\n\n"${group.name}"\n\nAll links between this group and ideas will also be deleted.`
+    );
+    if (!ok) return;
+
+    setErr(null);
+
+    const { error } = await supabase.from("idea_groups").delete().eq("id", group.id);
+    if (error) {
+      setErr(error.message);
+      return;
+    }
+
+    if (groupId === group.id) setGroupId("");
+    await refreshGroups();
   }
 
   function IdeaItem({ r }: { r: DetailRow }) {
@@ -510,7 +551,7 @@ export default function Home() {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Ideas</h1>
             <p className="text-sm text-slate-600">
-              Use Group filter to build video topic lists.
+              Groups are your video topics. Manage them here.
             </p>
           </div>
 
@@ -519,11 +560,7 @@ export default function Home() {
               {loadingRandom ? "🎲 Rolling…" : "🎲 Random 5"}
             </button>
 
-            <button
-              type="button"
-              onClick={() => setShowCreateGroup(true)}
-              className={ghostButtonClass}
-            >
+            <button type="button" onClick={() => setShowCreateGroup(true)} className={ghostButtonClass}>
               + Create group
             </button>
 
@@ -536,6 +573,48 @@ export default function Home() {
             </a>
           </div>
         </div>
+
+        {/* Group list */}
+        <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-base font-semibold text-slate-900">Groups</h2>
+            <span className="text-xs text-slate-500">{groups.length}</span>
+          </div>
+
+          {groups.length === 0 ? (
+            <p className="text-sm text-slate-600">No groups yet. Create one.</p>
+          ) : (
+            <div className="grid gap-2 md:grid-cols-2">
+              {groups.map((g) => (
+                <div
+                  key={g.id}
+                  className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"
+                >
+                  <button
+                    type="button"
+                    className="text-left"
+                    onClick={() => setGroupId(g.id)}
+                    title="Filter by this group"
+                  >
+                    <div className="font-semibold text-slate-900">{g.name}</div>
+                    <div className="text-xs text-slate-600">
+                      {groupCounts.get(g.id) ?? 0} idea(s)
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-900 hover:bg-rose-100"
+                    onClick={() => deleteGroup(g)}
+                    title="Delete group"
+                  >
+                    🗑
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
         {/* Create group panel */}
         {showCreateGroup && (
