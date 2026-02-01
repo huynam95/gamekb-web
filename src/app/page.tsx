@@ -16,6 +16,24 @@ type DetailRow = {
   pinned_at?: string | null;
 };
 
+const inputClass =
+  "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200";
+
+const selectClass =
+  "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200";
+
+const btnBase =
+  "inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold whitespace-nowrap cursor-pointer transition active:scale-[0.99]";
+
+const btnPrimary =
+  btnBase + " bg-slate-900 text-white shadow-sm hover:bg-slate-800";
+
+const btnGhost =
+  btnBase + " border border-slate-200 bg-white text-slate-800 shadow-sm hover:bg-slate-100";
+
+const btnDanger =
+  btnBase + " border border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100";
+
 const pillClass =
   "inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-700";
 
@@ -47,21 +65,6 @@ function priorityLabel(p: number) {
   if (p === 3) return "Normal";
   return "Low";
 }
-
-const inputClass =
-  "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400";
-
-const selectClass =
-  "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400";
-
-const btnBase =
-  "inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold whitespace-nowrap";
-
-const btnPrimary =
-  btnBase + " bg-slate-900 text-white shadow-sm hover:bg-slate-800";
-
-const btnGhost =
-  btnBase + " border border-slate-200 bg-white text-slate-800 shadow-sm hover:bg-slate-100";
 
 function yyyyMmDdLocal(d: Date) {
   const y = d.getFullYear();
@@ -116,7 +119,7 @@ function ComboBox({
 
         <button
           type="button"
-          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-left text-sm text-slate-900 hover:bg-slate-50"
+          className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-left text-sm text-slate-900 hover:bg-slate-50 cursor-pointer"
           onClick={() => setOpen((v) => !v)}
         >
           {selected ? selected.name : allowAllLabel}
@@ -138,7 +141,7 @@ function ComboBox({
           <div className="max-h-64 overflow-auto p-2 pt-0">
             <button
               type="button"
-              className="mb-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-100"
+              className="mb-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-100 cursor-pointer"
               onClick={() => {
                 onChange("");
                 setOpen(false);
@@ -158,7 +161,7 @@ function ComboBox({
                   <li key={x.id}>
                     <button
                       type="button"
-                      className="w-full rounded-xl px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-100"
+                      className="w-full rounded-xl px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-100 cursor-pointer"
                       onClick={() => {
                         onChange(x.id);
                         setOpen(false);
@@ -185,6 +188,8 @@ function ComboBox({
 export default function Home() {
   const [games, setGames] = useState<Game[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [groupCounts, setGroupCounts] = useState<Map<number, number>>(new Map());
+
   const [err, setErr] = useState<string | null>(null);
 
   const [pinned, setPinned] = useState<DetailRow[]>([]);
@@ -197,15 +202,14 @@ export default function Home() {
   const [random5, setRandom5] = useState<DetailRow[]>([]);
   const [loadingRandom, setLoadingRandom] = useState(false);
 
-  // filters
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
+
   const [gameId, setGameId] = useState<number | "">("");
   const [groupId, setGroupId] = useState<number | "">("");
   const [type, setType] = useState<string | "">("");
   const [priority, setPriority] = useState<number | "">("");
 
-  // create group
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupDesc, setNewGroupDesc] = useState("");
@@ -220,6 +224,42 @@ export default function Home() {
     return !debouncedQ.trim() && !gameId && !groupId && !type && !priority;
   }, [debouncedQ, gameId, groupId, type, priority]);
 
+  const gameMap = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const g of games) m.set(g.id, g.title);
+    return m;
+  }, [games]);
+
+  async function refreshGroups() {
+    const { data, error } = await supabase
+      .from("idea_groups")
+      .select("id,name")
+      .order("name");
+
+    if (error) {
+      setErr(error.message);
+      return;
+    }
+    setGroups((data ?? []) as Group[]);
+
+    const { data: items, error: e2 } = await supabase
+      .from("idea_group_items")
+      .select("group_id");
+
+    if (e2) {
+      setErr(e2.message);
+      setGroupCounts(new Map());
+      return;
+    }
+
+    const m = new Map<number, number>();
+    for (const row of items ?? []) {
+      const gid = Number((row as any).group_id);
+      m.set(gid, (m.get(gid) ?? 0) + 1);
+    }
+    setGroupCounts(m);
+  }
+
   useEffect(() => {
     supabase
       .from("games")
@@ -230,21 +270,9 @@ export default function Home() {
         setGames((data ?? []) as Game[]);
       });
 
-    supabase
-      .from("idea_groups")
-      .select("id,name")
-      .order("name")
-      .then(({ data, error }) => {
-        if (error) setErr(error.message);
-        setGroups((data ?? []) as Group[]);
-      });
+    refreshGroups();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const gameMap = useMemo(() => {
-    const m = new Map<number, string>();
-    for (const g of games) m.set(g.id, g.title);
-    return m;
-  }, [games]);
 
   async function loadDefaultView() {
     setLoadingDefault(true);
@@ -290,6 +318,7 @@ export default function Home() {
     setErr(null);
 
     let groupDetailIds: number[] | null = null;
+
     if (groupId) {
       const { data: gi, error: eG } = await supabase
         .from("idea_group_items")
@@ -386,10 +415,25 @@ export default function Home() {
     setShowCreateGroup(false);
     setNewGroupName("");
     setNewGroupDesc("");
+    await refreshGroups();
+  }
 
-    // refresh groups
-    const { data } = await supabase.from("idea_groups").select("id,name").order("name");
-    setGroups((data ?? []) as Group[]);
+  async function deleteGroup(g: Group) {
+    const ok = confirm(
+      `Delete group "${g.name}"?\nThis will remove all links to ideas as well.`
+    );
+    if (!ok) return;
+
+    setErr(null);
+
+    const { error } = await supabase.from("idea_groups").delete().eq("id", g.id);
+    if (error) {
+      setErr(error.message);
+      return;
+    }
+
+    if (groupId === g.id) setGroupId("");
+    await refreshGroups();
   }
 
   function IdeaItem({ r }: { r: DetailRow }) {
@@ -397,7 +441,7 @@ export default function Home() {
       <li key={r.id}>
         <a
           href={`/idea/${r.id}`}
-          className="block rounded-xl border border-slate-200 bg-slate-50 p-3 hover:bg-slate-100"
+          className="block rounded-xl border border-slate-200 bg-white p-3 shadow-sm hover:bg-slate-50 hover:shadow transition cursor-pointer"
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -418,27 +462,23 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50">
+    <main className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50">
       <div className="mx-auto max-w-6xl px-4 py-8">
         {/* Header */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Ideas</h1>
+            <h1 className="text-2xl font-bold text-slate-900">GameKB</h1>
             <p className="text-sm text-slate-600">
-              Use Group filter to build video topic lists.
+              Ideas, groups, and daily picks for your next videos.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" onClick={getRandom5} className={btnGhost}>
-              🎲 Random 5
+              {loadingRandom ? "🎲 Rolling…" : "🎲 Random 5"}
             </button>
 
-            <button
-              type="button"
-              onClick={() => setShowCreateGroup(true)}
-              className={btnGhost}
-            >
+            <button type="button" onClick={() => setShowCreateGroup(true)} className={btnGhost}>
               + Create group
             </button>
 
@@ -482,7 +522,6 @@ export default function Home() {
 
         {/* Filters */}
         <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          {/* One clean grid, no random line breaks */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <label className="grid gap-1 sm:col-span-2">
               <span className="text-sm font-medium text-slate-800">Search</span>
@@ -549,7 +588,6 @@ export default function Home() {
                 : loading
                 ? "Loading…"
                 : `${ideas.length} result(s)`}
-              {loadingRandom ? " · rolling…" : ""}
             </div>
 
             <button
@@ -591,9 +629,9 @@ export default function Home() {
           </section>
         )}
 
-        {/* Content */}
+        {/* Default view: 3 boxes */}
         {isDefaultView ? (
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <div className="mt-4 grid gap-4 lg:grid-cols-3">
             <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="mb-2 flex items-center justify-between">
                 <h2 className="text-base font-semibold text-slate-900">⭐ Pinned</h2>
@@ -629,6 +667,53 @@ export default function Home() {
                     <IdeaItem key={r.id} r={r} />
                   ))}
                 </ul>
+              )}
+            </section>
+
+            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="mb-2 flex items-center justify-between">
+                <h2 className="text-base font-semibold text-slate-900">🧩 Groups</h2>
+                <span className="text-xs text-slate-500">{groups.length}</span>
+              </div>
+
+              {groups.length === 0 ? (
+                <p className="text-sm text-slate-500">No groups yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {groups.slice(0, 8).map((g) => (
+                    <div
+                      key={g.id}
+                      className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2"
+                    >
+                      <button
+                        type="button"
+                        className="text-left cursor-pointer"
+                        onClick={() => setGroupId(g.id)}
+                        title="Filter by this group"
+                      >
+                        <div className="font-semibold text-slate-900">{g.name}</div>
+                        <div className="text-xs text-slate-600">
+                          {(groupCounts.get(g.id) ?? 0) + " idea(s)"}
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        className={btnDanger}
+                        onClick={() => deleteGroup(g)}
+                        title="Delete group"
+                      >
+                        🗑
+                      </button>
+                    </div>
+                  ))}
+
+                  {groups.length > 8 && (
+                    <div className="text-xs text-slate-500">
+                      Showing 8 of {groups.length}. Use Group filter to find more.
+                    </div>
+                  )}
+                </div>
               )}
             </section>
           </div>
