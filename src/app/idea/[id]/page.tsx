@@ -28,10 +28,13 @@ type Game = {
   release_year: number | null;
 };
 
+// CẬP NHẬT: Thêm title và downloaded
 type FootageRow = {
   id: number;
   detail_id: number;
   file_path: string | null;
+  title: string | null;       // NEW
+  downloaded: boolean;        // NEW
   start_ts: string | null;
   end_ts: string | null;
   label: string | null;
@@ -77,6 +80,19 @@ const btnGhost =
 const cardClass = "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm";
 
 /* ================= HELPERS ================= */
+
+// Hàm lấy tên Youtube Video (Tái sử dụng)
+async function fetchYoutubeTitle(url: string): Promise<string | null> {
+  try {
+    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$/;
+    if (!youtubeRegex.test(url)) return null;
+    const res = await fetch(`https://noembed.com/embed?url=${url}`);
+    const data = await res.json();
+    return data.title || null;
+  } catch (e) {
+    return null;
+  }
+}
 
 function PriorityBadge({ p }: { p: number }) {
   if (p === 1) return <span className="inline-flex items-center rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700">High Priority</span>;
@@ -229,10 +245,7 @@ export default function IdeaDetailPage() {
   const [fp, setFp] = useState("");
   const [srcUrl, setSrcUrl] = useState("");
   const [savingItem, setSavingItem] = useState(false);
-
-  /* ------------------------------------------------------------------ */
-  /* TITLE & DATA LOADING LOGIC                     */
-  /* ------------------------------------------------------------------ */
+  const [fetchingTitle, setFetchingTitle] = useState(false); // New state
 
   // 1. Load Data
   async function loadGroups() {
@@ -289,23 +302,16 @@ export default function IdeaDetailPage() {
     setLoading(false);
   }
 
-  // Effect để gọi hàm load
   useEffect(() => { loadAll(); }, [id]);
 
-  // 2. CHANGE TAB TITLE (SỬA LỖI Ở ĐÂY)
+  // 2. Change Tab Title
   useEffect(() => {
     if (detail && detail.title) {
-      // Đổi title khi có dữ liệu
       document.title = `${detail.title} | GameKB`;
     } else {
-      // Title tạm thời khi đang loading
       document.title = "Loading Idea... | GameKB";
     }
-
-    // (Cleanup) Trả về mặc định khi thoát trang
-    return () => {
-      document.title = "GameKB";
-    };
+    return () => { document.title = "GameKB"; };
   }, [detail]);
 
   /* ------------------------------------------------------------------ */
@@ -343,13 +349,38 @@ export default function IdeaDetailPage() {
     }
   }
 
+  // CẬP NHẬT: Thêm Footage có tự động lấy Title
   async function addFootage() {
     if (!detail || !fp.trim()) return;
-    setSavingItem(true);
-    await supabase.from("footage").insert({ detail_id: detail.id, file_path: fp.trim() });
+    
+    setFetchingTitle(true);
+    const link = fp.trim();
+    const ytTitle = await fetchYoutubeTitle(link);
+
+    await supabase.from("footage").insert({ 
+      detail_id: detail.id, 
+      file_path: link,
+      title: ytTitle || null,
+      downloaded: false
+    });
+
     setFp("");
-    setSavingItem(false);
+    setFetchingTitle(false);
     await loadAll();
+  }
+
+  // CẬP NHẬT: Toggle Download Status
+  async function toggleDownloaded(fid: number, currentStatus: boolean) {
+    // Optimistic UI update (optional, but good UX)
+    setFootage(prev => prev.map(f => f.id === fid ? { ...f, downloaded: !currentStatus } : f));
+    
+    await supabase
+      .from("footage")
+      .update({ downloaded: !currentStatus })
+      .eq("id", fid);
+    
+    // Refresh to be sure
+    // await loadAll(); 
   }
 
   async function deleteFootage(fid: number) {
@@ -393,7 +424,6 @@ export default function IdeaDetailPage() {
     }
   }
 
-  // 3. CONDITIONAL RENDER (Phải đặt SAU tất cả useEffect)
   if (loading) return <div className="p-8 text-center text-slate-500">Loading details...</div>;
   if (!detail) return <div className="p-8 text-center text-slate-500">Idea not found.</div>;
 
@@ -483,30 +513,63 @@ export default function IdeaDetailPage() {
               <div className="mb-4 flex gap-2">
                 <input 
                   className={inputClass} 
-                  placeholder="Paste file path or link..." 
+                  placeholder="Paste YouTube link or path..." 
                   value={fp} 
                   onChange={e => setFp(e.target.value)}
+                  disabled={fetchingTitle}
                   onKeyDown={e => e.key === 'Enter' && addFootage()}
                 />
-                <button onClick={addFootage} disabled={savingItem} className={btnGhost}>+</button>
+                <button onClick={addFootage} disabled={fetchingTitle} className={btnGhost}>
+                  {fetchingTitle ? "..." : "+"}
+                </button>
               </div>
 
               {footage.length === 0 ? (
                 <p className="text-sm text-slate-400 italic">No footage added.</p>
               ) : (
-                <ul className="space-y-2">
+                <ul className="space-y-3">
                   {footage.map(f => (
-                    <li key={f.id} className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm">
-                      <div className="flex items-center gap-3 overflow-hidden">
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-500">
-                          ▶
-                        </span>
-                        <div className="min-w-0">
-                          <div className="truncate font-medium text-slate-900">{f.file_path}</div>
-                          {f.notes && <div className="truncate text-xs text-slate-500">{f.notes}</div>}
+                    <li key={f.id} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3 min-w-0">
+                          {/* Icon */}
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-500 text-xs">
+                            ▶
+                          </span>
+                          
+                          {/* Info */}
+                          <div className="min-w-0 pt-0.5">
+                            {f.title && (
+                              <div className="font-semibold text-sm text-slate-900 line-clamp-2 mb-1">
+                                {f.title}
+                              </div>
+                            )}
+                            <div className={`truncate text-xs font-mono ${f.title ? 'text-slate-500' : 'text-slate-900 font-medium'}`}>
+                              {f.file_path}
+                            </div>
+                            {f.notes && <div className="mt-1 text-xs text-slate-500 italic">{f.notes}</div>}
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex flex-col items-end gap-2">
+                           <button onClick={() => deleteFootage(f.id)} className="text-slate-400 hover:text-rose-600">×</button>
                         </div>
                       </div>
-                      <button onClick={() => deleteFootage(f.id)} className="text-slate-400 hover:text-rose-600">×</button>
+
+                      {/* Download Status Toggle */}
+                      <div className="mt-3 flex items-center gap-2 pl-11">
+                         <button
+                           onClick={() => toggleDownloaded(f.id, f.downloaded)}
+                           className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
+                             f.downloaded 
+                               ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" 
+                               : "bg-white border border-slate-200 text-slate-500 hover:bg-slate-100"
+                           }`}
+                         >
+                           {f.downloaded ? "✓ Downloaded" : "☁ Need Download"}
+                         </button>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -541,7 +604,7 @@ export default function IdeaDetailPage() {
                         <div className="min-w-0">
                           <a href={s.url} target="_blank" className="truncate font-medium text-blue-700 hover:underline">{s.url}</a>
                           <div className="flex gap-2 text-xs text-slate-500">
-                             <span>Reliability: {s.reliability}/5</span>
+                             <span>Rel: {s.reliability}/5</span>
                              {s.note && <span>• {s.note}</span>}
                           </div>
                         </div>
