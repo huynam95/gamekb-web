@@ -26,7 +26,21 @@ type IdeaGroup = {
   description: string | null;
 };
 
-/* ================= STYLES (MATCHING HOME) ================= */
+// CẬP NHẬT: Thêm title và downloaded vào type này
+type StagedFootage = {
+  file_path: string;
+  title?: string;       // Tên video (tự lấy từ Youtube)
+  downloaded: boolean;  // Đã tải về hay chưa
+  notes?: string;
+};
+
+type StagedSource = {
+  url: string;
+  note?: string;
+  reliability: number;
+};
+
+/* ================= STYLES ================= */
 
 const inputClass =
   "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition";
@@ -49,6 +63,23 @@ const btnGhost =
 const cardClass = "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm";
 
 /* ================= HELPERS ================= */
+
+// Hàm lấy tên Youtube Video (Không cần API Key)
+async function fetchYoutubeTitle(url: string): Promise<string | null> {
+  try {
+    // Regex kiểm tra link youtube
+    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$/;
+    if (!youtubeRegex.test(url)) return null;
+
+    // Sử dụng noembed để lấy thông tin
+    const res = await fetch(`https://noembed.com/embed?url=${url}`);
+    const data = await res.json();
+    return data.title || null;
+  } catch (e) {
+    console.error("Error fetching youtube title", e);
+    return null;
+  }
+}
 
 function GameCombobox({
   games,
@@ -197,7 +228,6 @@ function GroupPicker({
         </button>
       </div>
 
-      {/* Selected Tags */}
       <div className="flex flex-wrap gap-2">
         {selectedIds.length === 0 && !open && (
           <span className="text-xs text-slate-400 italic">No groups selected</span>
@@ -302,9 +332,10 @@ export default function AddIdeaPage() {
 
   // Staging
   const [fp, setFp] = useState("");
-  const [stagedFootage, setStagedFootage] = useState<{ file_path: string; notes?: string }[]>([]);
+  const [fetchingTitle, setFetchingTitle] = useState(false); // Trạng thái đang tải tên video
+  const [stagedFootage, setStagedFootage] = useState<StagedFootage[]>([]);
   const [srcUrl, setSrcUrl] = useState("");
-  const [stagedSources, setStagedSources] = useState<{ url: string; reliability: number }[]>([]);
+  const [stagedSources, setStagedSources] = useState<StagedSource[]>([]);
 
   const [savingIdea, setSavingIdea] = useState(false);
   const [message, setMessage] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
@@ -361,6 +392,32 @@ export default function AddIdeaPage() {
     }
   }
 
+  // LOGIC MỚI: Xử lý thêm Footage
+  async function handleAddFootage() {
+    if (!fp.trim()) return;
+    
+    setFetchingTitle(true);
+    const link = fp.trim();
+    
+    // Tự động lấy title từ youtube
+    const ytTitle = await fetchYoutubeTitle(link);
+    
+    setStagedFootage([
+      ...stagedFootage,
+      { file_path: link, title: ytTitle || undefined, downloaded: false }
+    ]);
+    
+    setFp("");
+    setFetchingTitle(false);
+  }
+
+  // LOGIC MỚI: Toggle trạng thái Downloaded
+  function toggleDownloaded(index: number) {
+    const newArr = [...stagedFootage];
+    newArr[index].downloaded = !newArr[index].downloaded;
+    setStagedFootage(newArr);
+  }
+
   async function saveIdea(e: React.FormEvent) {
     e.preventDefault();
     if (!gameId || !title.trim() || !description.trim()) {
@@ -407,7 +464,13 @@ export default function AddIdeaPage() {
     if (stagedFootage.length) {
       promises.push(
         supabase.from("footage").insert(
-          stagedFootage.map((f) => ({ detail_id: detailId, file_path: f.file_path, notes: f.notes }))
+          stagedFootage.map((f) => ({
+            detail_id: detailId,
+            file_path: f.file_path,
+            title: f.title,           // Lưu title
+            downloaded: f.downloaded, // Lưu trạng thái download
+            notes: f.notes
+          }))
         )
       );
     }
@@ -540,20 +603,58 @@ export default function AddIdeaPage() {
                   <div className="mb-3 flex gap-2">
                     <input 
                       className={inputClass} 
-                      placeholder="Link or path..." 
+                      placeholder="Paste YouTube link or path..." 
                       value={fp} 
                       onChange={(e) => setFp(e.target.value)}
+                      disabled={fetchingTitle}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') { e.preventDefault(); if(fp) { setStagedFootage([...stagedFootage, { file_path: fp }]); setFp(""); } }
+                        if (e.key === 'Enter') { e.preventDefault(); handleAddFootage(); }
                       }}
                     />
-                    <button type="button" className={btnGhost} onClick={() => { if(fp) { setStagedFootage([...stagedFootage, { file_path: fp }]); setFp(""); } }}>+</button>
+                    <button 
+                      type="button" 
+                      className={btnGhost} 
+                      onClick={handleAddFootage}
+                      disabled={fetchingTitle}
+                    >
+                      {fetchingTitle ? "..." : "+"}
+                    </button>
                   </div>
+
+                  {/* DANH SÁCH FOOTAGE */}
                   <ul className="space-y-2">
                     {stagedFootage.map((f, i) => (
-                      <li key={i} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs">
-                        <span className="truncate font-medium text-slate-700">{f.file_path}</span>
-                        <button type="button" onClick={() => setStagedFootage(stagedFootage.filter((_, idx) => idx !== i))} className="text-slate-400 hover:text-rose-500">×</button>
+                      <li key={i} className="rounded-xl bg-slate-50 px-3 py-2 border border-slate-100">
+                        {/* Title or Link */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            {f.title ? (
+                              <div className="font-semibold text-xs text-slate-900 line-clamp-2 mb-0.5">
+                                🎬 {f.title}
+                              </div>
+                            ) : null}
+                            <div className="truncate text-xs text-slate-500 font-mono" title={f.file_path}>
+                              {f.file_path}
+                            </div>
+                          </div>
+                          
+                          <button type="button" onClick={() => setStagedFootage(stagedFootage.filter((_, idx) => idx !== i))} className="text-slate-400 hover:text-rose-500">×</button>
+                        </div>
+                        
+                        {/* Status Toggle */}
+                        <div className="mt-2 flex items-center justify-between">
+                          <button 
+                            type="button"
+                            onClick={() => toggleDownloaded(i)}
+                            className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
+                              f.downloaded 
+                                ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" 
+                                : "bg-slate-200 text-slate-500 hover:bg-slate-300"
+                            }`}
+                          >
+                            {f.downloaded ? "✓ Downloaded" : "☁ Need Download"}
+                          </button>
+                        </div>
                       </li>
                     ))}
                   </ul>
