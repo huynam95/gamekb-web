@@ -85,8 +85,8 @@ function yyyyMmDdLocal(d: Date) {
 // Component hiển thị tên Game nổi bật (MỚI)
 function GameBadge({ title }: { title: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-bold text-white shadow-sm">
-      🎮 {title}
+    <span className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-violet-600 px-2.5 py-1 text-xs font-bold text-white shadow-sm">
+      👾 {title}
     </span>
   );
 }
