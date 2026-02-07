@@ -17,6 +17,7 @@ type Detail = {
   status: string | null;
   game_id: number;
   created_at: string | null;
+
   pinned: boolean;
   pinned_at: string | null;
 };
@@ -95,7 +96,7 @@ function TypeBadge({ t }: { t: string }) {
   return <span className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">{map[t] || t}</span>;
 }
 
-/* ================= COMPONENTS ================= */
+/* ================= COMPONENT: GROUP PICKER ================= */
 
 function GroupAddPicker({
   groups,
@@ -189,7 +190,7 @@ function GroupAddPicker({
   );
 }
 
-/* ================= PAGE ================= */
+/* ================= MAIN PAGE ================= */
 
 export default function IdeaDetailPage() {
   const params = useParams();
@@ -229,6 +230,11 @@ export default function IdeaDetailPage() {
   const [srcUrl, setSrcUrl] = useState("");
   const [savingItem, setSavingItem] = useState(false);
 
+  /* ------------------------------------------------------------------ */
+  /* TITLE & DATA LOADING LOGIC                     */
+  /* ------------------------------------------------------------------ */
+
+  // 1. Load Data
   async function loadGroups() {
     const { data } = await supabase.from("idea_groups").select("*").order("name");
     setAllGroups((data ?? []) as Group[]);
@@ -283,21 +289,28 @@ export default function IdeaDetailPage() {
     setLoading(false);
   }
 
+  // Effect để gọi hàm load
   useEffect(() => { loadAll(); }, [id]);
 
+  // 2. CHANGE TAB TITLE (SỬA LỖI Ở ĐÂY)
   useEffect(() => {
-    if (detail) {
-      // Đổi tên tab thành: "Tiêu đề Idea | GameKB"
+    if (detail && detail.title) {
+      // Đổi title khi có dữ liệu
       document.title = `${detail.title} | GameKB`;
     } else {
-      document.title = "Loading... | GameKB";
+      // Title tạm thời khi đang loading
+      document.title = "Loading Idea... | GameKB";
     }
-    
-    // (Tuỳ chọn) Reset lại title khi thoát trang
+
+    // (Cleanup) Trả về mặc định khi thoát trang
     return () => {
       document.title = "GameKB";
     };
   }, [detail]);
+
+  /* ------------------------------------------------------------------ */
+  /* ACTIONS                               */
+  /* ------------------------------------------------------------------ */
 
   async function togglePin() {
     if (!detail) return;
@@ -380,6 +393,7 @@ export default function IdeaDetailPage() {
     }
   }
 
+  // 3. CONDITIONAL RENDER (Phải đặt SAU tất cả useEffect)
   if (loading) return <div className="p-8 text-center text-slate-500">Loading details...</div>;
   if (!detail) return <div className="p-8 text-center text-slate-500">Idea not found.</div>;
 
