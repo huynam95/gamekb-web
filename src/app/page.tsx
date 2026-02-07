@@ -16,6 +16,7 @@ type DetailRow = {
   game_id: number;
   pinned?: boolean;
   pinned_at?: string | null;
+  created_at?: string;
 };
 
 /* ================= STYLES ================= */
@@ -81,26 +82,43 @@ function yyyyMmDdLocal(d: Date) {
 
 /* ================= COMPONENTS ================= */
 
+// Component hiển thị tên Game nổi bật (MỚI)
+function GameBadge({ title }: { title: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-bold text-white shadow-sm">
+      🎮 {title}
+    </span>
+  );
+}
+
 function IdeaItem({ r, gameTitle }: { r: DetailRow; gameTitle: string }) {
   return (
     <li className="group">
       <a
         href={`/idea/${r.id}`}
-        className="block rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 hover:shadow-md"
+        className="block h-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-base font-semibold text-slate-900 group-hover:text-blue-600">
+            {/* Hàng 1: Game Badge (Đã đưa lên đầu) */}
+            <div className="mb-2.5">
+              <GameBadge title={gameTitle} />
+            </div>
+
+            {/* Hàng 2: Tiêu đề Idea */}
+            <h3 className="line-clamp-2 text-base font-bold text-slate-900 group-hover:text-blue-600">
               {r.title}
             </h3>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <Pill text={gameTitle} />
+            
+            {/* Hàng 3: Loại (Type) */}
+            <div className="mt-2.5 flex flex-wrap gap-2">
               <Pill text={typeLabel(r.detail_type)} />
             </div>
           </div>
 
+          {/* Cột bên phải: Priority */}
           <div
-            className={`shrink-0 rounded-lg border px-2 py-1 text-xs font-bold ${
+            className={`shrink-0 rounded-lg border px-2 py-1 text-xs font-bold uppercase tracking-wider ${
               r.priority === 1
                 ? "border-rose-200 bg-rose-50 text-rose-700"
                 : r.priority === 5
@@ -117,7 +135,7 @@ function IdeaItem({ r, gameTitle }: { r: DetailRow; gameTitle: string }) {
 }
 
 function ComboBox({
-  label, // hidden visually in this new design but used for a11y
+  label,
   placeholder,
   items,
   selectedId,
@@ -244,14 +262,13 @@ export default function Home() {
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [gameId, setGameId] = useState<number | "">("");
-  const [groupId, setGroupId] = useState<number | "">(""); // Can be set from sidebar
+  const [groupId, setGroupId] = useState<number | "">("");
   const [type, setType] = useState<string | "">("");
   const [priority, setPriority] = useState<number | "">("");
 
   // UI states
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
-  const [newGroupDesc, setNewGroupDesc] = useState("");
   const [savingGroup, setSavingGroup] = useState(false);
 
   useEffect(() => {
@@ -300,7 +317,7 @@ export default function Home() {
 
     const { data: p } = await supabase
       .from("details")
-      .select("id,title,priority,detail_type,game_id,pinned,pinned_at")
+      .select("id,title,priority,detail_type,game_id,pinned,pinned_at,created_at")
       .eq("status", "idea")
       .eq("pinned", true)
       .order("pinned_at", { ascending: false });
@@ -335,7 +352,7 @@ export default function Home() {
 
     let query = supabase
       .from("details")
-      .select("id,title,priority,detail_type,game_id,pinned,pinned_at")
+      .select("id,title,priority,detail_type,game_id,pinned,pinned_at,created_at")
       .eq("status", "idea");
 
     if (groupDetailIds) query = query.in("id", groupDetailIds);
@@ -373,7 +390,7 @@ export default function Home() {
     setSavingGroup(true);
     const { error } = await supabase
       .from("idea_groups")
-      .insert({ name: newGroupName.trim(), description: newGroupDesc.trim() || null });
+      .insert({ name: newGroupName.trim() });
     setSavingGroup(false);
     if (error) {
       setErr(error.message);
@@ -381,7 +398,6 @@ export default function Home() {
     }
     setShowCreateGroup(false);
     setNewGroupName("");
-    setNewGroupDesc("");
     await refreshGroups();
   }
 
@@ -449,7 +465,6 @@ export default function Home() {
                     onClick={() => {
                       setGroupId(g.id);
                       if (g.id !== groupId) {
-                        // Reset other filters if switching group to allow focus
                         setQ("");
                         setGameId("");
                       }
