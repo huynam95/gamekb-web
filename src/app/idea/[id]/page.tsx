@@ -285,7 +285,19 @@ export default function IdeaDetailPage() {
 
   useEffect(() => { loadAll(); }, [id]);
 
-  /* ACTIONS */
+  useEffect(() => {
+    if (detail) {
+      // Đổi tên tab thành: "Tiêu đề Idea | GameKB"
+      document.title = `${detail.title} | GameKB`;
+    } else {
+      document.title = "Loading... | GameKB";
+    }
+    
+    // (Tuỳ chọn) Reset lại title khi thoát trang
+    return () => {
+      document.title = "GameKB";
+    };
+  }, [detail]);
 
   async function togglePin() {
     if (!detail) return;
