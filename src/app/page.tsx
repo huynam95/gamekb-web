@@ -41,9 +41,6 @@ const btnBase =
 const btnPrimary =
   btnBase + " bg-slate-900 text-white shadow-md shadow-slate-900/10 hover:bg-slate-800";
 
-const btnGhost =
-  btnBase + " border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900";
-
 /* ================= HELPERS ================= */
 
 function Pill({ text }: { text: string }) {
@@ -64,12 +61,6 @@ function typeLabel(t: string) {
     punish: "Punish",
   };
   return map[t] ?? t;
-}
-
-function priorityLabel(p: number) {
-  if (p === 1) return "🔥 High";
-  if (p === 3) return "Normal";
-  return "Low";
 }
 
 function yyyyMmDdLocal(d: Date) {
@@ -149,79 +140,26 @@ function ComboBox({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const boxRef = useRef<HTMLDivElement | null>(null);
-
   const filtered = useMemo(() => {
     const s = query.trim().toLowerCase();
     if (!s) return items.slice(0, 50);
     return items.filter((x) => x.name.toLowerCase().includes(s)).slice(0, 50);
   }, [items, query]);
-
   useEffect(() => {
-    function onDocClick(e: MouseEvent) {
-      if (!boxRef.current) return;
-      if (!boxRef.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
+    function onDocClick(e: MouseEvent) { if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false); }
+    document.addEventListener("mousedown", onDocClick); return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
-
   return (
     <div ref={boxRef} className="relative w-full h-10">
-      <button
-        type="button"
-        className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-left text-sm text-slate-900 shadow-sm transition hover:border-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
-        onClick={() => setOpen((v) => !v)}
-      >
-        <span className="block truncate">
-          {items.find((x) => x.id === selectedId)?.name || <span className="text-slate-500">{placeholder}</span>}
-        </span>
+      <button type="button" className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-left text-sm text-slate-900 shadow-sm transition hover:border-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-100" onClick={() => setOpen((v) => !v)}>
+        <span className="block truncate">{items.find((x) => x.id === selectedId)?.name || <span className="text-slate-500">{placeholder}</span>}</span>
       </button>
-
       {open && (
         <div className="absolute left-0 top-full z-20 mt-1 w-full min-w-[200px] rounded-xl border border-slate-200 bg-white shadow-xl">
-          <div className="p-2">
-            <input
-              className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 text-sm outline-none focus:border-blue-400 focus:bg-white"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search..."
-              autoFocus
-            />
-          </div>
-
+          <div className="p-2"><input className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 text-sm outline-none focus:border-blue-400 focus:bg-white" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search..." autoFocus /></div>
           <div className="max-h-60 overflow-auto p-1 pt-0">
-            <button
-              type="button"
-              className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-600 hover:bg-slate-100"
-              onClick={() => {
-                onChange("");
-                setOpen(false);
-                setQuery("");
-              }}
-            >
-              {allowAllLabel}
-            </button>
-            {filtered.length === 0 ? (
-              <div className="p-3 text-center text-xs text-slate-500">No matches.</div>
-            ) : (
-              <ul>
-                {filtered.map((x) => (
-                  <li key={x.id}>
-                    <button
-                      type="button"
-                      className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-900 hover:bg-blue-50 hover:text-blue-700"
-                      onClick={() => {
-                        onChange(x.id);
-                        setOpen(false);
-                        setQuery("");
-                      }}
-                    >
-                      {x.name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-600 hover:bg-slate-100" onClick={() => { onChange(""); setOpen(false); setQuery(""); }}>{allowAllLabel}</button>
+            {filtered.length === 0 ? <div className="p-3 text-center text-xs text-slate-500">No matches.</div> : <ul>{filtered.map((x) => <li key={x.id}><button type="button" className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-900 hover:bg-blue-50 hover:text-blue-700" onClick={() => { onChange(x.id); setOpen(false); setQuery(""); }}>{x.name}</button></li>)}</ul>}
           </div>
         </div>
       )}
@@ -231,80 +169,28 @@ function ComboBox({
 
 /* ================= MODAL EDIT GAME ================= */
 
-function EditGameModal({
-  game,
-  onClose,
-  onSaved,
-}: {
-  game: Game;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
+function EditGameModal({ game, onClose, onSaved }: { game: Game; onClose: () => void; onSaved: () => void; }) {
   const [title, setTitle] = useState(game.title);
   const [coverUrl, setCoverUrl] = useState(game.cover_url || "");
   const [releaseYear, setReleaseYear] = useState(game.release_year ? String(game.release_year) : "");
   const [genres, setGenres] = useState(game.genres_text || "");
   const [saving, setSaving] = useState(false);
-
   async function handleSave() {
-    if (!title.trim()) return;
-    setSaving(true);
+    if (!title.trim()) return; setSaving(true);
     const yearNum = releaseYear.trim() ? Number(releaseYear.trim()) : null;
-
-    await supabase.from("games").update({
-      title: title.trim(),
-      cover_url: coverUrl.trim() || null,
-      release_year: yearNum,
-      genres_text: genres.trim() || null
-    }).eq("id", game.id);
-
-    setSaving(false);
-    onSaved();
-    onClose();
+    await supabase.from("games").update({ title: title.trim(), cover_url: coverUrl.trim() || null, release_year: yearNum, genres_text: genres.trim() || null }).eq("id", game.id);
+    setSaving(false); onSaved(); onClose();
   }
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
       <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-200">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-slate-900">Edit Game</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">✕</button>
-        </div>
-
+        <div className="mb-4 flex items-center justify-between"><h3 className="text-lg font-bold text-slate-900">Edit Game</h3><button onClick={onClose} className="text-slate-400 hover:text-slate-600">✕</button></div>
         <div className="space-y-4">
-          <label className="block">
-            <span className="mb-1 block text-xs font-bold text-slate-700">Title</span>
-            <input className={inputClass} value={title} onChange={e => setTitle(e.target.value)} autoFocus />
-          </label>
-          
-          <div className="grid grid-cols-2 gap-4">
-             <label className="block">
-              <span className="mb-1 block text-xs font-bold text-slate-700">Year</span>
-              <input className={inputClass} type="number" value={releaseYear} onChange={e => setReleaseYear(e.target.value)} placeholder="YYYY" />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-bold text-slate-700">Genres</span>
-              <input className={inputClass} value={genres} onChange={e => setGenres(e.target.value)} placeholder="Action..." />
-            </label>
-          </div>
-
-          <label className="block">
-            <span className="mb-1 block text-xs font-bold text-slate-700">Cover Image URL</span>
-            <input className={inputClass} value={coverUrl} onChange={e => setCoverUrl(e.target.value)} placeholder="https://..." />
-          </label>
-
-          {coverUrl && (
-            <div className="h-32 w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
-               <img src={coverUrl} className="h-full w-full object-cover" onError={e => e.currentTarget.style.display='none'} />
-            </div>
-          )}
-
-          <div className="flex justify-end gap-2 pt-2">
-            <button onClick={onClose} className={btnGhost}>Cancel</button>
-            <button onClick={handleSave} disabled={saving} className={btnPrimary}>
-              {saving ? "Saving..." : "Save Changes"}
-            </button>
-          </div>
+          <label className="block"><span className="mb-1 block text-xs font-bold text-slate-700">Title</span><input className={inputClass} value={title} onChange={e => setTitle(e.target.value)} autoFocus /></label>
+          <div className="grid grid-cols-2 gap-4"><label className="block"><span className="mb-1 block text-xs font-bold text-slate-700">Year</span><input className={inputClass} type="number" value={releaseYear} onChange={e => setReleaseYear(e.target.value)} placeholder="YYYY" /></label><label className="block"><span className="mb-1 block text-xs font-bold text-slate-700">Genres</span><input className={inputClass} value={genres} onChange={e => setGenres(e.target.value)} placeholder="Action..." /></label></div>
+          <label className="block"><span className="mb-1 block text-xs font-bold text-slate-700">Cover Image URL</span><input className={inputClass} value={coverUrl} onChange={e => setCoverUrl(e.target.value)} placeholder="https://..." /></label>
+          {coverUrl && <div className="h-32 w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100"><img src={coverUrl} className="h-full w-full object-cover" onError={e => e.currentTarget.style.display='none'} /></div>}
+          <div className="flex justify-end gap-2 pt-2"><button onClick={onClose} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">Cancel</button><button onClick={handleSave} disabled={saving} className={btnPrimary}>{saving ? "Saving..." : "Save Changes"}</button></div>
         </div>
       </div>
     </div>
@@ -319,14 +205,18 @@ export default function Home() {
   const [groupCounts, setGroupCounts] = useState<Map<number, number>>(new Map());
   const [err, setErr] = useState<string | null>(null);
 
+  // Data states
   const [pinned, setPinned] = useState<DetailRow[]>([]);
   const [daily, setDaily] = useState<DetailRow[]>([]);
+  const [recent, setRecent] = useState<DetailRow[]>([]); // MỚI: State cho cột Recent
   const [loadingDefault, setLoadingDefault] = useState(true);
+
   const [ideas, setIdeas] = useState<DetailRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [random5, setRandom5] = useState<DetailRow[]>([]);
   const [loadingRandom, setLoadingRandom] = useState(false);
 
+  // Filters
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [gameId, setGameId] = useState<number | "">("");
@@ -334,14 +224,12 @@ export default function Home() {
   const [type, setType] = useState<string | "">("");
   const [priority, setPriority] = useState<number | "">("");
 
+  // UI
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [editingGame, setEditingGame] = useState<Game | null>(null);
 
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedQ(q), 300);
-    return () => clearTimeout(t);
-  }, [q]);
+  useEffect(() => { const t = setTimeout(() => setDebouncedQ(q), 300); return () => clearTimeout(t); }, [q]);
 
   const isDefaultView = useMemo(() => {
     return !debouncedQ.trim() && !gameId && !groupId && !type && !priority;
@@ -362,35 +250,46 @@ export default function Home() {
     const { data, error } = await supabase.from("idea_groups").select("id,name").order("name");
     if (error) { setErr(error.message); return; }
     setGroups((data ?? []) as Group[]);
-
     const { data: items } = await supabase.from("idea_group_items").select("group_id");
     const m = new Map<number, number>();
-    for (const row of items ?? []) {
-      const gid = Number((row as any).group_id);
-      m.set(gid, (m.get(gid) ?? 0) + 1);
-    }
+    for (const row of items ?? []) { const gid = Number((row as any).group_id); m.set(gid, (m.get(gid) ?? 0) + 1); }
     setGroupCounts(m);
   }
 
-  useEffect(() => {
-    loadGames();
-    refreshGroups();
-  }, []);
+  useEffect(() => { loadGames(); refreshGroups(); }, []);
 
   async function loadDefaultView() {
     setLoadingDefault(true);
     setErr(null);
-    const { data: p } = await supabase.from("details").select("id,title,priority,detail_type,game_id,pinned,pinned_at,created_at").eq("status", "idea").eq("pinned", true).order("pinned_at", { ascending: false });
+
+    // 1. Get Pinned
+    const { data: p } = await supabase
+      .from("details")
+      .select("id,title,priority,detail_type,game_id,pinned,pinned_at,created_at")
+      .eq("status", "idea")
+      .eq("pinned", true)
+      .order("pinned_at", { ascending: false });
+
+    // 2. Get Daily (Random Seed)
     const seedDate = yyyyMmDdLocal(new Date());
     const { data: d } = await supabase.rpc("get_daily_seed_ideas", { seed_date: seedDate, take_count: 5 });
+
+    // 3. Get Recently Added (MỚI)
+    const { data: r } = await supabase
+      .from("details")
+      .select("id,title,priority,detail_type,game_id,pinned,pinned_at,created_at")
+      .eq("status", "idea")
+      .order("created_at", { ascending: false })
+      .limit(10); // Lấy 10 cái mới nhất
+
     setPinned((p ?? []) as DetailRow[]);
     setDaily((d ?? []) as DetailRow[]);
+    setRecent((r ?? []) as DetailRow[]);
     setLoadingDefault(false);
   }
 
   async function loadFilteredIdeas() {
-    setLoading(true);
-    setErr(null);
+    setLoading(true); setErr(null);
     let groupDetailIds: number[] | null = null;
     if (groupId) {
       const { data: gi } = await supabase.from("idea_group_items").select("detail_id").eq("group_id", groupId);
@@ -425,49 +324,30 @@ export default function Home() {
     if (!newGroupName.trim()) return;
     const { error } = await supabase.from("idea_groups").insert({ name: newGroupName.trim() });
     if (error) { setErr(error.message); return; }
-    setShowCreateGroup(false);
-    setNewGroupName("");
-    await refreshGroups();
+    setShowCreateGroup(false); setNewGroupName(""); await refreshGroups();
   }
 
   async function deleteGroup(g: Group) {
     if (!confirm(`Delete group "${g.name}"?`)) return;
     await supabase.from("idea_groups").delete().eq("id", g.id);
-    if (groupId === g.id) setGroupId("");
-    await refreshGroups();
+    if (groupId === g.id) setGroupId(""); await refreshGroups();
   }
 
-  const resetFilters = () => {
-    setQ(""); setGameId(""); setGroupId(""); setType(""); setPriority("");
-  };
+  const resetFilters = () => { setQ(""); setGameId(""); setGroupId(""); setType(""); setPriority(""); };
 
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
       
-      {editingGame && (
-        <EditGameModal 
-          game={editingGame} 
-          onClose={() => setEditingGame(null)} 
-          onSaved={loadGames} 
-        />
-      )}
+      {editingGame && <EditGameModal game={editingGame} onClose={() => setEditingGame(null)} onSaved={loadGames} />}
 
       {/* SIDEBAR */}
       <aside className="fixed inset-y-0 left-0 z-10 hidden w-64 flex-col border-r border-slate-200 bg-white md:flex">
-        <div className="flex h-16 items-center border-b border-slate-100 px-6">
-          <div className="text-xl font-bold tracking-tight text-slate-900">GameKB 🎮</div>
-        </div>
+        <div className="flex h-16 items-center border-b border-slate-100 px-6"><div className="text-xl font-bold tracking-tight text-slate-900">GameKB 🎮</div></div>
         <div className="flex-1 overflow-y-auto px-4 py-6">
           <nav className="space-y-1">
-            <button onClick={resetFilters} className={`flex w-full items-center rounded-xl px-3 py-2 text-sm font-medium transition ${!groupId && isDefaultView ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}>
-              🏠 Home
-            </button>
-            <button onClick={getRandom5} className="flex w-full items-center rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">
-              {loadingRandom ? "🎲 Rolling..." : "🎲 Random 5"}
-            </button>
-            <a href="/games/new" className="flex w-full items-center rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">
-              🕹️ Add Game
-            </a>
+            <button onClick={resetFilters} className={`flex w-full items-center rounded-xl px-3 py-2 text-sm font-medium transition ${!groupId && isDefaultView ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}>🏠 Home</button>
+            <button onClick={getRandom5} className="flex w-full items-center rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">{loadingRandom ? "🎲 Rolling..." : "🎲 Random 5"}</button>
+            <a href="/games/new" className="flex w-full items-center rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">🕹️ Add Game</a>
           </nav>
           <div className="mt-8 mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Groups</div>
           <nav className="space-y-1">
@@ -476,12 +356,9 @@ export default function Home() {
               return (
                 <div key={g.id} className="group flex items-center gap-1">
                   <button onClick={() => { setGroupId(g.id); if (g.id !== groupId) { setQ(""); setGameId(""); } }} className={`flex flex-1 items-center justify-between rounded-xl px-3 py-2 text-left text-sm font-medium transition ${isActive ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}>
-                    <span className="truncate">{g.name}</span>
-                    <span className={`ml-2 rounded-full px-2 py-0.5 text-[10px] ${isActive ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500"}`}>{groupCounts.get(g.id) ?? 0}</span>
+                    <span className="truncate">{g.name}</span><span className={`ml-2 rounded-full px-2 py-0.5 text-[10px] ${isActive ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500"}`}>{groupCounts.get(g.id) ?? 0}</span>
                   </button>
-                  <button onClick={() => deleteGroup(g)} className="hidden text-slate-400 hover:text-rose-500 group-hover:block" title="Delete group">
-                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                  </button>
+                  <button onClick={() => deleteGroup(g)} className="hidden text-slate-400 hover:text-rose-500 group-hover:block" title="Delete group"><svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg></button>
                 </div>
               );
             })}
@@ -490,10 +367,7 @@ export default function Home() {
           {showCreateGroup && (
             <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
               <input className="mb-2 block w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-slate-400 outline-none" placeholder="Group Name" value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} autoFocus />
-              <div className="flex items-center gap-2">
-                <button onClick={createGroupOnHome} className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800">Create</button>
-                <button onClick={() => setShowCreateGroup(false)} className="text-xs text-slate-500 hover:text-slate-700">Cancel</button>
-              </div>
+              <div className="flex items-center gap-2"><button onClick={createGroupOnHome} className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800">Create</button><button onClick={() => setShowCreateGroup(false)} className="text-xs text-slate-500 hover:text-slate-700">Cancel</button></div>
             </div>
           )}
         </div>
@@ -501,45 +375,22 @@ export default function Home() {
 
       {/* MAIN CONTENT */}
       <main className="flex-1 pl-0 md:pl-64">
-        {/* CẬP NHẬT: max-w-[1600px] để nội dung tràn rộng hơn */}
-        <div className="mx-auto max-w-[1600px] px-6 py-8">
+        {/* CẬP NHẬT: max-w-[1900px] để tràn màn hình rộng hơn */}
+        <div className="mx-auto max-w-[1900px] px-6 py-8">
           <header className="mb-8">
             <div className="flex flex-col gap-4 md:flex-row md:items-center">
               <div className="relative flex-1">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                  <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                </div>
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3"><svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg></div>
                 <input type="text" className="block h-12 w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-4 text-base text-slate-900 shadow-sm placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-4 focus:ring-slate-100 transition" placeholder="Find an idea..." value={q} onChange={(e) => setQ(e.target.value)} />
               </div>
               <a href="/add" className={`${btnPrimary} h-12 px-6 text-base`}>+ Add Idea</a>
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-3/4">
-              
               <div className="flex items-center gap-2 min-w-0">
-                <div className="flex-1 min-w-0">
-                  <ComboBox 
-                    placeholder="Game" 
-                    items={games.map((g) => ({ id: g.id, name: g.title }))} 
-                    selectedId={gameId} 
-                    onChange={setGameId} 
-                    allowAllLabel="All games" 
-                  />
-                </div>
-                {gameId !== "" && (
-                  <button 
-                    onClick={() => {
-                      const g = games.find(x => x.id === gameId);
-                      if(g) setEditingGame(g);
-                    }}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50 hover:text-blue-600 shadow-sm transition"
-                    title="Edit selected game"
-                  >
-                    ✎
-                  </button>
-                )}
+                <div className="flex-1 min-w-0"><ComboBox placeholder="Game" items={games.map((g) => ({ id: g.id, name: g.title }))} selectedId={gameId} onChange={setGameId} allowAllLabel="All games" /></div>
+                {gameId !== "" && <button onClick={() => { const g = games.find(x => x.id === gameId); if(g) setEditingGame(g); }} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50 hover:text-blue-600 shadow-sm transition" title="Edit selected game">✎</button>}
               </div>
-
               <div className="relative"><select className={selectClass} value={type} onChange={(e) => setType(e.target.value)}><option value="">All Types</option><option value="small_detail">Small detail</option><option value="easter_egg">Easter egg</option><option value="npc_reaction">NPC reaction</option><option value="physics">Physics</option><option value="troll">Troll</option><option value="punish">Punish</option></select></div>
               <div className="relative"><select className={selectClass} value={priority} onChange={(e) => setPriority(e.target.value ? Number(e.target.value) : "")}><option value="">All Priorities</option><option value={1}>High Priority</option><option value={3}>Normal</option><option value={5}>Low</option></select></div>
               {!isDefaultView && <button onClick={resetFilters} className="text-sm font-medium text-rose-600 hover:text-rose-700 hover:underline text-left px-2">Clear filters</button>}
@@ -551,37 +402,51 @@ export default function Home() {
           {random5.length > 0 && (
             <section className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
               <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-bold text-slate-900">🎲 Random Picks</h2><button onClick={() => setRandom5([])} className="text-sm text-slate-500 hover:text-slate-900">Clear</button></div>
-              {/* CẬP NHẬT GRID: Tăng số cột */}
-              <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-                {random5.map((r) => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}
-              </ul>
+              <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{random5.map((r) => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}</ul>
             </section>
           )}
 
           {isDefaultView ? (
-            <div className="grid gap-8 lg:grid-cols-2">
+            // CẬP NHẬT: CHIA 3 CỘT (XL) - 2 CỘT (LG) - 1 CỘT (MD)
+            <div className="grid gap-6 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+              
+              {/* CỘT 1: PINNED */}
               <section>
                 <div className="mb-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-lg">⭐</span><h2 className="text-xl font-bold text-slate-900">Pinned Ideas</h2></div>
+                  <div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-lg">⭐</span><h2 className="text-xl font-bold text-slate-900">Pinned</h2></div>
                   <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">{pinned.length}</span>
                 </div>
-                {/* CẬP NHẬT GRID CHO PINNED */}
-                {loadingDefault ? <div className="h-32 rounded-2xl border border-slate-100 bg-white p-4 text-slate-400">Loading pinned...</div> : pinned.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center"><p className="text-sm text-slate-500">No pinned ideas yet.</p></div> : <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2">{pinned.map((r) => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}</ul>}
+                {loadingDefault ? <div className="h-32 rounded-2xl border border-slate-100 bg-white p-4 text-slate-400">Loading pinned...</div> : pinned.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center"><p className="text-sm text-slate-500">No pinned ideas.</p></div> : 
+                  // Sử dụng grid 1 cột bên trong section để xếp dọc
+                  <ul className="grid gap-4 grid-cols-1">{pinned.map((r) => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}</ul>
+                }
               </section>
 
+              {/* CỘT 2: DAILY */}
               <section>
                 <div className="mb-4 flex items-center justify-between">
                   <div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 text-lg">🧠</span><h2 className="text-xl font-bold text-slate-900">Today's Picks</h2></div>
                   <span className="text-xs text-slate-400">{yyyyMmDdLocal(new Date())}</span>
                 </div>
-                {/* CẬP NHẬT GRID CHO DAILY */}
-                {loadingDefault ? <div className="h-32 rounded-2xl border border-slate-100 bg-white p-4 text-slate-400">Loading daily picks...</div> : daily.length === 0 ? <div className="p-4 text-sm text-slate-500">No ideas available.</div> : <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2">{daily.map((r) => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}</ul>}
+                {loadingDefault ? <div className="h-32 rounded-2xl border border-slate-100 bg-white p-4 text-slate-400">Loading daily...</div> : daily.length === 0 ? <div className="p-4 text-sm text-slate-500">No ideas available.</div> : 
+                   <ul className="grid gap-4 grid-cols-1">{daily.map((r) => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}</ul>
+                }
               </section>
+
+              {/* CỘT 3: RECENTLY ADDED (MỚI) */}
+              <section>
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-lg">✨</span><h2 className="text-xl font-bold text-slate-900">Recently Added</h2></div>
+                </div>
+                {loadingDefault ? <div className="h-32 rounded-2xl border border-slate-100 bg-white p-4 text-slate-400">Loading recent...</div> : recent.length === 0 ? <div className="p-4 text-sm text-slate-500">No recent ideas.</div> : 
+                   <ul className="grid gap-4 grid-cols-1">{recent.map((r) => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}</ul>
+                }
+              </section>
+
             </div>
           ) : (
             <section>
               <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-bold text-slate-900">{loading ? "Searching..." : `${ideas.length} Results`}</h2>{groupId && <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800">Group: {groups.find((g) => g.id === groupId)?.name}</span>}</div>
-              {/* CẬP NHẬT GRID CHO SEARCH: Lên 4 cột ở màn hình to */}
               {loading ? <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-20 animate-pulse rounded-xl bg-slate-200" />)}</div> : ideas.length === 0 ? <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 py-12"><p className="text-lg font-medium text-slate-900">No ideas found</p><button onClick={resetFilters} className="mt-4 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Clear all filters</button></div> : <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{ideas.map((r) => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}</ul>}
             </section>
           )}
