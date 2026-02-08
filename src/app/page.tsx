@@ -47,8 +47,9 @@ const btnGhost =
 /* ================= HELPERS ================= */
 
 function Pill({ text }: { text: string }) {
+  // Style kiểu kính mờ (Glass) trên nền tối
   return (
-    <span className="inline-flex items-center rounded-md border border-slate-200/60 bg-white/60 px-2 py-0.5 text-xs font-medium text-slate-700 backdrop-blur-md shadow-sm">
+    <span className="inline-flex items-center rounded-md border border-white/20 bg-white/10 px-2 py-0.5 text-[10px] font-medium text-white/90 backdrop-blur-md">
       {text}
     </span>
   );
@@ -56,8 +57,8 @@ function Pill({ text }: { text: string }) {
 
 function typeLabel(t: string) {
   const map: Record<string, string> = {
-    small_detail: "Small detail",
-    easter_egg: "Easter egg",
+    small_detail: "Small Detail",
+    easter_egg: "Easter Egg",
     npc_reaction: "NPC Reaction",
     physics: "Physics",
     troll: "Troll",
@@ -67,7 +68,7 @@ function typeLabel(t: string) {
 }
 
 function priorityLabel(p: number) {
-  if (p === 1) return "High";
+  if (p === 1) return "🔥 High";
   if (p === 3) return "Normal";
   return "Low";
 }
@@ -81,15 +82,7 @@ function yyyyMmDdLocal(d: Date) {
 
 /* ================= COMPONENTS ================= */
 
-function GameBadge({ title }: { title: string }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900/90 backdrop-blur-md px-2.5 py-1 text-xs font-bold text-white shadow-sm z-20">
-      🎮 {title}
-    </span>
-  );
-}
-
-// CẬP NHẬT: Giao diện thẻ Idea rõ ảnh hơn
+// CẬP NHẬT: IdeaItem theo phong cách Cinematic (Tối ưu hiển thị ảnh)
 function IdeaItem({ r, game }: { r: DetailRow; game?: Game }) {
   const hasCover = !!game?.cover_url;
 
@@ -97,52 +90,52 @@ function IdeaItem({ r, game }: { r: DetailRow; game?: Game }) {
     <li className="group h-full">
       <a
         href={`/idea/${r.id}`}
-        className="relative flex flex-col h-full overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-300 hover:border-slate-300 hover:shadow-lg hover:-translate-y-1"
+        className="relative flex h-64 w-full flex-col justify-end overflow-hidden rounded-2xl border border-slate-200 bg-slate-900 shadow-sm transition-all duration-500 hover:shadow-xl hover:-translate-y-1"
       >
-        {/* NỀN ẢNH (Đã tăng độ rõ) */}
-        {hasCover && (
-          <div className="absolute inset-0 z-0">
-            {/* Ảnh nền */}
-            <div 
-              className="absolute inset-0 bg-cover bg-center transition-all duration-500 ease-out group-hover:scale-110"
-              style={{ backgroundImage: `url(${game.cover_url})`, opacity: 0.25 }} // Tăng opacity từ 0.1 -> 0.25
-            />
-            {/* Lớp phủ gradient để chữ dễ đọc */}
-            <div className="absolute inset-0 bg-gradient-to-t from-white via-white/80 to-white/40" />
-          </div>
+        {/* LỚP 1: ẢNH NỀN (FULL HD) */}
+        {hasCover ? (
+          <div 
+            className="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover:scale-110"
+            style={{ backgroundImage: `url(${game.cover_url})` }}
+          />
+        ) : (
+          // Fallback nếu không có ảnh: Pattern tối
+          <div className="absolute inset-0 bg-slate-800 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-50" />
         )}
 
-        <div className="relative z-10 flex flex-1 flex-col items-start justify-between gap-3">
-          <div className="w-full">
-            <div className="mb-3 flex items-start justify-between">
-               <GameBadge title={game?.title ?? "Unknown Game"} />
-               
-               <div
-                className={`shrink-0 rounded-lg border px-2 py-1 text-xs font-bold uppercase tracking-wider backdrop-blur-md shadow-sm ${
-                  r.priority === 1
-                    ? "border-rose-200/50 bg-rose-50/80 text-rose-700"
-                    : r.priority === 5
-                    ? "border-slate-200/50 bg-slate-100/80 text-slate-500"
-                    : "border-slate-200/50 bg-white/80 text-slate-700"
-                }`}
-              >
-                {priorityLabel(r.priority)}
-              </div>
+        {/* LỚP 2: GRADIENT ĐEN (Để làm rõ chữ) */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent opacity-90 transition-opacity group-hover:opacity-80" />
+
+        {/* LỚP 3: NỘI DUNG (Text Trắng) */}
+        <div className="relative z-10 flex flex-col p-5">
+          
+          {/* Top Badges (Nổi lên trên cùng) */}
+          <div className="absolute top-4 right-4 flex gap-2">
+             {/* Priority Badge */}
+             {r.priority === 1 && (
+                <span className="inline-flex items-center rounded-lg bg-rose-500/90 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-sm backdrop-blur-md">
+                  High
+                </span>
+             )}
+          </div>
+
+          {/* Main Content */}
+          <div className="space-y-1">
+            {/* Tên Game nhỏ gọn phía trên */}
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-blue-300/90">
+               <span className="truncate">{game?.title || "Unknown Game"}</span>
             </div>
 
-            <h3 className="line-clamp-3 text-lg font-bold text-slate-900 drop-shadow-sm transition group-hover:text-blue-700">
+            {/* Tiêu đề Idea LỚN, RÕ RÀNG */}
+            <h3 className="line-clamp-2 text-lg font-bold leading-tight text-white drop-shadow-sm group-hover:text-blue-200 transition-colors">
               {r.title}
             </h3>
-          </div>
             
-          <div className="mt-2 flex flex-wrap gap-2">
-            <Pill text={typeLabel(r.detail_type)} />
-            {/* Nếu có ngày tạo thì hiện thêm cho đẹp */}
-            {r.created_at && (
-               <span className="text-[10px] text-slate-400 font-medium self-center ml-auto">
-                 {new Date(r.created_at).toLocaleDateString()}
-               </span>
-            )}
+            {/* Type & Date */}
+            <div className="mt-3 flex items-center gap-2">
+              <Pill text={typeLabel(r.detail_type)} />
+              {r.pinned && <span className="text-amber-400 text-xs">⭐ Pinned</span>}
+            </div>
           </div>
         </div>
       </a>
@@ -312,7 +305,7 @@ function EditGameModal({
 
           {coverUrl && (
             <div className="h-32 w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
-               <img src={coverUrl} className="h-full w-full object-cover opacity-80" onError={e => e.currentTarget.style.display='none'} />
+               <img src={coverUrl} className="h-full w-full object-cover" onError={e => e.currentTarget.style.display='none'} />
             </div>
           )}
 
@@ -336,7 +329,6 @@ export default function Home() {
   const [groupCounts, setGroupCounts] = useState<Map<number, number>>(new Map());
   const [err, setErr] = useState<string | null>(null);
 
-  // States
   const [pinned, setPinned] = useState<DetailRow[]>([]);
   const [daily, setDaily] = useState<DetailRow[]>([]);
   const [loadingDefault, setLoadingDefault] = useState(true);
@@ -345,7 +337,6 @@ export default function Home() {
   const [random5, setRandom5] = useState<DetailRow[]>([]);
   const [loadingRandom, setLoadingRandom] = useState(false);
 
-  // Filters
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [gameId, setGameId] = useState<number | "">("");
@@ -353,7 +344,6 @@ export default function Home() {
   const [type, setType] = useState<string | "">("");
   const [priority, setPriority] = useState<number | "">("");
 
-  // UI
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [editingGame, setEditingGame] = useState<Game | null>(null);
@@ -535,7 +525,6 @@ export default function Home() {
 
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-3/4">
               
-              {/* GAME FILTER + EDIT BUTTON (FIXED) */}
               <div className="flex items-center gap-2 min-w-0">
                 <div className="flex-1 min-w-0">
                   <ComboBox 
@@ -571,7 +560,7 @@ export default function Home() {
           {random5.length > 0 && (
             <section className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
               <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-bold text-slate-900">🎲 Random Picks</h2><button onClick={() => setRandom5([])} className="text-sm text-slate-500 hover:text-slate-900">Clear</button></div>
-              <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {random5.map((r) => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}
               </ul>
             </section>
@@ -584,7 +573,7 @@ export default function Home() {
                   <div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-lg">⭐</span><h2 className="text-xl font-bold text-slate-900">Pinned Ideas</h2></div>
                   <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">{pinned.length}</span>
                 </div>
-                {loadingDefault ? <div className="h-32 rounded-2xl border border-slate-100 bg-white p-4 text-slate-400">Loading pinned...</div> : pinned.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center"><p className="text-sm text-slate-500">No pinned ideas yet.</p></div> : <ul className="space-y-3">{pinned.map((r) => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}</ul>}
+                {loadingDefault ? <div className="h-32 rounded-2xl border border-slate-100 bg-white p-4 text-slate-400">Loading pinned...</div> : pinned.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center"><p className="text-sm text-slate-500">No pinned ideas yet.</p></div> : <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">{pinned.map((r) => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}</ul>}
               </section>
 
               <section>
@@ -592,7 +581,7 @@ export default function Home() {
                   <div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 text-lg">🧠</span><h2 className="text-xl font-bold text-slate-900">Today's Picks</h2></div>
                   <span className="text-xs text-slate-400">{yyyyMmDdLocal(new Date())}</span>
                 </div>
-                {loadingDefault ? <div className="h-32 rounded-2xl border border-slate-100 bg-white p-4 text-slate-400">Loading daily picks...</div> : daily.length === 0 ? <div className="p-4 text-sm text-slate-500">No ideas available.</div> : <ul className="space-y-3">{daily.map((r) => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}</ul>}
+                {loadingDefault ? <div className="h-32 rounded-2xl border border-slate-100 bg-white p-4 text-slate-400">Loading daily picks...</div> : daily.length === 0 ? <div className="p-4 text-sm text-slate-500">No ideas available.</div> : <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">{daily.map((r) => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}</ul>}
               </section>
             </div>
           ) : (
