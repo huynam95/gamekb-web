@@ -28,13 +28,12 @@ type Game = {
   release_year: number | null;
 };
 
-// CẬP NHẬT: Thêm title và downloaded
 type FootageRow = {
   id: number;
   detail_id: number;
   file_path: string | null;
-  title: string | null;       // NEW
-  downloaded: boolean;        // NEW
+  title: string | null;
+  downloaded: boolean;
   start_ts: string | null;
   end_ts: string | null;
   label: string | null;
@@ -81,7 +80,6 @@ const cardClass = "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm";
 
 /* ================= HELPERS ================= */
 
-// Hàm lấy tên Youtube Video (Tái sử dụng)
 async function fetchYoutubeTitle(url: string): Promise<string | null> {
   try {
     const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$/;
@@ -110,6 +108,27 @@ function TypeBadge({ t }: { t: string }) {
     punish: "Punish",
   };
   return <span className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">{map[t] || t}</span>;
+}
+
+// Helper để render link
+function renderLinkOrText(text: string | null) {
+  if (!text) return null;
+  const isUrl = text.startsWith("http://") || text.startsWith("https://");
+
+  if (isUrl) {
+    return (
+      <a 
+        href={text} 
+        target="_blank" 
+        rel="noopener noreferrer" 
+        className="break-all text-blue-600 hover:text-blue-800 hover:underline"
+        onClick={(e) => e.stopPropagation()} // Tránh kích hoạt các sự kiện click khác nếu có
+      >
+        {text}
+      </a>
+    );
+  }
+  return <span className="break-all font-mono text-slate-600">{text}</span>;
 }
 
 /* ================= COMPONENT: GROUP PICKER ================= */
@@ -245,7 +264,7 @@ export default function IdeaDetailPage() {
   const [fp, setFp] = useState("");
   const [srcUrl, setSrcUrl] = useState("");
   const [savingItem, setSavingItem] = useState(false);
-  const [fetchingTitle, setFetchingTitle] = useState(false); // New state
+  const [fetchingTitle, setFetchingTitle] = useState(false);
 
   // 1. Load Data
   async function loadGroups() {
@@ -349,7 +368,6 @@ export default function IdeaDetailPage() {
     }
   }
 
-  // CẬP NHẬT: Thêm Footage có tự động lấy Title
   async function addFootage() {
     if (!detail || !fp.trim()) return;
     
@@ -357,11 +375,14 @@ export default function IdeaDetailPage() {
     const link = fp.trim();
     const ytTitle = await fetchYoutubeTitle(link);
 
+    // Logic tự động đánh dấu downloaded nếu là file cục bộ
+    const isLocalFile = !link.startsWith("http");
+
     await supabase.from("footage").insert({ 
       detail_id: detail.id, 
       file_path: link,
       title: ytTitle || null,
-      downloaded: false
+      downloaded: isLocalFile
     });
 
     setFp("");
@@ -369,18 +390,9 @@ export default function IdeaDetailPage() {
     await loadAll();
   }
 
-  // CẬP NHẬT: Toggle Download Status
   async function toggleDownloaded(fid: number, currentStatus: boolean) {
-    // Optimistic UI update (optional, but good UX)
     setFootage(prev => prev.map(f => f.id === fid ? { ...f, downloaded: !currentStatus } : f));
-    
-    await supabase
-      .from("footage")
-      .update({ downloaded: !currentStatus })
-      .eq("id", fid);
-    
-    // Refresh to be sure
-    // await loadAll(); 
+    await supabase.from("footage").update({ downloaded: !currentStatus }).eq("id", fid);
   }
 
   async function deleteFootage(fid: number) {
@@ -541,11 +553,19 @@ export default function IdeaDetailPage() {
                           <div className="min-w-0 pt-0.5">
                             {f.title && (
                               <div className="font-semibold text-sm text-slate-900 line-clamp-2 mb-1">
-                                {f.title}
+                                <a 
+                                  href={f.file_path || "#"} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer" 
+                                  className="hover:underline hover:text-blue-600"
+                                >
+                                  {f.title}
+                                </a>
                               </div>
                             )}
-                            <div className={`truncate text-xs font-mono ${f.title ? 'text-slate-500' : 'text-slate-900 font-medium'}`}>
-                              {f.file_path}
+                            <div className={`truncate text-xs ${f.title ? 'text-slate-500' : 'text-slate-900 font-medium'}`}>
+                              {/* Sử dụng hàm renderLinkOrText để tự động biến link thành thẻ a */}
+                              {renderLinkOrText(f.file_path)}
                             </div>
                             {f.notes && <div className="mt-1 text-xs text-slate-500 italic">{f.notes}</div>}
                           </div>
@@ -602,7 +622,10 @@ export default function IdeaDetailPage() {
                           🌍
                         </span>
                         <div className="min-w-0">
-                          <a href={s.url} target="_blank" className="truncate font-medium text-blue-700 hover:underline">{s.url}</a>
+                          <div className="truncate font-medium">
+                            {/* Render link Sources */}
+                            {renderLinkOrText(s.url)}
+                          </div>
                           <div className="flex gap-2 text-xs text-slate-500">
                              <span>Rel: {s.reliability}/5</span>
                              {s.note && <span>• {s.note}</span>}
