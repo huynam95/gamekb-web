@@ -5,7 +5,8 @@ import { supabase } from "@/lib/supabaseClient";
 
 /* ================= TYPES ================= */
 
-type Game = { id: number; title: string };
+// CẬP NHẬT: Thêm cover_url
+type Game = { id: number; title: string; cover_url?: string | null };
 type Group = { id: number; name: string };
 
 type DetailRow = {
@@ -33,23 +34,11 @@ const btnBase =
 const btnPrimary =
   btnBase + " bg-slate-900 text-white shadow-md shadow-slate-900/10 hover:bg-slate-800";
 
-const btnGhost =
-  btnBase + " border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900";
-
-const btnDangerGhost =
-  "inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition";
-
 /* ================= HELPERS ================= */
 
-function Pill({ text, color = "slate" }: { text: string; color?: "slate" | "blue" | "amber" }) {
-  let colors = "border-slate-200 bg-slate-50 text-slate-700";
-  if (color === "blue") colors = "border-blue-200 bg-blue-50 text-blue-700";
-  if (color === "amber") colors = "border-amber-200 bg-amber-50 text-amber-700";
-
+function Pill({ text }: { text: string }) {
   return (
-    <span
-      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${colors}`}
-    >
+    <span className="inline-flex items-center rounded-md border border-slate-200/50 bg-slate-50/80 px-2 py-0.5 text-xs font-medium text-slate-700 backdrop-blur-sm">
       {text}
     </span>
   );
@@ -59,7 +48,7 @@ function typeLabel(t: string) {
   const map: Record<string, string> = {
     small_detail: "Small detail",
     easter_egg: "Easter egg",
-    npc_reaction: "NPC reaction",
+    npc_reaction: "NPC Reaction",
     physics: "Physics",
     troll: "Troll",
     punish: "Punish",
@@ -82,48 +71,59 @@ function yyyyMmDdLocal(d: Date) {
 
 /* ================= COMPONENTS ================= */
 
-// Component hiển thị tên Game nổi bật (MỚI)
 function GameBadge({ title }: { title: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-blue-600 to-violet-600 px-2.5 py-1 text-xs font-bold text-white shadow-sm">
-      👾 {title}
+    <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-bold text-white shadow-sm">
+      🎮 {title}
     </span>
   );
 }
 
-function IdeaItem({ r, gameTitle }: { r: DetailRow; gameTitle: string }) {
+// CẬP NHẬT: IdeaItem hiển thị ảnh nền
+function IdeaItem({ r, game }: { r: DetailRow; game?: Game }) {
+  const hasCover = !!game?.cover_url;
+
   return (
-    <li className="group">
+    <li className="group h-full">
       <a
         href={`/idea/${r.id}`}
-        className="block h-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md"
+        className="relative block h-full overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md"
       >
-        <div className="flex items-start justify-between gap-3">
+        {/* NỀN ẢNH (Nếu có) */}
+        {hasCover && (
+          <>
+            {/* Ảnh gốc mờ */}
+            <div 
+              className="absolute inset-0 z-0 bg-cover bg-center opacity-10 transition group-hover:opacity-15 group-hover:scale-105"
+              style={{ backgroundImage: `url(${game.cover_url})` }}
+            />
+            {/* Lớp phủ gradient để chữ dễ đọc hơn */}
+            <div className="absolute inset-0 z-0 bg-gradient-to-b from-white/40 to-white/90" />
+          </>
+        )}
+
+        <div className="relative z-10 flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            {/* Hàng 1: Game Badge (Đã đưa lên đầu) */}
             <div className="mb-2.5">
-              <GameBadge title={gameTitle} />
+              <GameBadge title={game?.title ?? "Unknown Game"} />
             </div>
 
-            {/* Hàng 2: Tiêu đề Idea */}
             <h3 className="line-clamp-2 text-base font-bold text-slate-900 group-hover:text-blue-600">
               {r.title}
             </h3>
             
-            {/* Hàng 3: Loại (Type) */}
             <div className="mt-2.5 flex flex-wrap gap-2">
               <Pill text={typeLabel(r.detail_type)} />
             </div>
           </div>
 
-          {/* Cột bên phải: Priority */}
           <div
-            className={`shrink-0 rounded-lg border px-2 py-1 text-xs font-bold uppercase tracking-wider ${
+            className={`shrink-0 rounded-lg border px-2 py-1 text-xs font-bold uppercase tracking-wider backdrop-blur-md ${
               r.priority === 1
-                ? "border-rose-200 bg-rose-50 text-rose-700"
+                ? "border-rose-200 bg-rose-50/80 text-rose-700"
                 : r.priority === 5
-                ? "border-slate-100 bg-slate-50 text-slate-500"
-                : "border-slate-200 bg-white text-slate-700"
+                ? "border-slate-200 bg-slate-100/80 text-slate-500"
+                : "border-slate-200 bg-white/80 text-slate-700"
             }`}
           >
             {priorityLabel(r.priority)}
@@ -135,14 +135,12 @@ function IdeaItem({ r, gameTitle }: { r: DetailRow; gameTitle: string }) {
 }
 
 function ComboBox({
-  label,
   placeholder,
   items,
   selectedId,
   onChange,
   allowAllLabel,
 }: {
-  label: string;
   placeholder: string;
   items: { id: number; name: string }[];
   selectedId: number | "";
@@ -209,7 +207,6 @@ function ComboBox({
             >
               {allowAllLabel}
             </button>
-
             {filtered.length === 0 ? (
               <div className="p-3 text-center text-xs text-slate-500">No matches.</div>
             ) : (
@@ -269,7 +266,6 @@ export default function Home() {
   // UI states
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
-  const [savingGroup, setSavingGroup] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQ(q), 300);
@@ -280,9 +276,10 @@ export default function Home() {
     return !debouncedQ.trim() && !gameId && !groupId && !type && !priority;
   }, [debouncedQ, gameId, groupId, type, priority]);
 
+  // CẬP NHẬT: Map gameID sang Object Game (chứa cả title và cover_url)
   const gameMap = useMemo(() => {
-    const m = new Map<number, string>();
-    for (const g of games) m.set(g.id, g.title);
+    const m = new Map<number, Game>();
+    for (const g of games) m.set(g.id, g);
     return m;
   }, [games]);
 
@@ -306,7 +303,8 @@ export default function Home() {
   }
 
   useEffect(() => {
-    supabase.from("games").select("id,title").order("title").then(({ data }) => setGames((data ?? []) as Game[]));
+    // CẬP NHẬT: Lấy thêm cover_url
+    supabase.from("games").select("id,title,cover_url").order("title").then(({ data }) => setGames((data ?? []) as Game[]));
     refreshGroups();
   }, []);
 
@@ -387,11 +385,7 @@ export default function Home() {
 
   async function createGroupOnHome() {
     if (!newGroupName.trim()) return;
-    setSavingGroup(true);
-    const { error } = await supabase
-      .from("idea_groups")
-      .insert({ name: newGroupName.trim() });
-    setSavingGroup(false);
+    const { error } = await supabase.from("idea_groups").insert({ name: newGroupName.trim() });
     if (error) {
       setErr(error.message);
       return;
@@ -408,7 +402,6 @@ export default function Home() {
     await refreshGroups();
   }
 
-  // RESET FILTERS
   const resetFilters = () => {
     setQ("");
     setGameId("");
@@ -419,36 +412,20 @@ export default function Home() {
 
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
-      {/* ================= SIDEBAR ================= */}
+      {/* SIDEBAR */}
       <aside className="fixed inset-y-0 left-0 z-10 hidden w-64 flex-col border-r border-slate-200 bg-white md:flex">
-        {/* Logo */}
         <div className="flex h-16 items-center border-b border-slate-100 px-6">
           <div className="text-xl font-bold tracking-tight text-slate-900">GameKB 🎮</div>
         </div>
-
-        {/* Navigation */}
         <div className="flex-1 overflow-y-auto px-4 py-6">
           <nav className="space-y-1">
-            <button
-              onClick={resetFilters}
-              className={`flex w-full items-center rounded-xl px-3 py-2 text-sm font-medium transition ${
-                !groupId && isDefaultView
-                  ? "bg-slate-100 text-slate-900"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
-            >
+            <button onClick={resetFilters} className={`flex w-full items-center rounded-xl px-3 py-2 text-sm font-medium transition ${!groupId && isDefaultView ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}>
               🏠 Home
             </button>
-            <button
-              onClick={getRandom5}
-              className="flex w-full items-center rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-            >
+            <button onClick={getRandom5} className="flex w-full items-center rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">
               {loadingRandom ? "🎲 Rolling..." : "🎲 Random 5"}
             </button>
-            <a
-              href="/games/new"
-              className="flex w-full items-center rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-            >
+            <a href="/games/new" className="flex w-full items-center rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">
               🕹️ Add Game
             </a>
           </nav>
@@ -461,299 +438,91 @@ export default function Home() {
               const isActive = groupId === g.id;
               return (
                 <div key={g.id} className="group flex items-center gap-1">
-                  <button
-                    onClick={() => {
-                      setGroupId(g.id);
-                      if (g.id !== groupId) {
-                        setQ("");
-                        setGameId("");
-                      }
-                    }}
-                    className={`flex flex-1 items-center justify-between rounded-xl px-3 py-2 text-left text-sm font-medium transition ${
-                      isActive
-                        ? "bg-blue-50 text-blue-700"
-                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                    }`}
-                  >
+                  <button onClick={() => { setGroupId(g.id); if (g.id !== groupId) { setQ(""); setGameId(""); } }} className={`flex flex-1 items-center justify-between rounded-xl px-3 py-2 text-left text-sm font-medium transition ${isActive ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}>
                     <span className="truncate">{g.name}</span>
-                    <span
-                      className={`ml-2 rounded-full px-2 py-0.5 text-[10px] ${
-                        isActive ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500"
-                      }`}
-                    >
+                    <span className={`ml-2 rounded-full px-2 py-0.5 text-[10px] ${isActive ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500"}`}>
                       {groupCounts.get(g.id) ?? 0}
                     </span>
                   </button>
-                  <button
-                    onClick={() => deleteGroup(g)}
-                    className="hidden text-slate-400 hover:text-rose-500 group-hover:block"
-                    title="Delete group"
-                  >
-                    <svg
-                      className="h-4 w-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                  <button onClick={() => deleteGroup(g)} className="hidden text-slate-400 hover:text-rose-500 group-hover:block" title="Delete group">
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                   </button>
                 </div>
               );
             })}
           </nav>
 
-          <button
-            onClick={() => setShowCreateGroup(true)}
-            className="mt-4 flex w-full items-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-500 hover:border-slate-400 hover:text-slate-700"
-          >
+          <button onClick={() => setShowCreateGroup(true)} className="mt-4 flex w-full items-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-500 hover:border-slate-400 hover:text-slate-700">
             + New Group
           </button>
 
-          {/* Inline Create Group Form */}
           {showCreateGroup && (
             <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <input
-                className="mb-2 block w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-slate-400 outline-none"
-                placeholder="Group Name"
-                value={newGroupName}
-                onChange={(e) => setNewGroupName(e.target.value)}
-                autoFocus
-              />
+              <input className="mb-2 block w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-slate-400 outline-none" placeholder="Group Name" value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} autoFocus />
               <div className="flex items-center gap-2">
-                <button
-                  onClick={createGroupOnHome}
-                  className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
-                >
-                  Create
-                </button>
-                <button
-                  onClick={() => setShowCreateGroup(false)}
-                  className="text-xs text-slate-500 hover:text-slate-700"
-                >
-                  Cancel
-                </button>
+                <button onClick={createGroupOnHome} className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800">Create</button>
+                <button onClick={() => setShowCreateGroup(false)} className="text-xs text-slate-500 hover:text-slate-700">Cancel</button>
               </div>
             </div>
           )}
         </div>
       </aside>
 
-      {/* ================= MAIN CONTENT ================= */}
+      {/* MAIN CONTENT */}
       <main className="flex-1 pl-0 md:pl-64">
         <div className="mx-auto max-w-5xl px-6 py-8">
-          {/* HEADER & SEARCH */}
           <header className="mb-8">
             <div className="flex flex-col gap-4 md:flex-row md:items-center">
-              {/* Search Bar - Big Hero Input */}
               <div className="relative flex-1">
                 <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                  <svg
-                    className="h-5 w-5 text-slate-400"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                    />
-                  </svg>
+                  <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                 </div>
-                <input
-                  type="text"
-                  className="block h-12 w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-4 text-base text-slate-900 shadow-sm placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-4 focus:ring-slate-100 transition"
-                  placeholder="Find an idea..."
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                />
+                <input type="text" className="block h-12 w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-4 text-base text-slate-900 shadow-sm placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-4 focus:ring-slate-100 transition" placeholder="Find an idea..." value={q} onChange={(e) => setQ(e.target.value)} />
               </div>
-
-              {/* Primary Action */}
-              <a href="/add" className={`${btnPrimary} h-12 px-6 text-base`}>
-                + Add Idea
-              </a>
+              <a href="/add" className={`${btnPrimary} h-12 px-6 text-base`}>+ Add Idea</a>
             </div>
 
-            {/* Filters Row */}
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-3/4">
-              <ComboBox
-                label="Game"
-                placeholder="Game"
-                items={games.map((g) => ({ id: g.id, name: g.title }))}
-                selectedId={gameId}
-                onChange={setGameId}
-                allowAllLabel="All games"
-              />
-              <div className="relative">
-                <select
-                  className={selectClass}
-                  value={type}
-                  onChange={(e) => setType(e.target.value)}
-                >
-                  <option value="">All Types</option>
-                  <option value="small_detail">Small detail</option>
-                  <option value="easter_egg">Easter egg</option>
-                  <option value="npc_reaction">NPC reaction</option>
-                  <option value="physics">Physics</option>
-                  <option value="troll">Troll</option>
-                  <option value="punish">Punish</option>
-                </select>
-              </div>
-              <div className="relative">
-                <select
-                  className={selectClass}
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value ? Number(e.target.value) : "")}
-                >
-                  <option value="">All Priorities</option>
-                  <option value={1}>High Priority</option>
-                  <option value={3}>Normal</option>
-                  <option value={5}>Low</option>
-                </select>
-              </div>
-              {!isDefaultView && (
-                <button
-                  onClick={resetFilters}
-                  className="text-sm font-medium text-rose-600 hover:text-rose-700 hover:underline text-left px-2"
-                >
-                  Clear filters
-                </button>
-              )}
+              <ComboBox placeholder="Game" items={games.map((g) => ({ id: g.id, name: g.title }))} selectedId={gameId} onChange={setGameId} allowAllLabel="All games" />
+              <div className="relative"><select className={selectClass} value={type} onChange={(e) => setType(e.target.value)}><option value="">All Types</option><option value="small_detail">Small detail</option><option value="easter_egg">Easter egg</option><option value="npc_reaction">NPC reaction</option><option value="physics">Physics</option><option value="troll">Troll</option><option value="punish">Punish</option></select></div>
+              <div className="relative"><select className={selectClass} value={priority} onChange={(e) => setPriority(e.target.value ? Number(e.target.value) : "")}><option value="">All Priorities</option><option value={1}>High Priority</option><option value={3}>Normal</option><option value={5}>Low</option></select></div>
+              {!isDefaultView && <button onClick={resetFilters} className="text-sm font-medium text-rose-600 hover:text-rose-700 hover:underline text-left px-2">Clear filters</button>}
             </div>
           </header>
 
-          {/* ERROR ALERT */}
-          {err && (
-            <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
-              {err}
-            </div>
-          )}
+          {err && <div className="mb-6 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{err}</div>}
 
-          {/* RANDOM 5 RESULT */}
           {random5.length > 0 && (
             <section className="mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-slate-900">🎲 Random Picks</h2>
-                <button
-                  onClick={() => setRandom5([])}
-                  className="text-sm text-slate-500 hover:text-slate-900"
-                >
-                  Clear
-                </button>
-              </div>
+              <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-bold text-slate-900">🎲 Random Picks</h2><button onClick={() => setRandom5([])} className="text-sm text-slate-500 hover:text-slate-900">Clear</button></div>
               <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {random5.map((r) => (
-                  <IdeaItem key={r.id} r={r} gameTitle={gameMap.get(r.game_id) ?? "Game"} />
-                ))}
+                {random5.map((r) => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}
               </ul>
             </section>
           )}
 
-          {/* ================= DASHBOARD CONTENT ================= */}
-
           {isDefaultView ? (
             <div className="grid gap-8 lg:grid-cols-2">
-              {/* PINNED SECTION */}
               <section>
                 <div className="mb-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-lg">
-                      ⭐
-                    </span>
-                    <h2 className="text-xl font-bold text-slate-900">Pinned Ideas</h2>
-                  </div>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
-                    {pinned.length}
-                  </span>
+                  <div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-lg">⭐</span><h2 className="text-xl font-bold text-slate-900">Pinned Ideas</h2></div>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">{pinned.length}</span>
                 </div>
-
-                {loadingDefault ? (
-                  <div className="h-32 rounded-2xl border border-slate-100 bg-white p-4 text-slate-400">
-                    Loading pinned...
-                  </div>
-                ) : pinned.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center">
-                    <p className="text-sm text-slate-500">No pinned ideas yet.</p>
-                    <p className="mt-1 text-xs text-slate-400">Pin an idea to see it here.</p>
-                  </div>
-                ) : (
-                  <ul className="space-y-3">
-                    {pinned.map((r) => (
-                      <IdeaItem key={r.id} r={r} gameTitle={gameMap.get(r.game_id) ?? "Game"} />
-                    ))}
-                  </ul>
-                )}
+                {loadingDefault ? <div className="h-32 rounded-2xl border border-slate-100 bg-white p-4 text-slate-400">Loading pinned...</div> : pinned.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center"><p className="text-sm text-slate-500">No pinned ideas yet.</p></div> : <ul className="space-y-3">{pinned.map((r) => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}</ul>}
               </section>
 
-              {/* DAILY PICKS SECTION */}
               <section>
                 <div className="mb-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 text-lg">
-                      🧠
-                    </span>
-                    <h2 className="text-xl font-bold text-slate-900">Today's Picks</h2>
-                  </div>
+                  <div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 text-lg">🧠</span><h2 className="text-xl font-bold text-slate-900">Today's Picks</h2></div>
                   <span className="text-xs text-slate-400">{yyyyMmDdLocal(new Date())}</span>
                 </div>
-
-                {loadingDefault ? (
-                  <div className="h-32 rounded-2xl border border-slate-100 bg-white p-4 text-slate-400">
-                    Loading daily picks...
-                  </div>
-                ) : daily.length === 0 ? (
-                  <div className="p-4 text-sm text-slate-500">No ideas available.</div>
-                ) : (
-                  <ul className="space-y-3">
-                    {daily.map((r) => (
-                      <IdeaItem key={r.id} r={r} gameTitle={gameMap.get(r.game_id) ?? "Game"} />
-                    ))}
-                  </ul>
-                )}
+                {loadingDefault ? <div className="h-32 rounded-2xl border border-slate-100 bg-white p-4 text-slate-400">Loading daily picks...</div> : daily.length === 0 ? <div className="p-4 text-sm text-slate-500">No ideas available.</div> : <ul className="space-y-3">{daily.map((r) => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}</ul>}
               </section>
             </div>
           ) : (
-            /* ================= SEARCH RESULTS ================= */
             <section>
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-slate-900">
-                  {loading ? "Searching..." : `${ideas.length} Results`}
-                </h2>
-                {groupId && (
-                  <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800">
-                    Group: {groups.find((g) => g.id === groupId)?.name}
-                  </span>
-                )}
-              </div>
-
-              {loading ? (
-                <div className="space-y-3">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="h-20 animate-pulse rounded-xl bg-slate-200" />
-                  ))}
-                </div>
-              ) : ideas.length === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 py-12">
-                  <p className="text-lg font-medium text-slate-900">No ideas found</p>
-                  <p className="text-sm text-slate-500">Try adjusting your filters.</p>
-                  <button
-                    onClick={resetFilters}
-                    className="mt-4 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50"
-                  >
-                    Clear all filters
-                  </button>
-                </div>
-              ) : (
-                <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {ideas.map((r) => (
-                    <IdeaItem key={r.id} r={r} gameTitle={gameMap.get(r.game_id) ?? "Game"} />
-                  ))}
-                </ul>
-              )}
+              <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-bold text-slate-900">{loading ? "Searching..." : `${ideas.length} Results`}</h2>{groupId && <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800">Group: {groups.find((g) => g.id === groupId)?.name}</span>}</div>
+              {loading ? <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-20 animate-pulse rounded-xl bg-slate-200" />)}</div> : ideas.length === 0 ? <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 py-12"><p className="text-lg font-medium text-slate-900">No ideas found</p><button onClick={resetFilters} className="mt-4 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Clear all filters</button></div> : <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{ideas.map((r) => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}</ul>}
             </section>
           )}
         </div>
