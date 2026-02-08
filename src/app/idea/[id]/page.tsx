@@ -22,10 +22,12 @@ type Detail = {
   pinned_at: string | null;
 };
 
+// CẬP NHẬT: Thêm cover_url
 type Game = {
   id: number;
   title: string;
   release_year: number | null;
+  cover_url?: string | null; 
 };
 
 type FootageRow = {
@@ -92,6 +94,26 @@ async function fetchYoutubeTitle(url: string): Promise<string | null> {
   }
 }
 
+function renderLinkOrText(text: string | null) {
+  if (!text) return null;
+  const isUrl = text.startsWith("http://") || text.startsWith("https://");
+
+  if (isUrl) {
+    return (
+      <a 
+        href={text} 
+        target="_blank" 
+        rel="noopener noreferrer" 
+        className="break-all text-blue-600 hover:text-blue-800 hover:underline"
+        onClick={(e) => e.stopPropagation()} 
+      >
+        {text}
+      </a>
+    );
+  }
+  return <span className="break-all font-mono text-slate-600">{text}</span>;
+}
+
 function PriorityBadge({ p }: { p: number }) {
   if (p === 1) return <span className="inline-flex items-center rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700">High Priority</span>;
   if (p === 5) return <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-100 px-2 py-1 text-xs font-medium text-slate-500">Low</span>;
@@ -108,27 +130,6 @@ function TypeBadge({ t }: { t: string }) {
     punish: "Punish",
   };
   return <span className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">{map[t] || t}</span>;
-}
-
-// Helper để render link
-function renderLinkOrText(text: string | null) {
-  if (!text) return null;
-  const isUrl = text.startsWith("http://") || text.startsWith("https://");
-
-  if (isUrl) {
-    return (
-      <a 
-        href={text} 
-        target="_blank" 
-        rel="noopener noreferrer" 
-        className="break-all text-blue-600 hover:text-blue-800 hover:underline"
-        onClick={(e) => e.stopPropagation()} // Tránh kích hoạt các sự kiện click khác nếu có
-      >
-        {text}
-      </a>
-    );
-  }
-  return <span className="break-all font-mono text-slate-600">{text}</span>;
 }
 
 /* ================= COMPONENT: GROUP PICKER ================= */
@@ -374,8 +375,6 @@ export default function IdeaDetailPage() {
     setFetchingTitle(true);
     const link = fp.trim();
     const ytTitle = await fetchYoutubeTitle(link);
-
-    // Logic tự động đánh dấu downloaded nếu là file cục bộ
     const isLocalFile = !link.startsWith("http");
 
     await supabase.from("footage").insert({ 
@@ -564,7 +563,6 @@ export default function IdeaDetailPage() {
                               </div>
                             )}
                             <div className={`truncate text-xs ${f.title ? 'text-slate-500' : 'text-slate-900 font-medium'}`}>
-                              {/* Sử dụng hàm renderLinkOrText để tự động biến link thành thẻ a */}
                               {renderLinkOrText(f.file_path)}
                             </div>
                             {f.notes && <div className="mt-1 text-xs text-slate-500 italic">{f.notes}</div>}
@@ -623,7 +621,6 @@ export default function IdeaDetailPage() {
                         </span>
                         <div className="min-w-0">
                           <div className="truncate font-medium">
-                            {/* Render link Sources */}
                             {renderLinkOrText(s.url)}
                           </div>
                           <div className="flex gap-2 text-xs text-slate-500">
@@ -689,11 +686,27 @@ export default function IdeaDetailPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div>
-                    <div className="mb-1 text-xs text-slate-500">Game</div>
-                    <div className="font-semibold text-slate-900">{game?.title || "Unknown"}</div>
-                  </div>
                   
+                  {/* CẬP NHẬT: HIỂN THỊ ẢNH GAME Ở ĐÂY */}
+                  {game?.cover_url && (
+                    <div className="mb-2 overflow-hidden rounded-xl border border-slate-100 bg-slate-50">
+                      <div className="relative h-32 w-full">
+                         <img src={game.cover_url} alt={game.title} className="h-full w-full object-cover" />
+                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+                         <div className="absolute bottom-2 left-3 font-bold text-white text-sm drop-shadow-md">
+                           {game.title}
+                         </div>
+                      </div>
+                    </div>
+                  )}
+                  {/* Nếu không có ảnh thì hiện text như cũ */}
+                  {!game?.cover_url && (
+                    <div>
+                      <div className="mb-1 text-xs text-slate-500">Game</div>
+                      <div className="font-semibold text-slate-900">{game?.title || "Unknown"}</div>
+                    </div>
+                  )}
+
                   <div className="flex justify-between border-t border-slate-100 pt-3">
                     <div>
                       <div className="mb-1 text-xs text-slate-500">Type</div>
