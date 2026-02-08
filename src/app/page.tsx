@@ -211,11 +211,10 @@ export default function Home() {
   const [recent, setRecent] = useState<DetailRow[]>([]);
   const [loadingDefault, setLoadingDefault] = useState(true);
 
-  // Filter List State
   const [ideas, setIdeas] = useState<DetailRow[]>([]);
-  const [fullIdeas, setFullIdeas] = useState<DetailRow[]>([]); // MỚI: Lưu toàn bộ danh sách để random
+  const [fullIdeas, setFullIdeas] = useState<DetailRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [randomMode, setRandomMode] = useState(false); // MỚI: Trạng thái đang random group
+  const [randomMode, setRandomMode] = useState(false);
 
   const [random5, setRandom5] = useState<DetailRow[]>([]);
   const [loadingRandom, setLoadingRandom] = useState(false);
@@ -268,10 +267,7 @@ export default function Home() {
     const seedDate = yyyyMmDdLocal(new Date());
     const { data: d } = await supabase.rpc("get_daily_seed_ideas", { seed_date: seedDate, take_count: 5 });
     const { data: r } = await supabase.from("details").select("*").eq("status", "idea").order("created_at", { ascending: false }).limit(10);
-
-    setPinned((p ?? []) as DetailRow[]);
-    setDaily((d ?? []) as DetailRow[]);
-    setRecent((r ?? []) as DetailRow[]);
+    setPinned((p ?? []) as DetailRow[]); setDaily((d ?? []) as DetailRow[]); setRecent((r ?? []) as DetailRow[]);
     setLoadingDefault(false);
   }
 
@@ -289,16 +285,10 @@ export default function Home() {
     if (type) query = query.eq("detail_type", type);
     if (priority) query = query.eq("priority", priority);
     if (debouncedQ.trim()) query = query.ilike("title", `%${debouncedQ.trim()}%`);
-    
     const { data, error } = await query.order("pinned", { ascending: false }).order("priority", { ascending: true }).order("created_at", { ascending: false });
-    
     if (error) setErr(error.message);
-    
     const loadedData = (data ?? []) as DetailRow[];
-    setIdeas(loadedData);
-    setFullIdeas(loadedData); // Backup để random
-    setRandomMode(false); // Reset mode khi filter đổi
-    setLoading(false);
+    setIdeas(loadedData); setFullIdeas(loadedData); setRandomMode(false); setLoading(false);
   }
 
   useEffect(() => {
@@ -306,7 +296,6 @@ export default function Home() {
     else loadFilteredIdeas();
   }, [isDefaultView, debouncedQ, gameId, groupId, type, priority]);
 
-  // MỚI: Random 3 ý tưởng trong group hiện tại
   function pickRandom3FromGroup() {
     if (fullIdeas.length === 0) return;
     const shuffled = [...fullIdeas].sort(() => 0.5 - Math.random());
@@ -346,41 +335,110 @@ export default function Home() {
       
       {editingGame && <EditGameModal game={editingGame} onClose={() => setEditingGame(null)} onSaved={loadGames} />}
 
-      {/* SIDEBAR */}
-      <aside className="fixed inset-y-0 left-0 z-10 hidden w-64 flex-col border-r border-slate-200 bg-white md:flex">
-        <div className="flex h-16 items-center border-b border-slate-100 px-6"><div className="text-xl font-bold tracking-tight text-slate-900">GameKB 🎮</div></div>
-        <div className="flex-1 overflow-y-auto px-4 py-6">
-          <nav className="space-y-1">
-            <button onClick={resetFilters} className={`flex w-full items-center rounded-xl px-3 py-2 text-sm font-medium transition ${!groupId && isDefaultView ? "bg-slate-100 text-slate-900" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}>🏠 Home</button>
-            <button onClick={getRandom5} className="flex w-full items-center rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">{loadingRandom ? "🎲 Rolling..." : "🎲 Random 5"}</button>
-            <a href="/games/new" className="flex w-full items-center rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">🕹️ Add Game</a>
+      {/* NEW MODERN SIDEBAR */}
+      <aside className="fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-slate-200/60 bg-white/80 backdrop-blur-xl shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] transition-transform duration-300 md:translate-x-0 hidden md:flex">
+        
+        {/* Header Logo */}
+        <div className="flex h-20 items-center px-8">
+           <div className="bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-2xl font-black tracking-tighter text-transparent">
+             GameKB<span className="text-blue-500">.</span>
+           </div>
+        </div>
+
+        {/* Main Nav */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-8 no-scrollbar">
+          
+          <nav className="space-y-2">
+            <button 
+               onClick={resetFilters} 
+               className={`group flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${!groupId && isDefaultView ? "bg-slate-900 text-white shadow-lg shadow-slate-900/20" : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"}`}
+            >
+               <span className="text-lg">🏠</span> Home
+            </button>
+            <button 
+               onClick={getRandom5} 
+               className="group flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-500 transition-all duration-200 hover:bg-slate-100 hover:text-slate-900"
+            >
+               <span className={`text-lg transition-transform duration-500 ${loadingRandom ? "animate-spin" : "group-hover:rotate-180"}`}>🎲</span> 
+               {loadingRandom ? "Rolling..." : "Random 5"}
+            </button>
+            <a 
+               href="/games/new" 
+               className="group flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-500 transition-all duration-200 hover:bg-slate-100 hover:text-slate-900"
+            >
+               <span className="text-lg">🕹️</span> Add Game
+            </a>
           </nav>
-          <div className="mt-8 mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Groups</div>
-          <nav className="space-y-1">
-            {groups.map((g) => {
-              const isActive = groupId === g.id;
-              return (
-                <div key={g.id} className="group flex items-center gap-1">
-                  <button onClick={() => { setGroupId(g.id); if (g.id !== groupId) { setQ(""); setGameId(""); } }} className={`flex flex-1 items-center justify-between rounded-xl px-3 py-2 text-left text-sm font-medium transition ${isActive ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}>
-                    <span className="truncate">{g.name}</span><span className={`ml-2 rounded-full px-2 py-0.5 text-[10px] ${isActive ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500"}`}>{groupCounts.get(g.id) ?? 0}</span>
-                  </button>
-                  <button onClick={() => deleteGroup(g)} className="hidden text-slate-400 hover:text-rose-500 group-hover:block" title="Delete group"><svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg></button>
-                </div>
-              );
-            })}
-          </nav>
-          <button onClick={() => setShowCreateGroup(true)} className="mt-4 flex w-full items-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-500 hover:border-slate-400 hover:text-slate-700">+ New Group</button>
-          {showCreateGroup && (
-            <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <input className="mb-2 block w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-slate-400 outline-none" placeholder="Group Name" value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} autoFocus />
-              <div className="flex items-center gap-2"><button onClick={createGroupOnHome} className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800">Create</button><button onClick={() => setShowCreateGroup(false)} className="text-xs text-slate-500 hover:text-slate-700">Cancel</button></div>
+
+          {/* Groups Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between px-2">
+               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Collections</h3>
+               <button 
+                  onClick={() => setShowCreateGroup(!showCreateGroup)} 
+                  className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-blue-100 hover:text-blue-600 transition"
+                  title="Create Group"
+               >
+                  +
+               </button>
             </div>
-          )}
+
+            {showCreateGroup && (
+               <div className="animate-in fade-in slide-in-from-top-2">
+                 <div className="relative">
+                    <input 
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium outline-none focus:border-blue-400 focus:bg-white transition"
+                      placeholder="Enter group name..." 
+                      value={newGroupName} 
+                      onChange={(e) => setNewGroupName(e.target.value)} 
+                      onKeyDown={(e) => e.key === 'Enter' && createGroupOnHome()}
+                      autoFocus 
+                    />
+                    <div className="absolute right-1 top-1 flex h-full items-start pt-1 gap-1">
+                       <button onClick={createGroupOnHome} className="rounded p-1 text-[10px] bg-blue-500 text-white hover:bg-blue-600">OK</button>
+                    </div>
+                 </div>
+               </div>
+            )}
+
+            <nav className="space-y-1">
+              {groups.map((g) => {
+                const isActive = groupId === g.id;
+                return (
+                  <div key={g.id} className="group/item relative">
+                    <button 
+                       onClick={() => { setGroupId(g.id); if (g.id !== groupId) { setQ(""); setGameId(""); } }} 
+                       className={`flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-left text-sm font-medium transition-all ${isActive ? "bg-white shadow-md text-blue-600 ring-1 ring-slate-100" : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"}`}
+                    >
+                      <span className="truncate">{g.name}</span>
+                      <span className={`ml-2 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${isActive ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-400 group-hover/item:bg-slate-200"}`}>
+                        {groupCounts.get(g.id) ?? 0}
+                      </span>
+                    </button>
+                    <button 
+                       onClick={() => deleteGroup(g)} 
+                       className="absolute right-12 top-1/2 -translate-y-1/2 opacity-0 group-hover/item:opacity-100 p-1.5 text-slate-300 hover:text-rose-500 transition" 
+                       title="Delete"
+                    >
+                       <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                );
+              })}
+            </nav>
+          </div>
+        </div>
+
+        {/* Footer Info */}
+        <div className="border-t border-slate-100 p-4">
+           <div className="rounded-xl bg-slate-50 p-3 text-center">
+              <p className="text-[10px] font-medium text-slate-400">Personal Knowledge Base</p>
+           </div>
         </div>
       </aside>
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 pl-0 md:pl-64">
+      <main className="flex-1 pl-0 md:pl-72 transition-all duration-300">
         <div className="mx-auto max-w-[1900px] px-6 py-8">
           <header className="mb-8">
             <div className="flex flex-col gap-4 md:flex-row md:items-center">
@@ -412,7 +470,6 @@ export default function Home() {
           )}
 
           {isDefaultView ? (
-            // GRID 3 CỘT (Pinned - Daily - Recent)
             <div className="grid gap-6 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
               <section>
                 <div className="mb-4 flex items-center justify-between"><div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-lg">⭐</span><h2 className="text-xl font-bold text-slate-900">Pinned</h2></div><span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">{pinned.length}</span></div>
@@ -437,16 +494,10 @@ export default function Home() {
                   {groupId && (
                      <>
                         <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800">Group: {groups.find((g) => g.id === groupId)?.name}</span>
-                        {/* NÚT RANDOM TRONG GROUP */}
-                        <button 
-                           onClick={pickRandom3FromGroup} 
-                           className="ml-2 inline-flex h-7 items-center gap-1 rounded-lg bg-indigo-100 px-2 text-xs font-bold text-indigo-700 hover:bg-indigo-200 transition"
-                        >
+                        <button onClick={pickRandom3FromGroup} className="ml-2 inline-flex h-7 items-center gap-1 rounded-lg bg-indigo-100 px-2 text-xs font-bold text-indigo-700 hover:bg-indigo-200 transition">
                            {randomMode ? "🎲 Re-roll 3" : "🎲 Pick 3 Random"}
                         </button>
-                        {randomMode && (
-                           <button onClick={resetGroupView} className="ml-1 text-xs text-slate-500 hover:text-slate-800 underline">Show All</button>
-                        )}
+                        {randomMode && <button onClick={resetGroupView} className="ml-1 text-xs text-slate-500 hover:text-slate-800 underline">Show All</button>}
                      </>
                   )}
                 </div>
