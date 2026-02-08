@@ -5,8 +5,16 @@ import { supabase } from "@/lib/supabaseClient";
 
 /* ================= TYPES ================= */
 
-// CẬP NHẬT: Thêm cover_url
-type Game = { id: number; title: string; cover_url?: string | null };
+// CẬP NHẬT: Type Game đầy đủ để edit
+type Game = {
+  id: number;
+  title: string;
+  cover_url?: string | null;
+  release_year?: number | null;
+  genres_text?: string | null;
+  notes?: string | null;
+};
+
 type Group = { id: number; name: string };
 
 type DetailRow = {
@@ -33,6 +41,9 @@ const btnBase =
 
 const btnPrimary =
   btnBase + " bg-slate-900 text-white shadow-md shadow-slate-900/10 hover:bg-slate-800";
+
+const btnGhost =
+  btnBase + " border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900";
 
 /* ================= HELPERS ================= */
 
@@ -79,7 +90,6 @@ function GameBadge({ title }: { title: string }) {
   );
 }
 
-// CẬP NHẬT: IdeaItem hiển thị ảnh nền
 function IdeaItem({ r, game }: { r: DetailRow; game?: Game }) {
   const hasCover = !!game?.cover_url;
 
@@ -89,15 +99,12 @@ function IdeaItem({ r, game }: { r: DetailRow; game?: Game }) {
         href={`/idea/${r.id}`}
         className="relative block h-full overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md"
       >
-        {/* NỀN ẢNH (Nếu có) */}
         {hasCover && (
           <>
-            {/* Ảnh gốc mờ */}
             <div 
               className="absolute inset-0 z-0 bg-cover bg-center opacity-10 transition group-hover:opacity-15 group-hover:scale-105"
               style={{ backgroundImage: `url(${game.cover_url})` }}
             />
-            {/* Lớp phủ gradient để chữ dễ đọc hơn */}
             <div className="absolute inset-0 z-0 bg-gradient-to-b from-white/40 to-white/90" />
           </>
         )}
@@ -235,27 +242,107 @@ function ComboBox({
   );
 }
 
+/* ================= MODAL EDIT GAME (MỚI) ================= */
+
+function EditGameModal({
+  game,
+  onClose,
+  onSaved,
+}: {
+  game: Game;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [title, setTitle] = useState(game.title);
+  const [coverUrl, setCoverUrl] = useState(game.cover_url || "");
+  const [releaseYear, setReleaseYear] = useState(game.release_year ? String(game.release_year) : "");
+  const [genres, setGenres] = useState(game.genres_text || "");
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    if (!title.trim()) return;
+    setSaving(true);
+    const yearNum = releaseYear.trim() ? Number(releaseYear.trim()) : null;
+
+    await supabase.from("games").update({
+      title: title.trim(),
+      cover_url: coverUrl.trim() || null,
+      release_year: yearNum,
+      genres_text: genres.trim() || null
+    }).eq("id", game.id);
+
+    setSaving(false);
+    onSaved();
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-lg font-bold text-slate-900">Edit Game</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">✕</button>
+        </div>
+
+        <div className="space-y-4">
+          <label className="block">
+            <span className="mb-1 block text-xs font-bold text-slate-700">Title</span>
+            <input className={inputClass} value={title} onChange={e => setTitle(e.target.value)} autoFocus />
+          </label>
+          
+          <div className="grid grid-cols-2 gap-4">
+             <label className="block">
+              <span className="mb-1 block text-xs font-bold text-slate-700">Year</span>
+              <input className={inputClass} type="number" value={releaseYear} onChange={e => setReleaseYear(e.target.value)} placeholder="YYYY" />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-bold text-slate-700">Genres</span>
+              <input className={inputClass} value={genres} onChange={e => setGenres(e.target.value)} placeholder="Action..." />
+            </label>
+          </div>
+
+          <label className="block">
+            <span className="mb-1 block text-xs font-bold text-slate-700">Cover Image URL</span>
+            <input className={inputClass} value={coverUrl} onChange={e => setCoverUrl(e.target.value)} placeholder="https://..." />
+          </label>
+
+          {/* Preview nhỏ */}
+          {coverUrl && (
+            <div className="h-32 w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+               <img src={coverUrl} className="h-full w-full object-cover opacity-80" onError={e => e.currentTarget.style.display='none'} />
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button onClick={onClose} className={btnGhost}>Cancel</button>
+            <button onClick={handleSave} disabled={saving} className={btnPrimary}>
+              {saving ? "Saving..." : "Save Changes"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ================= MAIN PAGE ================= */
 
 export default function Home() {
   const [games, setGames] = useState<Game[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupCounts, setGroupCounts] = useState<Map<number, number>>(new Map());
-
   const [err, setErr] = useState<string | null>(null);
 
-  // Data states
+  // States
   const [pinned, setPinned] = useState<DetailRow[]>([]);
   const [daily, setDaily] = useState<DetailRow[]>([]);
   const [loadingDefault, setLoadingDefault] = useState(true);
-
   const [ideas, setIdeas] = useState<DetailRow[]>([]);
   const [loading, setLoading] = useState(true);
-
   const [random5, setRandom5] = useState<DetailRow[]>([]);
   const [loadingRandom, setLoadingRandom] = useState(false);
 
-  // Filter states
+  // Filters
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [gameId, setGameId] = useState<number | "">("");
@@ -263,9 +350,12 @@ export default function Home() {
   const [type, setType] = useState<string | "">("");
   const [priority, setPriority] = useState<number | "">("");
 
-  // UI states
+  // UI States
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
+  
+  // EDIT GAME MODAL STATE
+  const [editingGame, setEditingGame] = useState<Game | null>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQ(q), 300);
@@ -276,94 +366,64 @@ export default function Home() {
     return !debouncedQ.trim() && !gameId && !groupId && !type && !priority;
   }, [debouncedQ, gameId, groupId, type, priority]);
 
-  // CẬP NHẬT: Map gameID sang Object Game (chứa cả title và cover_url)
   const gameMap = useMemo(() => {
     const m = new Map<number, Game>();
     for (const g of games) m.set(g.id, g);
     return m;
   }, [games]);
 
+  async function loadGames() {
+    // Lấy FULL thông tin game để còn edit
+    const { data } = await supabase.from("games").select("*").order("title");
+    setGames((data ?? []) as Game[]);
+  }
+
   async function refreshGroups() {
     const { data, error } = await supabase.from("idea_groups").select("id,name").order("name");
-    if (error) {
-      setErr(error.message);
-      return;
-    }
+    if (error) { setErr(error.message); return; }
     setGroups((data ?? []) as Group[]);
 
-    const { data: items, error: e2 } = await supabase.from("idea_group_items").select("group_id");
-    if (!e2) {
-      const m = new Map<number, number>();
-      for (const row of items ?? []) {
-        const gid = Number((row as any).group_id);
-        m.set(gid, (m.get(gid) ?? 0) + 1);
-      }
-      setGroupCounts(m);
+    const { data: items } = await supabase.from("idea_group_items").select("group_id");
+    const m = new Map<number, number>();
+    for (const row of items ?? []) {
+      const gid = Number((row as any).group_id);
+      m.set(gid, (m.get(gid) ?? 0) + 1);
     }
+    setGroupCounts(m);
   }
 
   useEffect(() => {
-    // CẬP NHẬT: Lấy thêm cover_url
-    supabase.from("games").select("id,title,cover_url").order("title").then(({ data }) => setGames((data ?? []) as Game[]));
+    loadGames();
     refreshGroups();
   }, []);
 
-  // LOAD DEFAULT VIEW
   async function loadDefaultView() {
     setLoadingDefault(true);
     setErr(null);
-
-    const { data: p } = await supabase
-      .from("details")
-      .select("id,title,priority,detail_type,game_id,pinned,pinned_at,created_at")
-      .eq("status", "idea")
-      .eq("pinned", true)
-      .order("pinned_at", { ascending: false });
-
+    const { data: p } = await supabase.from("details").select("id,title,priority,detail_type,game_id,pinned,pinned_at,created_at").eq("status", "idea").eq("pinned", true).order("pinned_at", { ascending: false });
     const seedDate = yyyyMmDdLocal(new Date());
-    const { data: d } = await supabase.rpc("get_daily_seed_ideas", {
-      seed_date: seedDate,
-      take_count: 5,
-    });
-
+    const { data: d } = await supabase.rpc("get_daily_seed_ideas", { seed_date: seedDate, take_count: 5 });
     setPinned((p ?? []) as DetailRow[]);
     setDaily((d ?? []) as DetailRow[]);
     setLoadingDefault(false);
   }
 
-  // LOAD FILTERED IDEAS
   async function loadFilteredIdeas() {
     setLoading(true);
     setErr(null);
-
     let groupDetailIds: number[] | null = null;
-
     if (groupId) {
       const { data: gi } = await supabase.from("idea_group_items").select("detail_id").eq("group_id", groupId);
       groupDetailIds = (gi ?? []).map((x: any) => Number(x.detail_id));
-      if (groupDetailIds.length === 0) {
-        setIdeas([]);
-        setLoading(false);
-        return;
-      }
+      if (groupDetailIds.length === 0) { setIdeas([]); setLoading(false); return; }
     }
-
-    let query = supabase
-      .from("details")
-      .select("id,title,priority,detail_type,game_id,pinned,pinned_at,created_at")
-      .eq("status", "idea");
-
+    let query = supabase.from("details").select("id,title,priority,detail_type,game_id,pinned,pinned_at,created_at").eq("status", "idea");
     if (groupDetailIds) query = query.in("id", groupDetailIds);
     if (gameId) query = query.eq("game_id", gameId);
     if (type) query = query.eq("detail_type", type);
     if (priority) query = query.eq("priority", priority);
     if (debouncedQ.trim()) query = query.ilike("title", `%${debouncedQ.trim()}%`);
-
-    const { data, error } = await query
-      .order("pinned", { ascending: false })
-      .order("priority", { ascending: true })
-      .order("created_at", { ascending: false });
-
+    const { data, error } = await query.order("pinned", { ascending: false }).order("priority", { ascending: true }).order("created_at", { ascending: false });
     if (error) setErr(error.message);
     setIdeas((data ?? []) as DetailRow[]);
     setLoading(false);
@@ -372,10 +432,8 @@ export default function Home() {
   useEffect(() => {
     if (isDefaultView) loadDefaultView();
     else loadFilteredIdeas();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDefaultView, debouncedQ, gameId, groupId, type, priority]);
 
-  // ACTIONS
   async function getRandom5() {
     setLoadingRandom(true);
     const { data } = await supabase.rpc("get_random_ideas", { take_count: 5, include_pinned: true });
@@ -386,10 +444,7 @@ export default function Home() {
   async function createGroupOnHome() {
     if (!newGroupName.trim()) return;
     const { error } = await supabase.from("idea_groups").insert({ name: newGroupName.trim() });
-    if (error) {
-      setErr(error.message);
-      return;
-    }
+    if (error) { setErr(error.message); return; }
     setShowCreateGroup(false);
     setNewGroupName("");
     await refreshGroups();
@@ -403,15 +458,21 @@ export default function Home() {
   }
 
   const resetFilters = () => {
-    setQ("");
-    setGameId("");
-    setGroupId("");
-    setType("");
-    setPriority("");
+    setQ(""); setGameId(""); setGroupId(""); setType(""); setPriority("");
   };
 
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
+      
+      {/* --- EDIT MODAL --- */}
+      {editingGame && (
+        <EditGameModal 
+          game={editingGame} 
+          onClose={() => setEditingGame(null)} 
+          onSaved={loadGames} 
+        />
+      )}
+
       {/* SIDEBAR */}
       <aside className="fixed inset-y-0 left-0 z-10 hidden w-64 flex-col border-r border-slate-200 bg-white md:flex">
         <div className="flex h-16 items-center border-b border-slate-100 px-6">
@@ -429,10 +490,7 @@ export default function Home() {
               🕹️ Add Game
             </a>
           </nav>
-
-          <div className="mt-8 mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
-            Groups
-          </div>
+          <div className="mt-8 mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Groups</div>
           <nav className="space-y-1">
             {groups.map((g) => {
               const isActive = groupId === g.id;
@@ -440,9 +498,7 @@ export default function Home() {
                 <div key={g.id} className="group flex items-center gap-1">
                   <button onClick={() => { setGroupId(g.id); if (g.id !== groupId) { setQ(""); setGameId(""); } }} className={`flex flex-1 items-center justify-between rounded-xl px-3 py-2 text-left text-sm font-medium transition ${isActive ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"}`}>
                     <span className="truncate">{g.name}</span>
-                    <span className={`ml-2 rounded-full px-2 py-0.5 text-[10px] ${isActive ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500"}`}>
-                      {groupCounts.get(g.id) ?? 0}
-                    </span>
+                    <span className={`ml-2 rounded-full px-2 py-0.5 text-[10px] ${isActive ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-500"}`}>{groupCounts.get(g.id) ?? 0}</span>
                   </button>
                   <button onClick={() => deleteGroup(g)} className="hidden text-slate-400 hover:text-rose-500 group-hover:block" title="Delete group">
                     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -451,11 +507,7 @@ export default function Home() {
               );
             })}
           </nav>
-
-          <button onClick={() => setShowCreateGroup(true)} className="mt-4 flex w-full items-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-500 hover:border-slate-400 hover:text-slate-700">
-            + New Group
-          </button>
-
+          <button onClick={() => setShowCreateGroup(true)} className="mt-4 flex w-full items-center gap-2 rounded-xl border border-dashed border-slate-300 px-3 py-2 text-sm font-medium text-slate-500 hover:border-slate-400 hover:text-slate-700">+ New Group</button>
           {showCreateGroup && (
             <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
               <input className="mb-2 block w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-slate-400 outline-none" placeholder="Group Name" value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} autoFocus />
@@ -483,7 +535,23 @@ export default function Home() {
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-3/4">
-              <ComboBox placeholder="Game" items={games.map((g) => ({ id: g.id, name: g.title }))} selectedId={gameId} onChange={setGameId} allowAllLabel="All games" />
+              {/* GAME FILTER + EDIT BUTTON */}
+              <div className="flex gap-2">
+                 <ComboBox placeholder="Game" items={games.map((g) => ({ id: g.id, name: g.title }))} selectedId={gameId} onChange={setGameId} allowAllLabel="All games" />
+                 {gameId && (
+                   <button 
+                    onClick={() => {
+                      const g = games.find(x => x.id === gameId);
+                      if(g) setEditingGame(g);
+                    }}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50 hover:text-blue-600 shadow-sm transition"
+                    title="Edit selected game"
+                   >
+                     ✎
+                   </button>
+                 )}
+              </div>
+              
               <div className="relative"><select className={selectClass} value={type} onChange={(e) => setType(e.target.value)}><option value="">All Types</option><option value="small_detail">Small detail</option><option value="easter_egg">Easter egg</option><option value="npc_reaction">NPC reaction</option><option value="physics">Physics</option><option value="troll">Troll</option><option value="punish">Punish</option></select></div>
               <div className="relative"><select className={selectClass} value={priority} onChange={(e) => setPriority(e.target.value ? Number(e.target.value) : "")}><option value="">All Priorities</option><option value={1}>High Priority</option><option value={3}>Normal</option><option value={5}>Low</option></select></div>
               {!isDefaultView && <button onClick={resetFilters} className="text-sm font-medium text-rose-600 hover:text-rose-700 hover:underline text-left px-2">Clear filters</button>}
