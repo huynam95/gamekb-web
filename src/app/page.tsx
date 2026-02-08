@@ -5,7 +5,6 @@ import { supabase } from "@/lib/supabaseClient";
 
 /* ================= TYPES ================= */
 
-// CẬP NHẬT: Type Game đầy đủ để edit
 type Game = {
   id: number;
   title: string;
@@ -242,7 +241,7 @@ function ComboBox({
   );
 }
 
-/* ================= MODAL EDIT GAME (MỚI) ================= */
+/* ================= MODAL EDIT GAME ================= */
 
 function EditGameModal({
   game,
@@ -373,7 +372,6 @@ export default function Home() {
   }, [games]);
 
   async function loadGames() {
-    // Lấy FULL thông tin game để còn edit
     const { data } = await supabase.from("games").select("*").order("title");
     setGames((data ?? []) as Game[]);
   }
@@ -535,23 +533,32 @@ export default function Home() {
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-3/4">
-              {/* GAME FILTER + EDIT BUTTON */}
-              <div className="flex gap-2">
-                 <ComboBox placeholder="Game" items={games.map((g) => ({ id: g.id, name: g.title }))} selectedId={gameId} onChange={setGameId} allowAllLabel="All games" />
-                 {gameId && (
-                   <button 
+              
+              {/* GAME FILTER + EDIT BUTTON (FIXED) */}
+              <div className="flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <ComboBox 
+                    placeholder="Game" 
+                    items={games.map((g) => ({ id: g.id, name: g.title }))} 
+                    selectedId={gameId} 
+                    onChange={setGameId} 
+                    allowAllLabel="All games" 
+                  />
+                </div>
+                {gameId !== "" && (
+                  <button 
                     onClick={() => {
                       const g = games.find(x => x.id === gameId);
                       if(g) setEditingGame(g);
                     }}
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50 hover:text-blue-600 shadow-sm transition"
                     title="Edit selected game"
-                   >
-                     ✎
-                   </button>
-                 )}
+                  >
+                    ✎
+                  </button>
+                )}
               </div>
-              
+
               <div className="relative"><select className={selectClass} value={type} onChange={(e) => setType(e.target.value)}><option value="">All Types</option><option value="small_detail">Small detail</option><option value="easter_egg">Easter egg</option><option value="npc_reaction">NPC reaction</option><option value="physics">Physics</option><option value="troll">Troll</option><option value="punish">Punish</option></select></div>
               <div className="relative"><select className={selectClass} value={priority} onChange={(e) => setPriority(e.target.value ? Number(e.target.value) : "")}><option value="">All Priorities</option><option value={1}>High Priority</option><option value={3}>Normal</option><option value={5}>Low</option></select></div>
               {!isDefaultView && <button onClick={resetFilters} className="text-sm font-medium text-rose-600 hover:text-rose-700 hover:underline text-left px-2">Clear filters</button>}
