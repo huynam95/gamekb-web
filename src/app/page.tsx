@@ -48,7 +48,7 @@ const btnGhost =
 
 function Pill({ text }: { text: string }) {
   return (
-    <span className="inline-flex items-center rounded-md border border-slate-200/50 bg-slate-50/80 px-2 py-0.5 text-xs font-medium text-slate-700 backdrop-blur-sm">
+    <span className="inline-flex items-center rounded-md border border-slate-200/60 bg-white/60 px-2 py-0.5 text-xs font-medium text-slate-700 backdrop-blur-md shadow-sm">
       {text}
     </span>
   );
@@ -83,12 +83,13 @@ function yyyyMmDdLocal(d: Date) {
 
 function GameBadge({ title }: { title: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-2.5 py-1 text-xs font-bold text-white shadow-sm">
+    <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900/90 backdrop-blur-md px-2.5 py-1 text-xs font-bold text-white shadow-sm z-20">
       🎮 {title}
     </span>
   );
 }
 
+// CẬP NHẬT: Giao diện thẻ Idea rõ ảnh hơn
 function IdeaItem({ r, game }: { r: DetailRow; game?: Game }) {
   const hasCover = !!game?.cover_url;
 
@@ -96,43 +97,52 @@ function IdeaItem({ r, game }: { r: DetailRow; game?: Game }) {
     <li className="group h-full">
       <a
         href={`/idea/${r.id}`}
-        className="relative block h-full overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md"
+        className="relative flex flex-col h-full overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-300 hover:border-slate-300 hover:shadow-lg hover:-translate-y-1"
       >
+        {/* NỀN ẢNH (Đã tăng độ rõ) */}
         {hasCover && (
-          <>
+          <div className="absolute inset-0 z-0">
+            {/* Ảnh nền */}
             <div 
-              className="absolute inset-0 z-0 bg-cover bg-center opacity-10 transition group-hover:opacity-15 group-hover:scale-105"
-              style={{ backgroundImage: `url(${game.cover_url})` }}
+              className="absolute inset-0 bg-cover bg-center transition-all duration-500 ease-out group-hover:scale-110"
+              style={{ backgroundImage: `url(${game.cover_url})`, opacity: 0.25 }} // Tăng opacity từ 0.1 -> 0.25
             />
-            <div className="absolute inset-0 z-0 bg-gradient-to-b from-white/40 to-white/90" />
-          </>
+            {/* Lớp phủ gradient để chữ dễ đọc */}
+            <div className="absolute inset-0 bg-gradient-to-t from-white via-white/80 to-white/40" />
+          </div>
         )}
 
-        <div className="relative z-10 flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="mb-2.5">
-              <GameBadge title={game?.title ?? "Unknown Game"} />
+        <div className="relative z-10 flex flex-1 flex-col items-start justify-between gap-3">
+          <div className="w-full">
+            <div className="mb-3 flex items-start justify-between">
+               <GameBadge title={game?.title ?? "Unknown Game"} />
+               
+               <div
+                className={`shrink-0 rounded-lg border px-2 py-1 text-xs font-bold uppercase tracking-wider backdrop-blur-md shadow-sm ${
+                  r.priority === 1
+                    ? "border-rose-200/50 bg-rose-50/80 text-rose-700"
+                    : r.priority === 5
+                    ? "border-slate-200/50 bg-slate-100/80 text-slate-500"
+                    : "border-slate-200/50 bg-white/80 text-slate-700"
+                }`}
+              >
+                {priorityLabel(r.priority)}
+              </div>
             </div>
 
-            <h3 className="line-clamp-2 text-base font-bold text-slate-900 group-hover:text-blue-600">
+            <h3 className="line-clamp-3 text-lg font-bold text-slate-900 drop-shadow-sm transition group-hover:text-blue-700">
               {r.title}
             </h3>
-            
-            <div className="mt-2.5 flex flex-wrap gap-2">
-              <Pill text={typeLabel(r.detail_type)} />
-            </div>
           </div>
-
-          <div
-            className={`shrink-0 rounded-lg border px-2 py-1 text-xs font-bold uppercase tracking-wider backdrop-blur-md ${
-              r.priority === 1
-                ? "border-rose-200 bg-rose-50/80 text-rose-700"
-                : r.priority === 5
-                ? "border-slate-200 bg-slate-100/80 text-slate-500"
-                : "border-slate-200 bg-white/80 text-slate-700"
-            }`}
-          >
-            {priorityLabel(r.priority)}
+            
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Pill text={typeLabel(r.detail_type)} />
+            {/* Nếu có ngày tạo thì hiện thêm cho đẹp */}
+            {r.created_at && (
+               <span className="text-[10px] text-slate-400 font-medium self-center ml-auto">
+                 {new Date(r.created_at).toLocaleDateString()}
+               </span>
+            )}
           </div>
         </div>
       </a>
@@ -157,11 +167,6 @@ function ComboBox({
   const [query, setQuery] = useState("");
   const boxRef = useRef<HTMLDivElement | null>(null);
 
-  const selected = useMemo(() => {
-    if (!selectedId) return null;
-    return items.find((x) => x.id === selectedId) ?? null;
-  }, [items, selectedId]);
-
   const filtered = useMemo(() => {
     const s = query.trim().toLowerCase();
     if (!s) return items.slice(0, 50);
@@ -178,14 +183,14 @@ function ComboBox({
   }, []);
 
   return (
-    <div ref={boxRef} className="relative w-full">
+    <div ref={boxRef} className="relative w-full h-10">
       <button
         type="button"
         className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-left text-sm text-slate-900 shadow-sm transition hover:border-slate-300 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
         onClick={() => setOpen((v) => !v)}
       >
         <span className="block truncate">
-          {selected ? selected.name : <span className="text-slate-500">{placeholder}</span>}
+          {items.find((x) => x.id === selectedId)?.name || <span className="text-slate-500">{placeholder}</span>}
         </span>
       </button>
 
@@ -305,7 +310,6 @@ function EditGameModal({
             <input className={inputClass} value={coverUrl} onChange={e => setCoverUrl(e.target.value)} placeholder="https://..." />
           </label>
 
-          {/* Preview nhỏ */}
           {coverUrl && (
             <div className="h-32 w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
                <img src={coverUrl} className="h-full w-full object-cover opacity-80" onError={e => e.currentTarget.style.display='none'} />
@@ -349,11 +353,9 @@ export default function Home() {
   const [type, setType] = useState<string | "">("");
   const [priority, setPriority] = useState<number | "">("");
 
-  // UI States
+  // UI
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
-  
-  // EDIT GAME MODAL STATE
   const [editingGame, setEditingGame] = useState<Game | null>(null);
 
   useEffect(() => {
@@ -462,7 +464,6 @@ export default function Home() {
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
       
-      {/* --- EDIT MODAL --- */}
       {editingGame && (
         <EditGameModal 
           game={editingGame} 
@@ -535,7 +536,7 @@ export default function Home() {
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-3/4">
               
               {/* GAME FILTER + EDIT BUTTON (FIXED) */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 min-w-0">
                 <div className="flex-1 min-w-0">
                   <ComboBox 
                     placeholder="Game" 
