@@ -76,7 +76,7 @@ function IdeaItem({ r, game }: { r: DetailRow; game?: Game }) {
   const hasCover = !!game?.cover_url;
 
   return (
-    <li className="group h-full">
+    <li className="group h-full animate-in fade-in zoom-in-95 duration-300">
       <a
         href={`/idea/${r.id}`}
         className="relative flex h-64 w-full flex-col justify-end overflow-hidden rounded-2xl border border-slate-200 bg-slate-900 shadow-sm transition-all duration-500 hover:shadow-xl hover:-translate-y-1"
@@ -208,11 +208,15 @@ export default function Home() {
   // Data states
   const [pinned, setPinned] = useState<DetailRow[]>([]);
   const [daily, setDaily] = useState<DetailRow[]>([]);
-  const [recent, setRecent] = useState<DetailRow[]>([]); // MỚI: State cho cột Recent
+  const [recent, setRecent] = useState<DetailRow[]>([]);
   const [loadingDefault, setLoadingDefault] = useState(true);
 
+  // Filter List State
   const [ideas, setIdeas] = useState<DetailRow[]>([]);
+  const [fullIdeas, setFullIdeas] = useState<DetailRow[]>([]); // MỚI: Lưu toàn bộ danh sách để random
   const [loading, setLoading] = useState(true);
+  const [randomMode, setRandomMode] = useState(false); // MỚI: Trạng thái đang random group
+
   const [random5, setRandom5] = useState<DetailRow[]>([]);
   const [loadingRandom, setLoadingRandom] = useState(false);
 
@@ -259,28 +263,11 @@ export default function Home() {
   useEffect(() => { loadGames(); refreshGroups(); }, []);
 
   async function loadDefaultView() {
-    setLoadingDefault(true);
-    setErr(null);
-
-    // 1. Get Pinned
-    const { data: p } = await supabase
-      .from("details")
-      .select("id,title,priority,detail_type,game_id,pinned,pinned_at,created_at")
-      .eq("status", "idea")
-      .eq("pinned", true)
-      .order("pinned_at", { ascending: false });
-
-    // 2. Get Daily (Random Seed)
+    setLoadingDefault(true); setErr(null);
+    const { data: p } = await supabase.from("details").select("*").eq("status", "idea").eq("pinned", true).order("pinned_at", { ascending: false });
     const seedDate = yyyyMmDdLocal(new Date());
     const { data: d } = await supabase.rpc("get_daily_seed_ideas", { seed_date: seedDate, take_count: 5 });
-
-    // 3. Get Recently Added (MỚI)
-    const { data: r } = await supabase
-      .from("details")
-      .select("id,title,priority,detail_type,game_id,pinned,pinned_at,created_at")
-      .eq("status", "idea")
-      .order("created_at", { ascending: false })
-      .limit(10); // Lấy 10 cái mới nhất
+    const { data: r } = await supabase.from("details").select("*").eq("status", "idea").order("created_at", { ascending: false }).limit(10);
 
     setPinned((p ?? []) as DetailRow[]);
     setDaily((d ?? []) as DetailRow[]);
@@ -294,17 +281,23 @@ export default function Home() {
     if (groupId) {
       const { data: gi } = await supabase.from("idea_group_items").select("detail_id").eq("group_id", groupId);
       groupDetailIds = (gi ?? []).map((x: any) => Number(x.detail_id));
-      if (groupDetailIds.length === 0) { setIdeas([]); setLoading(false); return; }
+      if (groupDetailIds.length === 0) { setIdeas([]); setFullIdeas([]); setLoading(false); return; }
     }
-    let query = supabase.from("details").select("id,title,priority,detail_type,game_id,pinned,pinned_at,created_at").eq("status", "idea");
+    let query = supabase.from("details").select("*").eq("status", "idea");
     if (groupDetailIds) query = query.in("id", groupDetailIds);
     if (gameId) query = query.eq("game_id", gameId);
     if (type) query = query.eq("detail_type", type);
     if (priority) query = query.eq("priority", priority);
     if (debouncedQ.trim()) query = query.ilike("title", `%${debouncedQ.trim()}%`);
+    
     const { data, error } = await query.order("pinned", { ascending: false }).order("priority", { ascending: true }).order("created_at", { ascending: false });
+    
     if (error) setErr(error.message);
-    setIdeas((data ?? []) as DetailRow[]);
+    
+    const loadedData = (data ?? []) as DetailRow[];
+    setIdeas(loadedData);
+    setFullIdeas(loadedData); // Backup để random
+    setRandomMode(false); // Reset mode khi filter đổi
     setLoading(false);
   }
 
@@ -312,6 +305,19 @@ export default function Home() {
     if (isDefaultView) loadDefaultView();
     else loadFilteredIdeas();
   }, [isDefaultView, debouncedQ, gameId, groupId, type, priority]);
+
+  // MỚI: Random 3 ý tưởng trong group hiện tại
+  function pickRandom3FromGroup() {
+    if (fullIdeas.length === 0) return;
+    const shuffled = [...fullIdeas].sort(() => 0.5 - Math.random());
+    setIdeas(shuffled.slice(0, 3));
+    setRandomMode(true);
+  }
+
+  function resetGroupView() {
+    setIdeas(fullIdeas);
+    setRandomMode(false);
+  }
 
   async function getRandom5() {
     setLoadingRandom(true);
@@ -375,7 +381,6 @@ export default function Home() {
 
       {/* MAIN CONTENT */}
       <main className="flex-1 pl-0 md:pl-64">
-        {/* CẬP NHẬT: max-w-[1900px] để tràn màn hình rộng hơn */}
         <div className="mx-auto max-w-[1900px] px-6 py-8">
           <header className="mb-8">
             <div className="flex flex-col gap-4 md:flex-row md:items-center">
@@ -407,46 +412,45 @@ export default function Home() {
           )}
 
           {isDefaultView ? (
-            // CẬP NHẬT: CHIA 3 CỘT (XL) - 2 CỘT (LG) - 1 CỘT (MD)
+            // GRID 3 CỘT (Pinned - Daily - Recent)
             <div className="grid gap-6 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-              
-              {/* CỘT 1: PINNED */}
               <section>
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-lg">⭐</span><h2 className="text-xl font-bold text-slate-900">Pinned</h2></div>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">{pinned.length}</span>
-                </div>
-                {loadingDefault ? <div className="h-32 rounded-2xl border border-slate-100 bg-white p-4 text-slate-400">Loading pinned...</div> : pinned.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center"><p className="text-sm text-slate-500">No pinned ideas.</p></div> : 
-                  // Sử dụng grid 1 cột bên trong section để xếp dọc
-                  <ul className="grid gap-4 grid-cols-1">{pinned.map((r) => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}</ul>
-                }
+                <div className="mb-4 flex items-center justify-between"><div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-lg">⭐</span><h2 className="text-xl font-bold text-slate-900">Pinned</h2></div><span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">{pinned.length}</span></div>
+                {loadingDefault ? <div className="h-32 rounded-2xl border border-slate-100 bg-white p-4 text-slate-400">Loading pinned...</div> : pinned.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-8 text-center"><p className="text-sm text-slate-500">No pinned ideas.</p></div> : <ul className="grid gap-4 grid-cols-1">{pinned.map((r) => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}</ul>}
               </section>
 
-              {/* CỘT 2: DAILY */}
               <section>
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 text-lg">🧠</span><h2 className="text-xl font-bold text-slate-900">Today's Picks</h2></div>
-                  <span className="text-xs text-slate-400">{yyyyMmDdLocal(new Date())}</span>
-                </div>
-                {loadingDefault ? <div className="h-32 rounded-2xl border border-slate-100 bg-white p-4 text-slate-400">Loading daily...</div> : daily.length === 0 ? <div className="p-4 text-sm text-slate-500">No ideas available.</div> : 
-                   <ul className="grid gap-4 grid-cols-1">{daily.map((r) => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}</ul>
-                }
+                <div className="mb-4 flex items-center justify-between"><div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 text-lg">🧠</span><h2 className="text-xl font-bold text-slate-900">Today's Picks</h2></div><span className="text-xs text-slate-400">{yyyyMmDdLocal(new Date())}</span></div>
+                {loadingDefault ? <div className="h-32 rounded-2xl border border-slate-100 bg-white p-4 text-slate-400">Loading daily...</div> : daily.length === 0 ? <div className="p-4 text-sm text-slate-500">No ideas available.</div> : <ul className="grid gap-4 grid-cols-1">{daily.map((r) => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}</ul>}
               </section>
 
-              {/* CỘT 3: RECENTLY ADDED (MỚI) */}
               <section>
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-lg">✨</span><h2 className="text-xl font-bold text-slate-900">Recently Added</h2></div>
-                </div>
-                {loadingDefault ? <div className="h-32 rounded-2xl border border-slate-100 bg-white p-4 text-slate-400">Loading recent...</div> : recent.length === 0 ? <div className="p-4 text-sm text-slate-500">No recent ideas.</div> : 
-                   <ul className="grid gap-4 grid-cols-1">{recent.map((r) => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}</ul>
-                }
+                <div className="mb-4 flex items-center justify-between"><div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-lg">✨</span><h2 className="text-xl font-bold text-slate-900">Recently Added</h2></div></div>
+                {loadingDefault ? <div className="h-32 rounded-2xl border border-slate-100 bg-white p-4 text-slate-400">Loading recent...</div> : recent.length === 0 ? <div className="p-4 text-sm text-slate-500">No recent ideas.</div> : <ul className="grid gap-4 grid-cols-1">{recent.map((r) => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}</ul>}
               </section>
-
             </div>
           ) : (
             <section>
-              <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-bold text-slate-900">{loading ? "Searching..." : `${ideas.length} Results`}</h2>{groupId && <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800">Group: {groups.find((g) => g.id === groupId)?.name}</span>}</div>
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-bold text-slate-900">{loading ? "Searching..." : `${ideas.length} Results`}</h2>
+                  {groupId && (
+                     <>
+                        <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800">Group: {groups.find((g) => g.id === groupId)?.name}</span>
+                        {/* NÚT RANDOM TRONG GROUP */}
+                        <button 
+                           onClick={pickRandom3FromGroup} 
+                           className="ml-2 inline-flex h-7 items-center gap-1 rounded-lg bg-indigo-100 px-2 text-xs font-bold text-indigo-700 hover:bg-indigo-200 transition"
+                        >
+                           {randomMode ? "🎲 Re-roll 3" : "🎲 Pick 3 Random"}
+                        </button>
+                        {randomMode && (
+                           <button onClick={resetGroupView} className="ml-1 text-xs text-slate-500 hover:text-slate-800 underline">Show All</button>
+                        )}
+                     </>
+                  )}
+                </div>
+              </div>
               {loading ? <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-20 animate-pulse rounded-xl bg-slate-200" />)}</div> : ideas.length === 0 ? <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 py-12"><p className="text-lg font-medium text-slate-900">No ideas found</p><button onClick={resetFilters} className="mt-4 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50">Clear all filters</button></div> : <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">{ideas.map((r) => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}</ul>}
             </section>
           )}
