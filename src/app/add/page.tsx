@@ -26,11 +26,10 @@ type IdeaGroup = {
   description: string | null;
 };
 
-// CẬP NHẬT: Thêm title và downloaded vào type này
 type StagedFootage = {
   file_path: string;
-  title?: string;       // Tên video (tự lấy từ Youtube)
-  downloaded: boolean;  // Đã tải về hay chưa
+  title?: string;
+  downloaded: boolean;
   notes?: string;
 };
 
@@ -64,21 +63,36 @@ const cardClass = "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm";
 
 /* ================= HELPERS ================= */
 
-// Hàm lấy tên Youtube Video (Không cần API Key)
 async function fetchYoutubeTitle(url: string): Promise<string | null> {
   try {
-    // Regex kiểm tra link youtube
     const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$/;
     if (!youtubeRegex.test(url)) return null;
 
-    // Sử dụng noembed để lấy thông tin
     const res = await fetch(`https://noembed.com/embed?url=${url}`);
     const data = await res.json();
     return data.title || null;
   } catch (e) {
-    console.error("Error fetching youtube title", e);
     return null;
   }
+}
+
+// Helper render link bấm được (MỚI)
+function renderLinkOrText(text: string) {
+  const isUrl = text.startsWith("http://") || text.startsWith("https://");
+  if (isUrl) {
+    return (
+      <a 
+        href={text} 
+        target="_blank" 
+        rel="noopener noreferrer" 
+        className="break-all text-blue-600 hover:text-blue-800 hover:underline"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {text}
+      </a>
+    );
+  }
+  return <span className="break-all font-mono text-slate-600">{text}</span>;
 }
 
 function GameCombobox({
@@ -318,6 +332,7 @@ export default function AddIdeaPage() {
   const [priority, setPriority] = useState(3);
   const [spoiler, setSpoiler] = useState(0);
   const [confidence, setConfidence] = useState(3);
+  const [pinned, setPinned] = useState(false); // MỚI: Trạng thái Pin
   const [selectedGroupIds, setSelectedGroupIds] = useState<number[]>([]);
 
   // Helpers
@@ -332,7 +347,7 @@ export default function AddIdeaPage() {
 
   // Staging
   const [fp, setFp] = useState("");
-  const [fetchingTitle, setFetchingTitle] = useState(false); // Trạng thái đang tải tên video
+  const [fetchingTitle, setFetchingTitle] = useState(false);
   const [stagedFootage, setStagedFootage] = useState<StagedFootage[]>([]);
   const [srcUrl, setSrcUrl] = useState("");
   const [stagedSources, setStagedSources] = useState<StagedSource[]>([]);
@@ -378,7 +393,6 @@ export default function AddIdeaPage() {
     if (!error && data) {
       setGameId(data.id);
       setShowCreateGame(false);
-      // reload games
       const { data: gs } = await supabase.from("games").select("*").order("title");
       setGames((gs ?? []) as Game[]);
     }
@@ -392,26 +406,27 @@ export default function AddIdeaPage() {
     }
   }
 
-  // LOGIC MỚI: Xử lý thêm Footage
   async function handleAddFootage() {
     if (!fp.trim()) return;
     
     setFetchingTitle(true);
     const link = fp.trim();
-    
-    // Tự động lấy title từ youtube
     const ytTitle = await fetchYoutubeTitle(link);
-    
+    const isLocalFile = !link.startsWith("http");
+
     setStagedFootage([
       ...stagedFootage,
-      { file_path: link, title: ytTitle || undefined, downloaded: false }
+      { 
+          file_path: link, 
+          title: ytTitle || undefined, 
+          downloaded: isLocalFile // Tự động đánh dấu nếu là file cục bộ
+      }
     ]);
     
     setFp("");
     setFetchingTitle(false);
   }
 
-  // LOGIC MỚI: Toggle trạng thái Downloaded
   function toggleDownloaded(index: number) {
     const newArr = [...stagedFootage];
     newArr[index].downloaded = !newArr[index].downloaded;
@@ -428,7 +443,7 @@ export default function AddIdeaPage() {
     setSavingIdea(true);
     setMessage(null);
 
-    // 1. Insert Detail
+    // 1. Insert Detail (Có thêm trường Pinned)
     const { data: idea, error } = await supabase
       .from("details")
       .insert({
@@ -440,6 +455,8 @@ export default function AddIdeaPage() {
         spoiler_level: spoiler,
         confidence,
         status: "idea",
+        pinned, // MỚI
+        pinned_at: pinned ? new Date().toISOString() : null, // MỚI
       })
       .select("id")
       .single();
@@ -452,7 +469,6 @@ export default function AddIdeaPage() {
 
     const detailId = idea.id;
 
-    // 2. Parallel Inserts
     const promises = [];
     if (selectedGroupIds.length) {
       promises.push(
@@ -467,8 +483,8 @@ export default function AddIdeaPage() {
           stagedFootage.map((f) => ({
             detail_id: detailId,
             file_path: f.file_path,
-            title: f.title,           // Lưu title
-            downloaded: f.downloaded, // Lưu trạng thái download
+            title: f.title,
+            downloaded: f.downloaded,
             notes: f.notes
           }))
         )
@@ -492,19 +508,24 @@ export default function AddIdeaPage() {
     setStagedFootage([]);
     setStagedSources([]);
     setSimilar([]);
+    setPinned(false);
   }
 
   return (
     <main className="min-h-screen bg-slate-50 pb-20">
       <div className="mx-auto max-w-5xl px-4 py-8">
         
-        {/* HEADER */}
+        {/* HEADER (MỚI: Thêm nút Home) */}
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Add New Idea</h1>
             <p className="text-sm text-slate-500">Document a detail, easter egg, or mechanic.</p>
           </div>
           <div className="flex gap-3">
+             {/* Nút Home Mới */}
+             <a href="/" className={btnGhost}>
+              ← Home
+            </a>
             <a href="/" className={btnGhost}>Cancel</a>
           </div>
         </div>
@@ -536,7 +557,7 @@ export default function AddIdeaPage() {
                   }}
                 />
 
-                {/* Create Game Modal (Inline) */}
+                {/* Create Game Modal */}
                 {showCreateGame && (
                   <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
                     <h4 className="mb-2 text-sm font-bold text-blue-900">New Game</h4>
@@ -621,11 +642,9 @@ export default function AddIdeaPage() {
                     </button>
                   </div>
 
-                  {/* DANH SÁCH FOOTAGE */}
                   <ul className="space-y-2">
                     {stagedFootage.map((f, i) => (
                       <li key={i} className="rounded-xl bg-slate-50 px-3 py-2 border border-slate-100">
-                        {/* Title or Link */}
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             {f.title ? (
@@ -633,15 +652,15 @@ export default function AddIdeaPage() {
                                 🎬 {f.title}
                               </div>
                             ) : null}
+                            {/* CẬP NHẬT: Render Link màu xanh bấm được */}
                             <div className="truncate text-xs text-slate-500 font-mono" title={f.file_path}>
-                              {f.file_path}
+                               {renderLinkOrText(f.file_path)}
                             </div>
                           </div>
                           
                           <button type="button" onClick={() => setStagedFootage(stagedFootage.filter((_, idx) => idx !== i))} className="text-slate-400 hover:text-rose-500">×</button>
                         </div>
                         
-                        {/* Status Toggle */}
                         <div className="mt-2 flex items-center justify-between">
                           <button 
                             type="button"
@@ -678,7 +697,8 @@ export default function AddIdeaPage() {
                   <ul className="space-y-2">
                     {stagedSources.map((s, i) => (
                       <li key={i} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs">
-                        <span className="truncate font-medium text-slate-700">{s.url}</span>
+                        {/* CẬP NHẬT: Render Link màu xanh bấm được */}
+                        <span className="truncate font-medium text-slate-700">{renderLinkOrText(s.url)}</span>
                         <button type="button" onClick={() => setStagedSources(stagedSources.filter((_, idx) => idx !== i))} className="text-slate-400 hover:text-rose-500">×</button>
                       </li>
                     ))}
@@ -708,6 +728,17 @@ export default function AddIdeaPage() {
               <h3 className="mb-4 text-sm font-bold text-slate-900">Properties</h3>
               <div className="space-y-4">
                 
+                {/* MỚI: Checkbox Pin */}
+                <label className="flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2">
+                  <input
+                    type="checkbox"
+                    checked={pinned}
+                    onChange={(e) => setPinned(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+                  />
+                  <span className="text-sm font-medium text-slate-900">Pin this idea</span>
+                </label>
+
                 <label className="block">
                   <span className="mb-1 block text-xs font-semibold text-slate-500 uppercase">Type</span>
                   <select className={selectClass} value={detailType} onChange={(e) => setDetailType(e.target.value)}>
