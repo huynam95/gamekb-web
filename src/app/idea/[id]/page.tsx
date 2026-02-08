@@ -17,17 +17,15 @@ type Detail = {
   status: string | null;
   game_id: number;
   created_at: string | null;
-
   pinned: boolean;
   pinned_at: string | null;
 };
 
-// CẬP NHẬT: Thêm cover_url
 type Game = {
   id: number;
   title: string;
   release_year: number | null;
-  cover_url?: string | null; 
+  cover_url?: string | null;
 };
 
 type FootageRow = {
@@ -63,6 +61,10 @@ type Group = {
 const inputClass =
   "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition";
 
+// Input trong suốt dành cho Hero Header
+const heroInputClass = 
+  "w-full bg-transparent text-3xl font-extrabold text-white placeholder:text-white/50 border-b-2 border-white/20 px-0 py-2 focus:border-white focus:outline-none transition";
+
 const textareaClass =
   "min-h-[120px] w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition resize-y";
 
@@ -77,6 +79,10 @@ const btnPrimary =
 
 const btnGhost =
   btnBase + " border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900";
+
+// Nút kính mờ (Glass Button)
+const btnGlass = 
+  "inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-white/20 bg-black/20 px-4 text-sm font-semibold text-white backdrop-blur-md hover:bg-black/40 transition";
 
 const cardClass = "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm";
 
@@ -114,12 +120,6 @@ function renderLinkOrText(text: string | null) {
   return <span className="break-all font-mono text-slate-600">{text}</span>;
 }
 
-function PriorityBadge({ p }: { p: number }) {
-  if (p === 1) return <span className="inline-flex items-center rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700">High Priority</span>;
-  if (p === 5) return <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-100 px-2 py-1 text-xs font-medium text-slate-500">Low</span>;
-  return <span className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">Normal</span>;
-}
-
 function TypeBadge({ t }: { t: string }) {
   const map: Record<string, string> = {
     small_detail: "Small Detail",
@@ -129,7 +129,16 @@ function TypeBadge({ t }: { t: string }) {
     troll: "Troll",
     punish: "Punish",
   };
-  return <span className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700">{map[t] || t}</span>;
+  return <span className="inline-flex items-center rounded-md border border-white/20 bg-white/10 px-2 py-0.5 text-xs font-medium text-white backdrop-blur-md">{map[t] || t}</span>;
+}
+
+function PriorityBadge({ p }: { p: number }) {
+  let color = "text-white bg-white/10 border-white/20";
+  let label = "Normal";
+  if (p === 1) { label = "🔥 High"; color = "text-white bg-rose-500/80 border-rose-400/50"; }
+  if (p === 5) { label = "Low"; }
+
+  return <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium backdrop-blur-md ${color}`}>{label}</span>;
 }
 
 /* ================= COMPONENT: GROUP PICKER ================= */
@@ -183,7 +192,6 @@ function GroupAddPicker({
               autoFocus
             />
           </div>
-
           <div className="max-h-48 overflow-auto p-1 pt-0">
             {filtered.length === 0 ? (
               <div className="p-2 text-center">
@@ -191,8 +199,7 @@ function GroupAddPicker({
                   type="button"
                   className="w-full rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-900 hover:bg-slate-200"
                   onClick={() => {
-                    const name = q.trim();
-                    if (name) onCreate(name);
+                    if (q.trim()) onCreate(q.trim());
                     setOpen(false);
                     setQ("");
                   }}
@@ -232,12 +239,7 @@ export default function IdeaDetailPage() {
   const params = useParams();
   const router = useRouter();
   const rawId = params?.id;
-
-  const id = useMemo(() => {
-    const s = Array.isArray(rawId) ? rawId[0] : rawId;
-    const n = Number(s);
-    return Number.isFinite(n) ? n : NaN;
-  }, [rawId]);
+  const id = useMemo(() => Number(rawId), [rawId]);
 
   const [detail, setDetail] = useState<Detail | null>(null);
   const [game, setGame] = useState<Game | null>(null);
@@ -248,7 +250,6 @@ export default function IdeaDetailPage() {
   const [ideaGroups, setIdeaGroups] = useState<Group[]>([]);
   
   const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string | null>(null);
 
   /* Edit States */
   const [editingCore, setEditingCore] = useState(false);
@@ -267,7 +268,7 @@ export default function IdeaDetailPage() {
   const [savingItem, setSavingItem] = useState(false);
   const [fetchingTitle, setFetchingTitle] = useState(false);
 
-  // 1. Load Data
+  // Load Data
   async function loadGroups() {
     const { data } = await supabase.from("idea_groups").select("*").order("name");
     setAllGroups((data ?? []) as Group[]);
@@ -286,21 +287,15 @@ export default function IdeaDetailPage() {
 
   async function loadAll() {
     setLoading(true);
-    setErr(null);
     if (!Number.isFinite(id)) return;
 
     await loadGroups();
 
     const { data: d, error } = await supabase.from("details").select("*").eq("id", id).single();
-    if (error) {
-      setErr(error.message);
-      setLoading(false);
-      return;
-    }
+    if (error) { setLoading(false); return; }
     const detailRow = d as Detail;
     setDetail(detailRow);
 
-    // Sync drafts
     setDraftTitle(detailRow.title);
     setDraftDesc(detailRow.description ?? "");
     setDraftType(detailRow.detail_type);
@@ -308,7 +303,6 @@ export default function IdeaDetailPage() {
     setDraftSpoiler(detailRow.spoiler_level ?? 0);
     setDraftConfidence(detailRow.confidence ?? 3);
 
-    // Load related
     const { data: g } = await supabase.from("games").select("*").eq("id", detailRow.game_id).single();
     setGame(g as Game);
 
@@ -324,20 +318,11 @@ export default function IdeaDetailPage() {
 
   useEffect(() => { loadAll(); }, [id]);
 
-  // 2. Change Tab Title
   useEffect(() => {
-    if (detail && detail.title) {
-      document.title = `${detail.title} | GameKB`;
-    } else {
-      document.title = "Loading Idea... | GameKB";
-    }
-    return () => { document.title = "GameKB"; };
+    if (detail && detail.title) document.title = `${detail.title} | GameKB`;
   }, [detail]);
 
-  /* ------------------------------------------------------------------ */
-  /* ACTIONS                               */
-  /* ------------------------------------------------------------------ */
-
+  // Actions
   async function togglePin() {
     if (!detail) return;
     const newPinned = !detail.pinned;
@@ -371,7 +356,6 @@ export default function IdeaDetailPage() {
 
   async function addFootage() {
     if (!detail || !fp.trim()) return;
-    
     setFetchingTitle(true);
     const link = fp.trim();
     const ytTitle = await fetchYoutubeTitle(link);
@@ -383,7 +367,6 @@ export default function IdeaDetailPage() {
       title: ytTitle || null,
       downloaded: isLocalFile
     });
-
     setFp("");
     setFetchingTitle(false);
     await loadAll();
@@ -440,79 +423,105 @@ export default function IdeaDetailPage() {
 
   return (
     <main className="min-h-screen bg-slate-50 pb-20">
-      <div className="mx-auto max-w-6xl px-4 py-8">
-        
-        {/* HEADER */}
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <a href="/" className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-500 shadow-sm hover:text-slate-900">
-              ←
-            </a>
-            <div className="flex items-baseline gap-2">
-              <span className="text-sm font-medium text-slate-500">{game?.title} /</span>
-              <span className="text-sm font-bold text-slate-900">Idea #{detail.id}</span>
+      
+      {/* ================= HERO HEADER ================= */}
+      <div className="relative h-[400px] w-full overflow-hidden bg-slate-900 shadow-xl">
+         
+         {/* Background Layer */}
+         {game?.cover_url ? (
+            <div 
+              className="absolute inset-0 bg-cover bg-center opacity-60 blur-sm"
+              style={{ backgroundImage: `url(${game.cover_url})` }}
+            />
+         ) : (
+            // Fallback pattern
+            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-30" />
+         )}
+
+         {/* Gradient Overlay (Để text nổi) */}
+         <div className="absolute inset-0 bg-gradient-to-t from-slate-50 via-slate-900/60 to-slate-900/80" />
+
+         {/* Navigation Top */}
+         <div className="absolute top-0 left-0 w-full p-6 flex justify-between items-start z-20">
+            <a href="/" className={btnGlass}>← Back to Home</a>
+            
+            {/* Actions Top Right */}
+            <div className="flex gap-2">
+              {!editingCore && (
+                <>
+                  <button onClick={togglePin} className={btnGlass}>
+                    {detail.pinned ? "⭐ Unpin" : "☆ Pin"}
+                  </button>
+                  <button onClick={() => setEditingCore(true)} className={btnGlass}>
+                    ✏️ Edit
+                  </button>
+                  <button onClick={deleteIdea} className="inline-flex h-9 items-center justify-center rounded-lg bg-rose-500/80 backdrop-blur-md px-4 text-sm font-semibold text-white hover:bg-rose-600 transition">
+                    Delete
+                  </button>
+                </>
+              )}
+              {editingCore && (
+                <>
+                  <button onClick={saveCore} disabled={savingCore} className="inline-flex h-9 items-center justify-center rounded-lg bg-emerald-500 px-4 text-sm font-bold text-white shadow-lg hover:bg-emerald-600">
+                    {savingCore ? "Saving..." : "Save Changes"}
+                  </button>
+                  <button onClick={() => setEditingCore(false)} className={btnGlass}>
+                    Cancel
+                  </button>
+                </>
+              )}
             </div>
-          </div>
+         </div>
 
-          <div className="flex items-center gap-2">
-            {!editingCore && (
-              <>
-                 <button
-                  onClick={togglePin}
-                  className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-semibold shadow-sm transition ${
-                    detail.pinned
-                      ? "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100"
-                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                  }`}
-                >
-                  {detail.pinned ? "⭐ Pinned" : "☆ Pin"}
-                </button>
-                <button onClick={() => setEditingCore(true)} className={btnGhost}>
-                  ✏️ Edit
-                </button>
-                <button onClick={deleteIdea} className="inline-flex h-9 items-center justify-center rounded-lg border border-transparent px-3 text-sm font-medium text-rose-600 hover:bg-rose-50">
-                  Delete
-                </button>
-              </>
+         {/* Hero Content (Bottom) */}
+         <div className="absolute bottom-0 w-full p-8 pb-12 z-10 max-w-6xl mx-auto left-0 right-0">
+            <div className="flex items-center gap-3 mb-2">
+               <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/20 px-2.5 py-1 text-xs font-bold text-white backdrop-blur-md">
+                 🎮 {game?.title}
+               </span>
+               <span className="text-white/60 text-xs font-mono uppercase tracking-widest">
+                 #{detail.id}
+               </span>
+            </div>
+
+            {editingCore ? (
+               <input 
+                 className={heroInputClass} 
+                 value={draftTitle} 
+                 onChange={e => setDraftTitle(e.target.value)} 
+                 autoFocus
+               />
+            ) : (
+               <h1 className="text-4xl md:text-5xl font-extrabold text-white drop-shadow-md leading-tight max-w-4xl">
+                 {detail.title}
+               </h1>
             )}
-             {editingCore && (
-               <>
-                <button onClick={saveCore} disabled={savingCore} className={btnPrimary}>
-                  {savingCore ? "Saving..." : "Save Changes"}
-                </button>
-                <button onClick={() => setEditingCore(false)} className={btnGhost}>
-                  Cancel
-                </button>
-               </>
-             )}
-          </div>
-        </div>
 
-        {/* MAIN LAYOUT */}
+            <div className="flex flex-wrap gap-2 mt-4">
+               <TypeBadge t={detail.detail_type} />
+               <PriorityBadge p={detail.priority} />
+               {detail.pinned && <span className="text-amber-300 text-sm font-bold drop-shadow-sm self-center ml-2">⭐ Pinned</span>}
+            </div>
+         </div>
+      </div>
+
+
+      {/* ================= MAIN CONTENT ================= */}
+      <div className="mx-auto max-w-6xl px-4 py-8 -mt-6 relative z-20">
+        
         <div className="grid gap-6 lg:grid-cols-3">
           
           {/* LEFT COLUMN: CONTENT */}
           <div className="space-y-6 lg:col-span-2">
             
-            {/* CORE CARD */}
+            {/* DESCRIPTION CARD */}
             <div className={cardClass}>
+              <h3 className="mb-3 text-sm font-bold uppercase text-slate-400">Description</h3>
               {editingCore ? (
-                <div className="space-y-4">
-                  <label className="block">
-                     <span className="mb-1 block text-xs font-bold uppercase text-slate-400">Title</span>
-                     <input className={inputClass} value={draftTitle} onChange={e => setDraftTitle(e.target.value)} />
-                  </label>
-                  <label className="block">
-                     <span className="mb-1 block text-xs font-bold uppercase text-slate-400">Description</span>
-                     <textarea className={textareaClass} value={draftDesc} onChange={e => setDraftDesc(e.target.value)} />
-                  </label>
-                </div>
+                 <textarea className={textareaClass} value={draftDesc} onChange={e => setDraftDesc(e.target.value)} />
               ) : (
-                <div>
-                  <h1 className="mb-4 text-2xl font-bold leading-tight text-slate-900">{detail.title}</h1>
-                  <div className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
-                    {detail.description || <span className="italic text-slate-400">No description provided.</span>}
-                  </div>
+                <div className="whitespace-pre-wrap text-base leading-relaxed text-slate-800">
+                   {detail.description || <span className="italic text-slate-400">No description provided.</span>}
                 </div>
               )}
             </div>
@@ -540,24 +549,14 @@ export default function IdeaDetailPage() {
               ) : (
                 <ul className="space-y-3">
                   {footage.map(f => (
-                    <li key={f.id} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                    <li key={f.id} className="rounded-xl border border-slate-100 bg-slate-50 p-3 transition hover:bg-white hover:shadow-sm hover:border-slate-200">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start gap-3 min-w-0">
-                          {/* Icon */}
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-500 text-xs">
-                            ▶
-                          </span>
-                          
-                          {/* Info */}
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-500 text-xs">▶</span>
                           <div className="min-w-0 pt-0.5">
                             {f.title && (
                               <div className="font-semibold text-sm text-slate-900 line-clamp-2 mb-1">
-                                <a 
-                                  href={f.file_path || "#"} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer" 
-                                  className="hover:underline hover:text-blue-600"
-                                >
+                                <a href={f.file_path || "#"} target="_blank" rel="noopener noreferrer" className="hover:underline hover:text-blue-600">
                                   {f.title}
                                 </a>
                               </div>
@@ -568,23 +567,12 @@ export default function IdeaDetailPage() {
                             {f.notes && <div className="mt-1 text-xs text-slate-500 italic">{f.notes}</div>}
                           </div>
                         </div>
-
-                        {/* Actions */}
                         <div className="flex flex-col items-end gap-2">
                            <button onClick={() => deleteFootage(f.id)} className="text-slate-400 hover:text-rose-600">×</button>
                         </div>
                       </div>
-
-                      {/* Download Status Toggle */}
                       <div className="mt-3 flex items-center gap-2 pl-11">
-                         <button
-                           onClick={() => toggleDownloaded(f.id, f.downloaded)}
-                           className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition ${
-                             f.downloaded 
-                               ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" 
-                               : "bg-white border border-slate-200 text-slate-500 hover:bg-slate-100"
-                           }`}
-                         >
+                         <button onClick={() => toggleDownloaded(f.id, f.downloaded)} className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition ${f.downloaded ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200" : "bg-white border border-slate-200 text-slate-500 hover:bg-slate-100"}`}>
                            {f.downloaded ? "✓ Downloaded" : "☁ Need Download"}
                          </button>
                       </div>
@@ -597,36 +585,19 @@ export default function IdeaDetailPage() {
             {/* SOURCES CARD */}
             <div className={cardClass}>
               <h3 className="mb-3 text-base font-bold text-slate-900">🔗 Sources</h3>
-              
               <div className="mb-4 flex gap-2">
-                <input 
-                  className={inputClass} 
-                  placeholder="Paste source URL..." 
-                  value={srcUrl} 
-                  onChange={e => setSrcUrl(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && addSource()}
-                />
+                <input className={inputClass} placeholder="Paste source URL..." value={srcUrl} onChange={e => setSrcUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && addSource()} />
                 <button onClick={addSource} disabled={savingItem} className={btnGhost}>+</button>
               </div>
-
-              {sources.length === 0 ? (
-                <p className="text-sm text-slate-400 italic">No sources added.</p>
-              ) : (
+              {sources.length === 0 ? <p className="text-sm text-slate-400 italic">No sources added.</p> : (
                 <ul className="space-y-2">
                   {sources.map(s => (
                     <li key={s.id} className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-sm">
                       <div className="flex items-center gap-3 overflow-hidden">
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-500">
-                          🌍
-                        </span>
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-500">🌍</span>
                         <div className="min-w-0">
-                          <div className="truncate font-medium">
-                            {renderLinkOrText(s.url)}
-                          </div>
-                          <div className="flex gap-2 text-xs text-slate-500">
-                             <span>Rel: {s.reliability}/5</span>
-                             {s.note && <span>• {s.note}</span>}
-                          </div>
+                          <div className="truncate font-medium">{renderLinkOrText(s.url)}</div>
+                          <div className="flex gap-2 text-xs text-slate-500"><span>Rel: {s.reliability}/5</span>{s.note && <span>• {s.note}</span>}</div>
                         </div>
                       </div>
                       <button onClick={() => deleteSource(s.id)} className="text-slate-400 hover:text-rose-600">×</button>
@@ -635,7 +606,6 @@ export default function IdeaDetailPage() {
                 </ul>
               )}
             </div>
-
           </div>
 
           {/* RIGHT COLUMN: META & SIDEBAR */}
@@ -686,39 +656,7 @@ export default function IdeaDetailPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  
-                  {/* CẬP NHẬT: HIỂN THỊ ẢNH GAME Ở ĐÂY */}
-                  {game?.cover_url && (
-                    <div className="mb-2 overflow-hidden rounded-xl border border-slate-100 bg-slate-50">
-                      <div className="relative h-32 w-full">
-                         <img src={game.cover_url} alt={game.title} className="h-full w-full object-cover" />
-                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                         <div className="absolute bottom-2 left-3 font-bold text-white text-sm drop-shadow-md">
-                           {game.title}
-                         </div>
-                      </div>
-                    </div>
-                  )}
-                  {/* Nếu không có ảnh thì hiện text như cũ */}
-                  {!game?.cover_url && (
-                    <div>
-                      <div className="mb-1 text-xs text-slate-500">Game</div>
-                      <div className="font-semibold text-slate-900">{game?.title || "Unknown"}</div>
-                    </div>
-                  )}
-
-                  <div className="flex justify-between border-t border-slate-100 pt-3">
-                    <div>
-                      <div className="mb-1 text-xs text-slate-500">Type</div>
-                      <TypeBadge t={detail.detail_type} />
-                    </div>
-                    <div className="text-right">
-                      <div className="mb-1 text-xs text-slate-500">Priority</div>
-                      <PriorityBadge p={detail.priority} />
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between border-t border-slate-100 pt-3">
+                  <div className="flex justify-between border-b border-slate-100 pb-3">
                     <div>
                       <div className="mb-1 text-xs text-slate-500">Confidence</div>
                       <span className="text-sm font-medium text-slate-900">{detail.confidence}/5</span>
@@ -730,6 +668,10 @@ export default function IdeaDetailPage() {
                       </span>
                     </div>
                   </div>
+                   <div>
+                      <div className="mb-1 text-xs text-slate-500">Game Release</div>
+                      <span className="text-sm font-medium text-slate-900">{game?.release_year || "Unknown"}</span>
+                    </div>
                 </div>
               )}
             </div>
@@ -738,16 +680,9 @@ export default function IdeaDetailPage() {
             <div className={cardClass}>
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Groups</h3>
-                <GroupAddPicker 
-                  groups={allGroups} 
-                  onAdd={addToGroup} 
-                  onCreate={createGroup}
-                />
+                <GroupAddPicker groups={allGroups} onAdd={addToGroup} onCreate={createGroup} />
               </div>
-
-              {ideaGroups.length === 0 ? (
-                <p className="text-sm text-slate-400">Not in any group.</p>
-              ) : (
+              {ideaGroups.length === 0 ? <p className="text-sm text-slate-400">Not in any group.</p> : (
                 <div className="flex flex-wrap gap-2">
                   {ideaGroups.map(g => (
                     <span key={g.id} className="inline-flex items-center gap-1 rounded-md border border-blue-100 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
