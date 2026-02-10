@@ -32,29 +32,50 @@ function TypePill({ typeKey }: { typeKey: string }) {
   );
 }
 
-// IdeaItem mới (Đồng bộ với Home)
-function IdeaItem({ r, game }: { r: DetailRow; game?: Game }) {
+// CẬP NHẬT: IdeaItem có nút Pin (Giống hệt trang chủ)
+function IdeaItem({ r, game, onTogglePin }: { r: DetailRow; game?: Game; onTogglePin: (id: number, current: boolean) => void }) {
   const hasCover = !!game?.cover_url;
   return (
     <li className="group h-full animate-in fade-in zoom-in-95 duration-300">
       <a href={`/idea/${r.id}`} className="relative flex h-64 w-full flex-col justify-end overflow-hidden rounded-2xl border border-slate-200 bg-slate-900 shadow-sm transition-all duration-500 hover:shadow-xl hover:-translate-y-1">
+        
+        {/* Background */}
         {hasCover ? (
           <div className="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover:scale-110" style={{ backgroundImage: `url(${game.cover_url})` }} />
         ) : (
           <div className="absolute inset-0 bg-slate-800 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-50" />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent opacity-90 transition-opacity group-hover:opacity-80" />
+        
+        {/* === ACTION BAR (PIN BUTTON) === */}
+        <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
+           {r.priority === 1 && <span className="rounded-lg bg-rose-600 px-2 py-1 text-[10px] font-bold uppercase text-white shadow-lg border border-rose-500">🔥 High</span>}
+           
+           <button
+             onClick={(e) => {
+               e.preventDefault();
+               e.stopPropagation();
+               onTogglePin(r.id, !!r.pinned);
+             }}
+             className={`flex h-7 w-7 items-center justify-center rounded-full border transition-all duration-200 hover:scale-110 active:scale-95 cursor-pointer ${
+               r.pinned 
+                 ? "bg-amber-400 border-amber-300 text-white shadow-[0_0_15px_rgba(251,191,36,0.6)]" 
+                 : "bg-black/30 border-white/20 text-white/40 hover:bg-black/50 hover:text-amber-300 hover:border-amber-300/50 backdrop-blur-md"
+             }`}
+             title={r.pinned ? "Unpin this idea" : "Pin to favorites"}
+           >
+             {r.pinned ? "★" : "☆"}
+           </button>
+        </div>
+
+        {/* Content */}
         <div className="relative z-10 flex flex-col p-5">
-           <div className="absolute top-4 right-4">
-             {r.priority === 1 && <span className="rounded-lg bg-rose-600 px-2 py-1 text-[10px] font-bold uppercase text-white shadow-lg border border-rose-500">🔥 High</span>}
-           </div>
            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-blue-300/90 mb-1">
              <span className="truncate">{game?.title || "Unknown"}</span>
            </div>
            <h3 className="line-clamp-2 text-lg font-bold leading-tight text-white drop-shadow-md group-hover:text-blue-200 mb-3">{r.title}</h3>
            <div className="flex items-center flex-wrap gap-2">
              <TypePill typeKey={r.detail_type} />
-             {r.pinned && <span className="rounded-lg bg-amber-400/20 border border-amber-400/50 px-2 py-1 text-[10px] font-bold uppercase text-amber-300 backdrop-blur-md">⭐ Pinned</span>}
            </div>
         </div>
       </a>
@@ -89,7 +110,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function load() {
-      // 1. Load Meta (Games, Groups) để hiển thị Sidebar và Card
+      // 1. Load Meta
       const [gs, grps, items] = await Promise.all([
         supabase.from("games").select("id,title,cover_url"),
         supabase.from("idea_groups").select("id,name").order("name"),
@@ -116,6 +137,23 @@ export default function Dashboard() {
     load();
   }, []);
 
+  // CẬP NHẬT: Hàm Pin nhanh (Cập nhật cả 3 list để đồng bộ)
+  async function togglePinFast(id: number, currentStatus: boolean) {
+    const newStatus = !currentStatus;
+    
+    // Optimistic Update cho cả 3 danh sách
+    // (Vì 1 item có thể xuất hiện ở cả Recent và Pinned)
+    setPinned(prev => prev.map(i => i.id === id ? { ...i, pinned: newStatus } : i));
+    setDaily(prev => prev.map(i => i.id === id ? { ...i, pinned: newStatus } : i));
+    setRecent(prev => prev.map(i => i.id === id ? { ...i, pinned: newStatus } : i));
+
+    // Gửi request ngầm
+    await supabase.from("details").update({ 
+      pinned: newStatus, 
+      pinned_at: newStatus ? new Date().toISOString() : null 
+    }).eq("id", id);
+  }
+
   // Sidebar Actions
   async function createGroup() {
     if (!newGroupName.trim()) return;
@@ -132,7 +170,7 @@ export default function Dashboard() {
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
       
-      {/* MODERN SIDEBAR (Đồng bộ với Home) */}
+      {/* SIDEBAR */}
       <aside className="fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-slate-200/60 bg-white/80 backdrop-blur-xl shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)] hidden md:flex">
         <div className="flex h-20 items-center px-8">
            <div className="bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-2xl font-black tracking-tighter text-transparent">
@@ -142,44 +180,38 @@ export default function Dashboard() {
 
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-8 no-scrollbar">
           <nav className="space-y-2">
-            {/* Home Button: Inactive style */}
             <a href="/" className="group flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-500 transition-all duration-200 hover:bg-slate-100 hover:text-slate-900">
                <span className="text-lg">🏠</span> Home
             </a>
-            
-            {/* Dashboard Button: Active style */}
-            <button className="group flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 bg-slate-900 text-white shadow-lg shadow-slate-900/20">
+            <button className="group flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition-all duration-200 bg-slate-900 text-white shadow-lg shadow-slate-900/20 cursor-default">
                <span className="text-lg">📊</span> Dashboard
             </button>
-            
             <a href="/games/new" className="group flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold text-slate-500 transition-all duration-200 hover:bg-slate-100 hover:text-slate-900">
                <span className="text-lg">🕹️</span> Add Game
             </a>
           </nav>
 
-          {/* Collections (Groups) */}
           <div className="space-y-4">
             <div className="flex items-center justify-between px-2">
                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Collections</h3>
-               <button onClick={() => setShowCreateGroup(!showCreateGroup)} className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-blue-100 hover:text-blue-600 transition" title="Create Group">+</button>
+               <button onClick={() => setShowCreateGroup(!showCreateGroup)} className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-blue-100 hover:text-blue-600 transition cursor-pointer" title="Create Group">+</button>
             </div>
 
             {showCreateGroup && (
                <div className="animate-in fade-in slide-in-from-top-2 relative mb-2">
                   <input className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium outline-none focus:border-blue-400 focus:bg-white transition" placeholder="Group name..." value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && createGroup()} autoFocus />
-                  <button onClick={createGroup} className="absolute right-1 top-1 rounded p-1 text-[10px] bg-blue-500 text-white hover:bg-blue-600">OK</button>
+                  <button onClick={createGroup} className="absolute right-1 top-1 rounded p-1 text-[10px] bg-blue-500 text-white hover:bg-blue-600 cursor-pointer">OK</button>
                </div>
             )}
 
             <nav className="space-y-1">
               {groups.map((g) => (
                 <div key={g.id} className="group/item relative">
-                  {/* Ở Dashboard, click vào Group sẽ về Home để lọc (vì Dashboard là view tổng hợp) */}
                   <a href="/" className="flex w-full items-center justify-between rounded-xl px-4 py-2.5 text-left text-sm font-medium text-slate-500 transition-all hover:bg-slate-50 hover:text-slate-900">
                     <span className="truncate">{g.name}</span>
                     <span className="ml-2 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-400 group-hover/item:bg-slate-200">{groupCounts.get(g.id) ?? 0}</span>
                   </a>
-                  <button onClick={() => deleteGroup(g)} className="absolute right-12 top-1/2 -translate-y-1/2 opacity-0 group-hover/item:opacity-100 p-1.5 text-slate-300 hover:text-rose-500 transition" title="Delete">
+                  <button onClick={() => deleteGroup(g)} className="absolute right-12 top-1/2 -translate-y-1/2 opacity-0 group-hover/item:opacity-100 p-1.5 text-slate-300 hover:text-rose-500 transition cursor-pointer" title="Delete">
                      <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                   </button>
                 </div>
@@ -211,7 +243,7 @@ export default function Dashboard() {
                  </div>
                  {pinned.length === 0 ? <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center text-sm text-slate-400">No pinned ideas.</div> : (
                     <ul className="grid gap-4 grid-cols-1">
-                      {pinned.map(r => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}
+                      {pinned.map(r => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} onTogglePin={togglePinFast} />)}
                     </ul>
                  )}
               </section>
@@ -227,7 +259,7 @@ export default function Dashboard() {
                  </div>
                  {daily.length === 0 ? <div className="text-center text-sm text-slate-400">No daily picks.</div> : (
                     <ul className="grid gap-4 grid-cols-1">
-                      {daily.map(r => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}
+                      {daily.map(r => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} onTogglePin={togglePinFast} />)}
                     </ul>
                  )}
               </section>
@@ -243,7 +275,7 @@ export default function Dashboard() {
                  </div>
                  {recent.length === 0 ? <div className="text-center text-sm text-slate-400">No recent items.</div> : (
                     <ul className="grid gap-4 grid-cols-1">
-                      {recent.map(r => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}
+                      {recent.map(r => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} onTogglePin={togglePinFast} />)}
                     </ul>
                  )}
               </section>
