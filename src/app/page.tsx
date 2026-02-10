@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 import { PlayCircleIcon } from "@heroicons/react/24/solid";
-import { CheckIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { CheckIcon, TrashIcon, PencilSquareIcon } from "@heroicons/react/24/outline";
 
 /* ================= TYPES ================= */
 
@@ -27,7 +27,6 @@ type ScriptProject = {
 
 const ITEMS_PER_PAGE = 24;
 
-// 1. CONFIG TYPE ĐẦY ĐỦ
 const TYPE_CONFIG: Record<string, { label: string; className: string }> = {
   small_detail: { label: "🔍 Small Detail", className: "bg-blue-500/20 border-blue-400/30 text-blue-100" },
   easter_egg: { label: "🥚 Easter Egg", className: "bg-purple-500/20 border-purple-400/30 text-purple-100" },
@@ -38,7 +37,6 @@ const TYPE_CONFIG: Record<string, { label: string; className: string }> = {
   default: { label: "📝 Note", className: "bg-slate-500/20 border-slate-400/30 text-slate-100" }
 };
 
-// 2. CONFIG PRIORITY ĐẦY ĐỦ
 const PRIORITY_OPTIONS = [
   { value: 1, label: "🔥 High (1)" },
   { value: 2, label: "⬆️ Medium (2)" },
@@ -72,7 +70,7 @@ function ComboBox({ placeholder, items, selectedId, onChange }: { placeholder: s
   );
 }
 
-// COMPONENT: IDEA CARD
+// COMPONENT: IDEA CARD (Đã thêm nút Edit và Link Game)
 function IdeaItem({ r, game, isSelectMode, isSelected, onToggleSelect, onTogglePin }: { 
   r: DetailRow; game?: Game; 
   isSelectMode: boolean; isSelected: boolean; 
@@ -111,9 +109,21 @@ function IdeaItem({ r, game, isSelectMode, isSelected, onToggleSelect, onToggleP
 
         <div className="absolute inset-0 flex flex-col justify-end p-5">
            <div className="z-10">
+              {/* GAME LINK: Cho phép bấm vào tên game để sửa game */}
               <div className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                <span className="truncate">{game?.title}</span>
+                {isSelectMode ? (
+                   <span className="truncate">{game?.title}</span>
+                ) : (
+                   <Link 
+                     href={`/games/${r.game_id}`} 
+                     className="truncate hover:text-blue-400 hover:underline z-20"
+                     onClick={(e) => e.stopPropagation()}
+                   >
+                     {game?.title}
+                   </Link>
+                )}
               </div>
+
               <h3 className="line-clamp-2 text-base font-bold leading-snug text-white mb-2">
                 {r.title}
               </h3>
@@ -125,13 +135,25 @@ function IdeaItem({ r, game, isSelectMode, isSelected, onToggleSelect, onToggleP
         </div>
 
         {!isSelectMode && (
-           <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+           <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex flex-col gap-2">
+              {/* Nút PIN */}
               <button 
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTogglePin(r.id, !!r.pinned); }}
-                className={`flex h-8 w-8 items-center justify-center rounded-full backdrop-blur-md shadow-lg ${r.pinned ? 'bg-amber-400 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
+                className={`flex h-8 w-8 items-center justify-center rounded-full backdrop-blur-md shadow-lg transition hover:scale-110 ${r.pinned ? 'bg-amber-400 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
+                title="Pin"
               >
                  {r.pinned ? "★" : "☆"}
               </button>
+
+              {/* Nút EDIT IDEA (MỚI) */}
+              <Link 
+                href={`/idea/${r.id}/edit`} // Giả sử route edit là /idea/[id]/edit
+                onClick={(e) => e.stopPropagation()}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-md shadow-lg hover:bg-blue-600 hover:scale-110 transition"
+                title="Edit Details"
+              >
+                 <PencilSquareIcon className="h-4 w-4" />
+              </Link>
            </div>
         )}
         <a href={`/idea/${r.id}`} className={`absolute inset-0 z-0 ${isSelectMode ? 'pointer-events-none' : ''}`} />
@@ -369,7 +391,7 @@ export default function Home() {
          </div>
       )}
 
-      {/* SIDEBAR FULL */}
+      {/* SIDEBAR FULL (FIXED FLEXBOX) */}
       <aside className="fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-slate-200 bg-white hidden md:flex">
          <div className="flex h-20 items-center px-8 text-2xl font-black text-slate-900">GameKB<span className="text-blue-500">.</span></div>
          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
@@ -384,12 +406,13 @@ export default function Home() {
                {showCreateGroup && <div className="mb-2"><input className="w-full border rounded px-2 py-1 text-xs" value={newGroupName} onChange={e=>setNewGroupName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&createGroup()} placeholder="Name..." autoFocus/></div>}
                <div className="space-y-1">
                   {groups.map(g => (
-                     <div key={g.id} className="group/item relative">
-                        <button onClick={() => setGroupId(g.id)} className={`flex w-full justify-between rounded-xl px-4 py-2 text-sm font-medium cursor-pointer ${groupId===g.id ? "bg-blue-50 text-blue-700" : "text-slate-500 hover:bg-slate-50"}`}>
-                           <span className="truncate">{g.name}</span>
-                           <span className="text-[10px] font-bold opacity-60">{groupCounts.get(g.id)||0}</span>
+                     // FIX: Sử dụng Flexbox + flex-1 để tên group không đè lên nút xóa
+                     <div key={g.id} className="group/item relative flex items-center justify-between w-full hover:bg-slate-50 rounded-xl px-2 py-1 transition">
+                        <button onClick={() => setGroupId(g.id)} className={`flex flex-1 items-center justify-between py-2 px-2 text-sm font-medium cursor-pointer overflow-hidden ${groupId===g.id ? "bg-blue-50 text-blue-700 rounded-lg" : "text-slate-500"}`}>
+                           <span className="truncate pr-2">{g.name}</span>
+                           <span className="text-[10px] font-bold opacity-60 shrink-0">{groupCounts.get(g.id)||0}</span>
                         </button>
-                        <button onClick={()=>deleteGroup(g)} className="absolute right-1 top-2 hidden text-xs text-rose-400 group-hover/item:block cursor-pointer"><TrashIcon className="h-4 w-4"/></button>
+                        <button onClick={()=>deleteGroup(g)} className="hidden group-hover/item:block p-2 text-xs text-rose-400 hover:text-rose-600 cursor-pointer shrink-0"><TrashIcon className="h-4 w-4"/></button>
                      </div>
                   ))}
                </div>
@@ -401,9 +424,8 @@ export default function Home() {
       <main className="flex-1 pl-0 md:pl-72 pb-32">
         <div className="mx-auto max-w-[1900px] px-6 py-8">
           
-          {/* HEADER WITH FILTERS */}
+          {/* HEADER */}
           <header className="mb-8 space-y-4">
-             {/* Row 1: Search & Actions */}
              <div className="flex gap-4">
                 <div className="flex-1 relative">
                    <input className="h-12 w-full rounded-2xl border border-slate-200 px-4 shadow-sm outline-none focus:ring-2 focus:ring-slate-200" placeholder="Search ideas..." value={q} onChange={e=>setQ(e.target.value)} />
@@ -417,24 +439,18 @@ export default function Home() {
                 <Link href="/add" className="h-12 px-6 flex items-center justify-center rounded-2xl bg-slate-900 text-white font-bold hover:bg-slate-800 transition">+ Add</Link>
              </div>
 
-             {/* Row 2: Filters */}
              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-3/4">
                <ComboBox placeholder="Game" items={games.map(g=>({id:g.id, name:g.title}))} selectedId={gameId} onChange={setGameId} />
-               
-               {/* TYPE SELECTOR (Dynamically generated) */}
                <select className={selectClass} value={type} onChange={e=>setType(e.target.value)}>
                   <option value="">All Types</option>
                   {Object.entries(TYPE_CONFIG).filter(([k]) => k !== 'default').map(([key, val]) => (
                      <option key={key} value={key}>{val.label}</option>
                   ))}
                </select>
-
-               {/* PRIORITY SELECTOR (Dynamically generated) */}
                <select className={selectClass} value={priority} onChange={e=>setPriority(e.target.value ? Number(e.target.value) : "")}>
                   <option value="">All Priority</option>
                   {PRIORITY_OPTIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                </select>
-
                {(q||gameId||groupId||type||priority) && <button onClick={()=>{setQ("");setGameId("");setGroupId("");setType("");setPriority("")}} className="text-sm text-rose-500 cursor-pointer">Clear Filters</button>}
              </div>
           </header>
@@ -461,7 +477,6 @@ export default function Home() {
             ))}
           </ul>
 
-          {/* PAGINATION CONTROLS */}
           {!loading && totalPages > 1 && (
             <div className="mt-12 flex justify-center items-center gap-2 pb-10">
                <button disabled={currentPage === 1} onClick={() => goToPage(currentPage - 1)} className={btnPage}>←</button>
