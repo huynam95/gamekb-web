@@ -12,7 +12,11 @@ import {
   PuzzlePieceIcon,
   CheckIcon,
   PencilSquareIcon,
-  EyeIcon
+  EyeIcon,
+  VideoCameraIcon,
+  HashtagIcon,
+  TagIcon,
+  DocumentDuplicateIcon
 } from "@heroicons/react/24/outline";
 
 /* ================= TYPES & CONFIG ================= */
@@ -28,7 +32,7 @@ type DetailRow = {
 };
 
 type ScriptProject = { 
-  id: number; title: string; content: string; assets: string[];
+  id: number; title: string; content: string; assets: { url: string; name: string }[];
   description: string; hashtags: string[]; tags: string[];
   publish_date: string | null; status: string;
 };
@@ -110,6 +114,129 @@ function GameEditorModal({ game, isOpen, onClose, onUpdate }: { game: Game | nul
   );
 }
 
+function ScriptEditorModal({ 
+  isOpen, onClose, initialData, onSave 
+}: { 
+  isOpen: boolean; onClose: () => void; 
+  initialData: { ids: number[], ideas: DetailRow[], games: Game[] };
+  onSave: (data: Partial<ScriptProject>) => void;
+}) {
+  const [formData, setFormData] = useState<Partial<ScriptProject>>({
+    title: "", content: "", description: "", hashtags: [], tags: [], publish_date: null, status: "Draft", assets: []
+  });
+  const [activeTab, setActiveTab] = useState<"details" | "script" | "assets">("script");
+
+  useEffect(() => {
+    if (isOpen && initialData.ideas.length > 0) {
+       const titles = initialData.ideas.map(i => i.title);
+       const gameNames = Array.from(new Set(initialData.ideas.map(i => {
+          const g = initialData.games.find(game => game.id === i.game_id);
+          return g?.title || "";
+       }).filter(Boolean)));
+
+       const fullDescription = initialData.ideas.map(i => `• ${i.title}: ${i.description || ""}`).join("\n\n");
+       
+       // HIỂN THỊ TÊN VIDEO CHUẨN TẠI ĐÂY
+       const allAssets = initialData.ideas.flatMap(i => 
+         i.footage?.map(f => ({ url: f.file_path, name: f.title || f.file_path.split('/').pop() || "Video" })) || []
+       );
+
+       setFormData({
+         title: `Shorts Script: ${titles[0]}${titles.length > 1 ? '...' : ''}`,
+         content: initialData.ideas.map(i => `[${i.title}]\n${i.description || ""}`).join("\n\n"),
+         description: `Video tổng hợp các chi tiết thú vị.\n\n${fullDescription}`,
+         assets: allAssets,
+         tags: [...gameNames, "Shorts", "Gaming", "Game Facts"],
+         hashtags: ["#shorts", "#gaming", ...gameNames.map(g => `#${g.replace(/\s+/g, '').toLowerCase()}`)],
+         status: "Draft",
+         publish_date: null
+       });
+    }
+  }, [isOpen, initialData]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+       <div className="bg-white w-full max-w-4xl h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+             <div><h2 className="text-xl font-black text-slate-900">Create Video Script</h2><p className="text-xs text-slate-500 font-bold">Drafting from {initialData.ideas.length} ideas</p></div>
+             <div className="flex gap-2">
+                <button onClick={onClose} className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl">Cancel</button>
+                <button onClick={() => { onSave(formData); onClose(); }} className="px-6 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg">Save Project</button>
+             </div>
+          </div>
+          <div className="flex px-6 border-b border-slate-100 bg-slate-50">
+             {(["script", "details", "assets"] as const).map(tab => (
+               <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-3 text-sm font-bold border-b-2 transition ${activeTab === tab ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"}`}>
+                 {tab === "script" ? "📝 Content" : tab === "details" ? "ℹ️ Metadata" : "🔗 Assets"}
+               </button>
+             ))}
+          </div>
+          <div className="flex-1 overflow-y-auto p-8 bg-slate-50/30">
+             {activeTab === "script" && <textarea className="h-full w-full rounded-2xl border border-slate-200 p-6 text-sm leading-relaxed text-slate-800 outline-none focus:border-blue-500 font-mono shadow-inner" value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} />}
+             
+             {activeTab === "details" && <div className="space-y-6">
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-slate-400 mb-2 block">Title</label>
+                  <input className="w-full h-11 rounded-xl border border-slate-200 px-4 text-sm font-bold outline-none focus:border-blue-500 shadow-sm" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-slate-400 mb-2 block">Description</label>
+                  <textarea className="w-full h-40 rounded-xl border border-slate-200 p-4 text-xs outline-none focus:border-blue-500 shadow-sm" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
+                </div>
+                <div className="grid grid-cols-2 gap-8">
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1 tracking-widest"><HashtagIcon className="w-3 h-3"/> Hashtags</label>
+                    <div className="flex flex-wrap gap-2">
+                      {formData.hashtags?.map((tag, i) => (
+                        <span key={i} className="px-2.5 py-1 bg-blue-50 text-blue-600 rounded-lg text-[11px] font-bold border border-blue-100 shadow-sm">{tag}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1 tracking-widest"><TagIcon className="w-3 h-3"/> Tags</label>
+                    <div className="flex flex-wrap gap-2">
+                      {formData.tags?.map((tag, i) => (
+                        <span key={i} className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-[11px] font-bold border border-slate-200 shadow-sm">{tag}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+             </div>}
+
+             {activeTab === "assets" && <div className="space-y-4">
+                <div className="flex justify-between items-center px-1">
+                  <label className="text-[10px] font-bold uppercase text-slate-400 block tracking-widest">Selected Footage</label>
+                  <button onClick={() => navigator.clipboard.writeText(formData.assets?.map(a => a.url).join('\n') || "")} className="text-[10px] flex items-center gap-1 font-bold text-blue-600 hover:underline">
+                    <DocumentDuplicateIcon className="w-3 h-3"/> Copy All Links
+                  </button>
+                </div>
+                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm divide-y divide-slate-50">
+                  {(formData.assets || []).length > 0 ? (
+                    formData.assets?.map((asset, i) => (
+                      <div key={i} className="p-4 flex items-center gap-4 hover:bg-slate-50 transition group">
+                         <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-500">#{i+1}</div>
+                         <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-slate-700 truncate">{asset.name}</p>
+                            <p className="text-[10px] text-slate-400 truncate font-mono">{asset.url}</p>
+                         </div>
+                         <a href={asset.url} target="_blank" className="p-2 rounded-lg bg-slate-100 text-slate-400 hover:bg-blue-600 hover:text-white transition shadow-sm">
+                            <VideoCameraIcon className="w-4 h-4" />
+                         </a>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-12 text-center text-slate-400 italic text-sm">No assets linked to these ideas.</div>
+                  )}
+                </div>
+             </div>}
+          </div>
+       </div>
+    </div>
+  );
+}
+
 function IdeaItem({ r, game, isSelectMode, isSelected, onToggleSelect, onTogglePin, onEditGame, onQuickView }: { 
   r: DetailRow; game?: Game; isSelectMode: boolean; isSelected: boolean; 
   onToggleSelect: (id: number) => void; onTogglePin: (id: number, current: boolean) => void; 
@@ -145,10 +272,12 @@ export default function Dashboard() {
   const [pinnedIdeas, setPinnedIdeas] = useState<DetailRow[]>([]);
   const [recentIdeas, setRecentIdeas] = useState<DetailRow[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [allGames, setAllGames] = useState<Game[]>([]);
   const [groupCounts, setGroupCounts] = useState<Map<number, number>>(new Map());
   
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [showEditor, setShowEditor] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [editingGame, setEditingGame] = useState<Game | null>(null);
@@ -158,19 +287,22 @@ export default function Dashboard() {
     async function loadData() {
       const ideasRes = await supabase.from("details").select("id, priority, status", { count: 'exact' });
       const scriptsRes = await supabase.from("scripts").select("id", { count: 'exact' });
-      const gamesRes = await supabase.from("games").select("id", { count: 'exact' });
+      const gamesRes = await supabase.from("games").select("*").order("title");
       
+      const gamesData = (gamesRes.data || []) as Game[];
+      setAllGames(gamesData);
+
       setStats({
         total: ideasRes.count || 0,
         high: ideasRes.data?.filter(i => i.priority === 1).length || 0,
         scripts: scriptsRes.count || 0,
-        games: gamesRes.count || 0
+        games: gamesData.length
       });
 
-      const pinnedRes = await supabase.from("details").select("*, game:games(*), footage(file_path)").eq("status", "idea").eq("pinned", true).order("created_at", { ascending: false });
+      const pinnedRes = await supabase.from("details").select("*, game:games(*), footage(file_path, title)").eq("status", "idea").eq("pinned", true).order("created_at", { ascending: false });
       setPinnedIdeas((pinnedRes.data || []) as DetailRow[]);
 
-      const recentRes = await supabase.from("details").select("*, game:games(*), footage(file_path)").eq("status", "idea").eq("pinned", false).order("created_at", { ascending: false }).limit(10);
+      const recentRes = await supabase.from("details").select("*, game:games(*), footage(file_path, title)").eq("status", "idea").eq("pinned", false).order("created_at", { ascending: false }).limit(10);
       setRecentIdeas((recentRes.data || []) as DetailRow[]);
 
       const grps = await supabase.from("idea_groups").select("*").order("name");
@@ -187,6 +319,11 @@ export default function Dashboard() {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
+  async function handleSaveScript(data: Partial<ScriptProject>) {
+    const { error } = await supabase.from("scripts").insert(data);
+    if (!error) { alert("Script saved successfully!"); setIsSelectMode(false); setSelectedIds([]); }
+  }
+
   async function createGroup() {
     if (!newGroupName.trim()) return;
     await supabase.from("idea_groups").insert({ name: newGroupName.trim() });
@@ -200,17 +337,31 @@ export default function Dashboard() {
   }
 
   const updateGameInList = (updatedGame: Game) => {
+     setAllGames(prev => prev.map(g => g.id === updatedGame.id ? updatedGame : g));
      const updateList = (list: DetailRow[]) => list.map(item => item.game_id === updatedGame.id ? { ...item, game: updatedGame } : item);
      setPinnedIdeas(updateList(pinnedIdeas));
      setRecentIdeas(updateList(recentIdeas));
   };
 
+  const combinedIdeas = [...pinnedIdeas, ...recentIdeas];
+
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
       
       {/* MODALS */}
+      <ScriptEditorModal isOpen={showEditor} onClose={() => setShowEditor(false)} onSave={handleSaveScript} initialData={{ ids: selectedIds, ideas: combinedIdeas.filter(i => selectedIds.includes(i.id)), games: allGames }} />
       <GameEditorModal game={editingGame} isOpen={!!editingGame} onClose={() => setEditingGame(null)} onUpdate={updateGameInList} />
       <QuickViewModal idea={previewIdea} isOpen={!!previewIdea} onClose={() => setPreviewIdea(null)} />
+
+      {/* SELECTION BAR */}
+      {isSelectMode && (
+         <div className="fixed bottom-0 inset-x-0 z-[80] bg-white border-t border-slate-200 p-4 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] animate-in slide-in-from-bottom-10 md:pl-72">
+            <div className="mx-auto max-w-4xl flex items-center justify-between">
+               <div className="flex items-center gap-4"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-white font-bold text-sm">{selectedIds.length}</span><span className="text-sm font-bold text-slate-600 uppercase tracking-widest">Ideas Selected</span></div>
+               <button disabled={selectedIds.length === 0} onClick={() => setShowEditor(true)} className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-white font-bold shadow-lg hover:bg-blue-700 active:scale-95 transition disabled:opacity-50"><PlayCircleIcon className="h-5 w-5" /> Create Script</button>
+            </div>
+         </div>
+      )}
 
       {/* SIDEBAR */}
       <aside className="fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-slate-200 bg-white hidden md:flex">
@@ -247,13 +398,11 @@ export default function Dashboard() {
       {/* MAIN CONTENT */}
       <main className="flex-1 pl-0 md:pl-72 pb-32">
         <div className="mx-auto max-w-[1900px] px-6 py-8">
-           
            <div className="flex items-center justify-between mb-8">
              <h1 className="text-3xl font-black text-slate-900">Dashboard</h1>
              <button onClick={() => { setIsSelectMode(!isSelectMode); setSelectedIds([]); }} className={`h-10 px-4 rounded-xl font-bold border text-sm transition ${isSelectMode ? "bg-blue-50 border-blue-200 text-blue-600" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}>{isSelectMode ? "Exit Select" : "Select Mode"}</button>
            </div>
 
-           {/* STATS ROW */}
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
               <StatCard title="Total Ideas" value={stats.total} icon={DocumentTextIcon} color="bg-blue-500" />
               <StatCard title="High Priority" value={stats.high} icon={FireIcon} color="bg-red-500" />
@@ -261,7 +410,6 @@ export default function Dashboard() {
               <StatCard title="Scripts Drafted" value={stats.scripts} icon={ChartBarIcon} color="bg-purple-500" />
            </div>
 
-           {/* SECTION: PINNED IDEAS */}
            {pinnedIdeas.length > 0 && (
              <div className="mb-12">
                <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2">
@@ -275,7 +423,6 @@ export default function Dashboard() {
              </div>
            )}
 
-           {/* SECTION: RECENT IDEAS */}
            <div>
              <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2">✨ Recently Added</h3>
              <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
@@ -284,7 +431,6 @@ export default function Dashboard() {
                 ))}
              </ul>
            </div>
-
         </div>
       </main>
     </div>
