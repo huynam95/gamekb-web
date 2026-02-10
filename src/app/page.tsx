@@ -120,6 +120,76 @@ function GameEditorModal({ game, isOpen, onClose, onUpdate }: { game: Game | nul
   );
 }
 
+function ScriptEditorModal({ 
+  isOpen, onClose, initialData, onSave 
+}: { 
+  isOpen: boolean; onClose: () => void; 
+  initialData: { ids: number[], ideas: DetailRow[], games: Game[] };
+  onSave: (data: Partial<ScriptProject>) => void;
+}) {
+  const [formData, setFormData] = useState<Partial<ScriptProject>>({
+    title: "", content: "", description: "", hashtags: [], tags: [], publish_date: null, status: "Draft", assets: []
+  });
+  const [activeTab, setActiveTab] = useState<"details" | "script" | "assets">("script");
+
+  useEffect(() => {
+    if (isOpen && initialData.ideas.length > 0) {
+       const titles = initialData.ideas.map(i => i.title);
+       const gameNames = Array.from(new Set(initialData.ideas.map(i => {
+          const g = initialData.games.find(game => game.id === i.game_id);
+          return g?.title || "";
+       }).filter(Boolean)));
+
+       const fullDescription = initialData.ideas.map(i => `• ${i.title}: ${i.description || ""}`).join("\n\n");
+       const allAssets = initialData.ideas.flatMap(i => i.footage?.map(f => f.file_path) || []).filter(Boolean) as string[];
+
+       setFormData({
+         title: `Shorts: ${titles[0]}${titles.length > 1 ? '...' : ''}`,
+         content: initialData.ideas.map(i => `[${i.title}]\n${i.description || ""}`).join("\n\n"),
+         description: `Video tổng hợp các chi tiết thú vị.\n\n${fullDescription}`,
+         assets: allAssets,
+         tags: [...gameNames, "Shorts", "Gaming"],
+         hashtags: ["#shorts", "#gaming", ...gameNames.map(g => `#${g.replace(/\s+/g, '').toLowerCase()}`)],
+         status: "Draft",
+         publish_date: null
+       });
+    }
+  }, [isOpen, initialData]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+       <div className="bg-white w-full max-w-4xl h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+             <div><h2 className="text-xl font-black text-slate-900">Create Video Script</h2><p className="text-xs text-slate-500">Drafting from {initialData.ideas.length} ideas</p></div>
+             <div className="flex gap-2">
+                <button onClick={onClose} className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl">Cancel</button>
+                <button onClick={() => { onSave(formData); onClose(); }} className="px-6 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl">Save Project</button>
+             </div>
+          </div>
+          <div className="flex px-6 border-b border-slate-100 bg-slate-50">
+             {(["script", "details", "assets"] as const).map(tab => (
+               <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-3 text-sm font-bold border-b-2 transition ${activeTab === tab ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"}`}>
+                 {tab === "script" ? "📝 Content" : tab === "details" ? "ℹ️ Metadata" : "🔗 Assets"}
+               </button>
+             ))}
+          </div>
+          <div className="flex-1 overflow-y-auto p-6 bg-slate-50/30">
+             {activeTab === "script" && <textarea className="h-full w-full rounded-2xl border border-slate-200 p-5 text-sm outline-none focus:border-blue-500 font-mono" value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} />}
+             {activeTab === "details" && <div className="space-y-4">
+                <input className="w-full h-10 rounded-xl border px-3 text-sm font-bold" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
+                <textarea className="w-full h-40 rounded-xl border p-4 text-xs" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
+             </div>}
+             {activeTab === "assets" && <div className="bg-white rounded-xl border overflow-hidden shadow-sm">
+                {(formData.assets || []).map((link, i) => <div key={i} className="p-3 border-b text-xs text-blue-600 truncate hover:bg-slate-50"><a href={link} target="_blank">{link}</a></div>)}
+             </div>}
+          </div>
+       </div>
+    </div>
+  );
+}
+
 function IdeaItem({ r, game, isSelectMode, isSelected, onToggleSelect, onTogglePin, onEditGame, onQuickView }: { 
   r: DetailRow; game?: Game; isSelectMode: boolean; isSelected: boolean; 
   onToggleSelect: (id: number) => void; onTogglePin: (id: number, current: boolean) => void; 
@@ -148,53 +218,16 @@ function IdeaItem({ r, game, isSelectMode, isSelected, onToggleSelect, onToggleP
   );
 }
 
-function ScriptEditorModal({ isOpen, onClose, initialData, onSave }: { isOpen: boolean; onClose: () => void; initialData: { ids: number[], ideas: DetailRow[], games: Game[] }; onSave: (data: Partial<ScriptProject>) => void; }) {
-  const [formData, setFormData] = useState<Partial<ScriptProject>>({ title: "", content: "", description: "", hashtags: [], tags: [], publish_date: null, status: "Draft", assets: [] });
-  const [activeTab, setActiveTab] = useState<"details" | "script" | "assets">("script");
-  useEffect(() => {
-    if (isOpen && initialData.ideas.length > 0) {
-       const titles = initialData.ideas.map(i => i.title);
-       const gameNames = Array.from(new Set(initialData.ideas.map(i => initialData.games.find(g => g.id === i.game_id)?.title || "").filter(Boolean)));
-       setFormData({
-         title: `Shorts: ${titles[0]}...`,
-         content: initialData.ideas.map(i => `[${i.title}]\n${i.description || ""}`).join("\n\n"),
-         description: `Video tổng hợp các chi tiết thú vị.\n\nTimestamps:\n0:00 Intro`,
-         assets: initialData.ideas.flatMap(i => i.footage?.map(f => f.file_path) || []).filter(Boolean) as string[],
-         tags: [...gameNames, "Shorts", "Gaming"],
-         hashtags: ["#shorts", "#gaming", ...gameNames.map(g => `#${g.replace(/\s+/g, '')}`)],
-         status: "Draft"
-       });
-    }
-  }, [isOpen, initialData]);
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
-       <div className="bg-white w-full max-w-4xl h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-             <div><h2 className="text-xl font-black text-slate-900">Create Video Script</h2><p className="text-xs text-slate-500">Drafting from {initialData.ideas.length} selected ideas</p></div>
-             <div className="flex gap-2"><button onClick={onClose} className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl">Cancel</button><button onClick={() => { onSave(formData); onClose(); }} className="px-6 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg">Save Project</button></div>
-          </div>
-          <div className="flex px-6 border-b border-slate-100 bg-slate-50">{(["script", "details", "assets"] as const).map(tab => (<button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-3 text-sm font-bold border-b-2 transition ${activeTab === tab ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"}`}>{tab === "script" ? "📝 Script Content" : tab === "details" ? "ℹ️ Metadata" : "🔗 Assets"}</button>))}</div>
-          <div className="flex-1 overflow-y-auto p-6">{activeTab === "script" && (<textarea className="h-full w-full rounded-2xl border border-slate-200 p-5 text-sm leading-relaxed text-slate-800 outline-none focus:border-blue-500 font-mono" value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} />)}</div>
-       </div>
-    </div>
-  );
-}
-
-/* ================= PAGE LOGIC (MAIN) ================= */
-
 export default function Home() {
   const [games, setGames] = useState<Game[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupCounts, setGroupCounts] = useState<Map<number, number>>(new Map());
   const [ideas, setIdeas] = useState<DetailRow[]>([]);
-  
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showEditor, setShowEditor] = useState(false);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const [previewIdea, setPreviewIdea] = useState<DetailRow | null>(null);
-
   const [currentPage, setCurrentPage] = useState(1);
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
@@ -203,7 +236,6 @@ export default function Home() {
   const [type, setType] = useState<string | "">("");
   const [priority, setPriority] = useState<number | "">("");
   const [loading, setLoading] = useState(true);
-
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
 
@@ -273,13 +305,10 @@ export default function Home() {
 
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
-      
-      {/* MODALS */}
       <ScriptEditorModal isOpen={showEditor} onClose={() => setShowEditor(false)} onSave={handleSaveScript} initialData={{ ids: selectedIds, ideas: ideas.filter(i => selectedIds.includes(i.id)), games: games }} />
       <GameEditorModal game={editingGame} isOpen={!!editingGame} onClose={() => setEditingGame(null)} onUpdate={(updatedGame) => { setGames(prev => prev.map(g => g.id === updatedGame.id ? updatedGame : g)); }} />
       <QuickViewModal idea={previewIdea} isOpen={!!previewIdea} onClose={() => setPreviewIdea(null)} />
 
-      {/* SELECTION BAR */}
       {isSelectMode && (
          <div className="fixed bottom-0 inset-x-0 z-[80] bg-white border-t border-slate-200 p-4 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] animate-in slide-in-from-bottom-10">
             <div className="mx-auto max-w-4xl flex items-center justify-between">
@@ -289,7 +318,6 @@ export default function Home() {
          </div>
       )}
 
-      {/* SIDEBAR */}
       <aside className="fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-slate-200 bg-white hidden md:flex">
          <div className="flex h-20 items-center px-8 text-2xl font-black text-slate-900">GameKB<span className="text-blue-500">.</span></div>
          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
@@ -308,7 +336,7 @@ export default function Home() {
                         <div onClick={() => setGroupId(g.id)} className={`flex-1 flex items-center gap-2 overflow-hidden py-2 ${groupId === g.id ? "text-blue-700 font-bold" : "text-slate-500 font-medium"}`}><span className="truncate">{g.name}</span></div>
                         <div className="w-8 flex justify-center shrink-0">
                            <span className={`text-[10px] font-bold opacity-60 group-hover/item:hidden ${groupId === g.id ? "text-blue-700" : ""}`}>{groupCounts.get(g.id)||0}</span>
-                           <button onClick={(e) => { e.stopPropagation(); deleteGroup(g.id); }} className="hidden group-hover/item:block text-rose-500 hover:text-rose-700"><TrashIcon className="h-4 w-4"/></button>
+                           <button onClick={(e) => { e.stopPropagation(); deleteGroup(g.id); }} className="hidden group-hover/item:block text-rose-500 hover:text-rose-700 transition"><TrashIcon className="h-4 w-4"/></button>
                         </div>
                      </div>
                   ))}
@@ -317,7 +345,6 @@ export default function Home() {
          </div>
       </aside>
 
-      {/* MAIN */}
       <main className="flex-1 pl-0 md:pl-72 pb-32 min-w-0">
         <div className="mx-auto max-w-[1900px] px-6 py-8">
           <header className="mb-8 space-y-4">
