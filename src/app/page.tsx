@@ -10,7 +10,9 @@ import {
   PencilSquareIcon, 
   EyeIcon, 
   MagnifyingGlassIcon,
-  PlusIcon
+  VideoCameraIcon,
+  HashtagIcon,
+  TagIcon
 } from "@heroicons/react/24/outline";
 
 /* ================= TYPES ================= */
@@ -148,7 +150,7 @@ function ScriptEditorModal({
          content: initialData.ideas.map(i => `[${i.title}]\n${i.description || ""}`).join("\n\n"),
          description: `Video tổng hợp các chi tiết thú vị.\n\n${fullDescription}`,
          assets: allAssets,
-         tags: [...gameNames, "Shorts", "Gaming"],
+         tags: [...gameNames, "Shorts", "Gaming", "Shorts Facts"],
          hashtags: ["#shorts", "#gaming", ...gameNames.map(g => `#${g.replace(/\s+/g, '').toLowerCase()}`)],
          status: "Draft",
          publish_date: null
@@ -162,10 +164,10 @@ function ScriptEditorModal({
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
        <div className="bg-white w-full max-w-4xl h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95">
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-             <div><h2 className="text-xl font-black text-slate-900">Create Video Script</h2><p className="text-xs text-slate-500">Drafting from {initialData.ideas.length} ideas</p></div>
+             <div><h2 className="text-xl font-black text-slate-900">Create Video Script</h2><p className="text-xs text-slate-500 font-bold">Drafting from {initialData.ideas.length} ideas</p></div>
              <div className="flex gap-2">
                 <button onClick={onClose} className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl">Cancel</button>
-                <button onClick={() => { onSave(formData); onClose(); }} className="px-6 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl">Save Project</button>
+                <button onClick={() => { onSave(formData); onClose(); }} className="px-6 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg">Save Project</button>
              </div>
           </div>
           <div className="flex px-6 border-b border-slate-100 bg-slate-50">
@@ -176,13 +178,60 @@ function ScriptEditorModal({
              ))}
           </div>
           <div className="flex-1 overflow-y-auto p-6 bg-slate-50/30">
-             {activeTab === "script" && <textarea className="h-full w-full rounded-2xl border border-slate-200 p-5 text-sm outline-none focus:border-blue-500 font-mono" value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} />}
-             {activeTab === "details" && <div className="space-y-4">
-                <input className="w-full h-10 rounded-xl border px-3 text-sm font-bold" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
-                <textarea className="w-full h-40 rounded-xl border p-4 text-xs" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
+             {activeTab === "script" && <textarea className="h-full w-full rounded-2xl border border-slate-200 p-5 text-sm leading-relaxed text-slate-800 outline-none focus:border-blue-500 font-mono shadow-inner" value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} />}
+             
+             {activeTab === "details" && <div className="space-y-6">
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-slate-400 mb-1 block">Title</label>
+                  <input className="w-full h-11 rounded-xl border border-slate-200 px-4 text-sm font-bold outline-none focus:border-blue-500" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-slate-400 mb-1 block">Description</label>
+                  <textarea className="w-full h-32 rounded-xl border border-slate-200 p-4 text-xs outline-none focus:border-blue-500" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
+                </div>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1"><HashtagIcon className="w-3 h-3"/> Hashtags</label>
+                    <div className="flex flex-wrap gap-2">
+                      {formData.hashtags?.map((tag, i) => (
+                        <span key={i} className="px-2 py-1 bg-blue-50 text-blue-600 rounded-lg text-[11px] font-bold border border-blue-100">{tag}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1"><TagIcon className="w-3 h-3"/> Tags</label>
+                    <div className="flex flex-wrap gap-2">
+                      {formData.tags?.map((tag, i) => (
+                        <span key={i} className="px-2 py-1 bg-slate-100 text-slate-600 rounded-lg text-[11px] font-bold border border-slate-200">{tag}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
              </div>}
-             {activeTab === "assets" && <div className="bg-white rounded-xl border overflow-hidden shadow-sm">
-                {(formData.assets || []).map((link, i) => <div key={i} className="p-3 border-b text-xs text-blue-600 truncate hover:bg-slate-50"><a href={link} target="_blank">{link}</a></div>)}
+
+             {activeTab === "assets" && <div className="space-y-3">
+                <label className="text-[10px] font-bold uppercase text-slate-400 block tracking-widest">Footage & Resources</label>
+                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm divide-y divide-slate-50">
+                  {(formData.assets || []).length > 0 ? (
+                    formData.assets?.map((link, i) => {
+                      const fileName = link.split('/').pop()?.split('?')[0] || "Unnamed file";
+                      return (
+                        <div key={i} className="p-4 flex items-center gap-4 hover:bg-slate-50 transition group">
+                           <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-500">#{i+1}</div>
+                           <div className="flex-1 min-w-0">
+                              <p className="text-sm font-bold text-slate-700 truncate">{fileName}</p>
+                              <p className="text-[10px] text-blue-500 truncate font-mono">{link}</p>
+                           </div>
+                           <a href={link} target="_blank" className="p-2 rounded-lg bg-slate-100 text-slate-400 hover:bg-blue-600 hover:text-white transition">
+                              <VideoCameraIcon className="w-4 h-4" />
+                           </a>
+                        </div>
+                      )
+                    })
+                  ) : (
+                    <div className="p-10 text-center text-slate-400 italic">No assets linked to these ideas.</div>
+                  )}
+                </div>
              </div>}
           </div>
        </div>
