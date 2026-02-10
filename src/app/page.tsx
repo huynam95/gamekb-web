@@ -4,17 +4,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 import { 
-  PlusIcon, 
-  StarIcon as StarSolid, 
-  DocumentTextIcon, 
-  LinkIcon, 
-  XMarkIcon, 
-  ChevronUpIcon,
-  ChevronDownIcon,
-  ClipboardDocumentCheckIcon,
-  ClipboardDocumentIcon
+  CheckCircleIcon, 
+  CalendarIcon, 
+  HashtagIcon, 
+  TagIcon, 
+  XMarkIcon,
+  PlayCircleIcon
 } from "@heroicons/react/24/solid";
-import { StarIcon as StarOutline } from "@heroicons/react/24/outline";
+import { CheckIcon, PlusIcon } from "@heroicons/react/24/outline";
 
 /* ================= TYPES ================= */
 
@@ -26,7 +23,19 @@ type DetailRow = {
   detail_type: string; game_id: number; pinned?: boolean; created_at?: string; 
   footage?: FootageItem[]; 
 };
-type ScriptProject = { id: number; title: string; content: string; assets: string[] };
+
+// CẬP NHẬT: Type Script đầy đủ
+type ScriptProject = { 
+  id: number; 
+  title: string; 
+  content: string; 
+  assets: string[];
+  description: string;
+  hashtags: string[];
+  tags: string[];
+  publish_date: string | null;
+  status: string;
+};
 
 /* ================= CONFIG ================= */
 
@@ -47,33 +56,52 @@ function TypePill({ typeKey }: { typeKey: string }) {
   return <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider backdrop-blur-md ${config.className}`}>{config.label}</span>;
 }
 
-// COMPONENT: CLEANER IDEA CARD
-function IdeaItem({ r, game, onTogglePin, onAddToScript }: { r: DetailRow; game?: Game; onTogglePin: (id: number, current: boolean) => void; onAddToScript: (desc: string, footage: FootageItem[]) => void }) {
+// COMPONENT: SELECTABLE IDEA CARD
+function IdeaItem({ r, game, isSelectMode, isSelected, onToggleSelect, onTogglePin }: { 
+  r: DetailRow; game?: Game; 
+  isSelectMode: boolean; isSelected: boolean; 
+  onToggleSelect: (id: number) => void;
+  onTogglePin: (id: number, current: boolean) => void; 
+}) {
   const hasCover = !!game?.cover_url;
 
   return (
-    <li className="group relative h-64 w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-900 shadow-sm transition-all duration-500 hover:shadow-2xl hover:-translate-y-1">
+    <li 
+      onClick={() => isSelectMode && onToggleSelect(r.id)}
+      className={`group relative h-64 w-full overflow-hidden rounded-2xl border shadow-sm transition-all duration-300 ${
+        isSelectMode 
+          ? "cursor-pointer active:scale-95" 
+          : "hover:shadow-2xl hover:-translate-y-1"
+      } ${
+        isSelected 
+          ? "border-blue-500 ring-2 ring-blue-500 ring-offset-2 ring-offset-slate-50" 
+          : "border-slate-200 bg-slate-900"
+      }`}
+    >
         {/* Background Layer */}
         {hasCover ? (
-          <div className="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover:scale-110 opacity-60 group-hover:opacity-40" style={{ backgroundImage: `url(${game.cover_url})` }} />
+          <div className={`absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out opacity-60 ${isSelectMode ? '' : 'group-hover:scale-110 group-hover:opacity-40'}`} style={{ backgroundImage: `url(${game.cover_url})` }} />
         ) : (
           <div className="absolute inset-0 bg-slate-800 opacity-50" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/60 to-transparent" />
+        <div className={`absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/60 to-transparent ${isSelected ? 'opacity-90 bg-blue-900/20' : ''}`} />
+
+        {/* SELECTION OVERLAY (Only in Select Mode) */}
+        {isSelectMode && (
+          <div className="absolute top-3 right-3 z-30">
+             <div className={`h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? "bg-blue-500 border-blue-500 text-white" : "border-white/50 bg-black/20"}`}>
+                {isSelected && <CheckIcon className="h-4 w-4 stroke-[3]" />}
+             </div>
+          </div>
+        )}
 
         {/* Content Layer */}
         <div className="absolute inset-0 flex flex-col justify-end p-5">
-           {/* Top Badges */}
-           <div className="absolute top-3 left-3 flex gap-2">
-              {r.priority === 1 && <span className="rounded bg-rose-500 px-1.5 py-0.5 text-[9px] font-bold uppercase text-white shadow-sm">High</span>}
-           </div>
-
-           {/* MAIN TEXT */}
            <div className="z-10">
               <div className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 <span className="truncate">{game?.title}</span>
               </div>
-              <h3 className="line-clamp-2 text-base font-bold leading-snug text-white group-hover:text-blue-200 mb-2">
+              <h3 className="line-clamp-2 text-base font-bold leading-snug text-white mb-2">
                 {r.title}
               </h3>
               <div className="flex items-center gap-2">
@@ -83,172 +111,199 @@ function IdeaItem({ r, game, onTogglePin, onAddToScript }: { r: DetailRow; game?
            </div>
         </div>
 
-        {/* HOVER ACTIONS (Chỉ hiện khi di chuột) */}
-        <div className="absolute top-3 right-3 flex flex-col gap-2 translate-x-10 opacity-0 transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100 z-20">
-           {/* Pin Button */}
-           <button 
-             onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTogglePin(r.id, !!r.pinned); }}
-             className={`flex h-8 w-8 items-center justify-center rounded-full backdrop-blur-md shadow-lg transition hover:scale-110 ${r.pinned ? 'bg-amber-400 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
-             title="Pin"
-           >
-             {r.pinned ? <StarSolid className="h-4 w-4" /> : <StarOutline className="h-4 w-4" />}
-           </button>
+        {/* Standard Actions (Hidden in Select Mode) */}
+        {!isSelectMode && (
+           <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+              <button 
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTogglePin(r.id, !!r.pinned); }}
+                className={`flex h-8 w-8 items-center justify-center rounded-full backdrop-blur-md shadow-lg ${r.pinned ? 'bg-amber-400 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
+              >
+                 {r.pinned ? "★" : "☆"}
+              </button>
+           </div>
+        )}
 
-           {/* Add Script Button */}
-           <button 
-             onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAddToScript(r.description || "", r.footage || []); }}
-             className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg backdrop-blur-md transition hover:bg-blue-500 hover:scale-110"
-             title="Add to Script"
-           >
-             <PlusIcon className="h-4 w-4" />
-           </button>
-        </div>
-
-        {/* Clickable Link Overlay */}
-        <a href={`/idea/${r.id}`} className="absolute inset-0 z-0" />
+        <a href={`/idea/${r.id}`} className={`absolute inset-0 z-0 ${isSelectMode ? 'pointer-events-none' : ''}`} />
     </li>
   );
 }
 
-// COMPONENT: MODERN SCRIPT DOCK (HUD STYLE)
-function ScriptDock({ 
-  currentScript, 
-  scripts, 
-  onSelectScript, 
-  onUpdateContent, 
-  onCreateScript 
+// COMPONENT: EDITOR MODAL (YOUTUBE STUDIO STYLE)
+function ScriptEditorModal({ 
+  isOpen, onClose, initialData, onSave 
 }: { 
-  currentScript: ScriptProject | null, 
-  scripts: ScriptProject[], 
-  onSelectScript: (id: number) => void,
-  onUpdateContent: (content: string) => void,
-  onCreateScript: () => void
+  isOpen: boolean; onClose: () => void; 
+  initialData: { ids: number[], ideas: DetailRow[], games: Game[] };
+  onSave: (data: Partial<ScriptProject>) => void;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"text" | "assets">("text");
-  const [copied, setCopied] = useState(false);
-  const [flash, setFlash] = useState(false); // Hiệu ứng nháy khi data thay đổi
+  const [formData, setFormData] = useState<Partial<ScriptProject>>({
+    title: "", content: "", description: "", hashtags: [], tags: [], publish_date: null, status: "Draft", assets: []
+  });
+  const [activeTab, setActiveTab] = useState<"details" | "script" | "assets">("script");
 
-  // Trigger flash effect when content changes (visual feedback)
+  // Init Data when opening
   useEffect(() => {
-    if (currentScript) {
-        setFlash(true);
-        const t = setTimeout(() => setFlash(false), 300);
-        return () => clearTimeout(t);
+    if (isOpen && initialData.ideas.length > 0) {
+       const titles = initialData.ideas.map(i => i.title);
+       const gameNames = Array.from(new Set(initialData.ideas.map(i => {
+          return initialData.games.find(g => g.id === i.game_id)?.title || "";
+       }).filter(Boolean)));
+
+       // Auto Generate Content
+       const generatedContent = initialData.ideas.map(i => `[${i.title}]\n${i.description || ""}`).join("\n\n");
+       const generatedAssets = initialData.ideas.flatMap(i => i.footage?.map(f => f.file_path) || []).filter(Boolean) as string[];
+       const generatedDesc = `Video tổng hợp các chi tiết thú vị trong game.\n\nTimestamps:\n0:00 Intro\n...`;
+       const generatedTags = [...gameNames, "Shorts", "Gaming", "Facts"];
+       const generatedHashtags = ["#shorts", "#gaming", ...gameNames.map(g => `#${g.replace(/\s+/g, '')}`)];
+
+       setFormData({
+         title: `Shorts: ${titles[0]}...`,
+         content: generatedContent,
+         description: generatedDesc,
+         assets: generatedAssets,
+         tags: generatedTags,
+         hashtags: generatedHashtags,
+         status: "Draft"
+       });
     }
-  }, [currentScript?.content, currentScript?.assets?.length]);
+  }, [isOpen, initialData]);
 
-  const wordCount = currentScript?.content ? currentScript.content.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
-  const estimatedSeconds = Math.round(wordCount / 2.5); // Approx reading speed
-  
-  const handleCopy = () => {
-     const text = activeTab === "text" ? (currentScript?.content || "") : (currentScript?.assets || []).join("\n");
-     navigator.clipboard.writeText(text);
-     setCopied(true); setTimeout(() => setCopied(false), 2000);
-  };
+  if (!isOpen) return null;
 
-  // 1. MINIMIZED STATE (Pill)
-  if (!isOpen) {
-     return (
-        <div className="fixed bottom-6 right-6 z-50">
-           <button 
-             onClick={() => setIsOpen(true)}
-             className={`group flex items-center gap-3 rounded-full bg-slate-900/90 pl-4 pr-5 py-3 text-white shadow-2xl backdrop-blur-xl border border-white/10 transition-all hover:scale-105 hover:bg-slate-800 ${flash ? "ring-2 ring-blue-500" : ""}`}
-           >
-             <div className="relative">
-                <span className="text-xl">📜</span>
-                {currentScript && <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-blue-500 animate-pulse border border-slate-900"/>}
-             </div>
-             <div className="text-left flex flex-col items-start">
-                <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Script Dock</div>
-                <div className="text-xs font-medium max-w-[150px] truncate">
-                   {currentScript ? currentScript.title : "No Project Selected"}
-                </div>
-             </div>
-             <ChevronUpIcon className="h-4 w-4 text-slate-500 group-hover:text-white transition" />
-           </button>
-        </div>
-     );
-  }
-
-  // 2. EXPANDED STATE (HUD Panel)
   return (
-    <div className="fixed bottom-6 right-6 z-50 w-[90vw] md:w-[500px] rounded-2xl border border-slate-200/50 bg-white/80 backdrop-blur-2xl shadow-2xl animate-in slide-in-from-bottom-4 zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[80vh]">
-       
-       {/* Header */}
-       <div className="flex items-center justify-between border-b border-slate-200/50 px-4 py-3 bg-white/50">
-          <select 
-             className="bg-transparent text-sm font-bold text-slate-900 outline-none cursor-pointer max-w-[200px] hover:text-blue-600 transition"
-             value={currentScript?.id || ""}
-             onChange={(e) => e.target.value === "new" ? onCreateScript() : onSelectScript(Number(e.target.value))}
-          >
-             <option value="" disabled>Select Project...</option>
-             {scripts.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
-             <option value="new" className="text-blue-600">+ New Project...</option>
-          </select>
-          <button onClick={() => setIsOpen(false)} className="rounded-full p-1 hover:bg-slate-200/50 text-slate-400 transition">
-             <ChevronDownIcon className="h-5 w-5" />
-          </button>
-       </div>
-
-       {/* Tabs & Stats */}
-       {currentScript && (
-        <div className="px-4 py-2 flex items-center justify-between bg-slate-50/50 border-b border-slate-100">
-           <div className="flex gap-1 p-1 bg-slate-200/50 rounded-lg">
-              <button onClick={() => setActiveTab("text")} className={`px-3 py-1 text-xs font-bold rounded-md transition ${activeTab === "text" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
-                 Script
-              </button>
-              <button onClick={() => setActiveTab("assets")} className={`px-3 py-1 text-xs font-bold rounded-md transition ${activeTab === "assets" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
-                 Links <span className="opacity-60">({currentScript.assets?.length || 0})</span>
-              </button>
-           </div>
-           <div className={`text-xs font-mono font-bold px-2 py-1 rounded ${estimatedSeconds > 60 ? 'text-rose-600 bg-rose-50' : 'text-emerald-600 bg-emerald-50'}`}>
-              {estimatedSeconds}s / 60s
-           </div>
-        </div>
-       )}
-
-       {/* Content Area */}
-       <div className="flex-1 overflow-hidden relative group">
-          {!currentScript ? (
-             <div className="flex h-64 flex-col items-center justify-center text-slate-400 p-8 text-center">
-                <DocumentTextIcon className="h-10 w-10 mb-2 opacity-20" />
-                <p className="text-sm">Select or create a project to start gathering ideas.</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+       <div className="bg-white w-full max-w-4xl h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+          
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+             <div>
+                <h2 className="text-xl font-black text-slate-900">Create Video Script</h2>
+                <p className="text-xs text-slate-500">Drafting from {initialData.ideas.length} selected ideas</p>
              </div>
-          ) : activeTab === "text" ? (
-             <textarea 
-               className="h-[300px] w-full resize-none bg-transparent p-4 text-sm leading-relaxed text-slate-700 placeholder:text-slate-300 outline-none font-mono"
-               placeholder="Script content will appear here..."
-               value={currentScript.content || ""}
-               onChange={(e) => onUpdateContent(e.target.value)}
-               spellCheck={false}
-             />
-          ) : (
-             <div className="h-[300px] w-full overflow-y-auto p-2 space-y-1">
-                {(currentScript.assets || []).length === 0 ? <p className="text-xs text-slate-400 p-4 text-center">No video assets collected yet.</p> : 
-                   currentScript.assets.map((link, i) => (
-                     <div key={i} className="flex items-center gap-2 rounded-lg bg-slate-50 border border-slate-100 p-2 group/link hover:border-blue-200 transition">
-                        <span className="text-[10px] font-bold text-slate-400 w-5">#{i+1}</span>
-                        <a href={link} target="_blank" className="flex-1 truncate text-xs text-blue-600 hover:underline">{link}</a>
-                     </div>
-                   ))
-                }
+             <div className="flex gap-2">
+                <button onClick={onClose} className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl">Cancel</button>
+                <button onClick={() => { onSave(formData); onClose(); }} className="px-6 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-600/20">Save Project</button>
              </div>
-          )}
-       </div>
-
-       {/* Footer Actions */}
-       {currentScript && (
-          <div className="border-t border-slate-100 p-3 bg-white/80 flex justify-end">
-             <button 
-               onClick={handleCopy}
-               className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white shadow-lg shadow-slate-900/10 hover:bg-slate-800 active:scale-95 transition"
-             >
-               {copied ? <ClipboardDocumentCheckIcon className="h-4 w-4"/> : <ClipboardDocumentIcon className="h-4 w-4"/>}
-               {copied ? "Copied!" : (activeTab === "text" ? "Copy Text" : "Copy Links")}
-             </button>
           </div>
-       )}
+
+          {/* Tabs */}
+          <div className="flex px-6 border-b border-slate-100 bg-slate-50">
+             {(["script", "details", "assets"] as const).map(tab => (
+               <button 
+                 key={tab}
+                 onClick={() => setActiveTab(tab)}
+                 className={`px-4 py-3 text-sm font-bold border-b-2 transition ${activeTab === tab ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"}`}
+               >
+                 {tab === "script" ? "📝 Script Content" : tab === "details" ? "ℹ️ Metadata" : "🔗 Assets"}
+               </button>
+             ))}
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-6 bg-slate-50/30">
+             
+             {/* TAB 1: SCRIPT EDITOR */}
+             {activeTab === "script" && (
+                <div className="h-full flex flex-col gap-4">
+                   <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold uppercase text-slate-400">Voiceover Script</label>
+                      <button onClick={() => navigator.clipboard.writeText(formData.content || "")} className="text-xs text-blue-600 font-bold hover:underline">Copy for TTS</button>
+                   </div>
+                   <textarea 
+                     className="flex-1 w-full rounded-2xl border border-slate-200 p-5 text-sm leading-relaxed text-slate-800 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 font-mono"
+                     value={formData.content}
+                     onChange={e => setFormData({...formData, content: e.target.value})}
+                     placeholder="Write your script here..."
+                   />
+                   <div className="flex justify-end text-xs text-slate-400">
+                      {formData.content?.split(/\s+/).length || 0} words • ~{Math.round((formData.content?.split(/\s+/).length || 0) / 2.5)}s duration
+                   </div>
+                </div>
+             )}
+
+             {/* TAB 2: METADATA (DETAILS) */}
+             {activeTab === "details" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                   <div className="space-y-4">
+                      <div>
+                         <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Video Title</label>
+                         <input className="w-full h-12 rounded-xl border border-slate-200 px-4 font-bold text-slate-900 outline-none focus:border-blue-500" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
+                      </div>
+                      <div>
+                         <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Description</label>
+                         <textarea className="w-full h-32 rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-blue-500" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
+                      </div>
+                   </div>
+                   <div className="space-y-4">
+                      <div>
+                         <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Hashtags (#)</label>
+                         <div className="flex flex-wrap gap-2 p-3 rounded-xl border border-slate-200 bg-white min-h-[50px]">
+                            {formData.hashtags?.map((tag, i) => (
+                               <span key={i} className="px-2 py-1 bg-blue-50 text-blue-600 text-xs font-bold rounded-lg">{tag}</span>
+                            ))}
+                            <input 
+                              className="flex-1 min-w-[100px] outline-none text-xs" 
+                              placeholder="Add tag..." 
+                              onKeyDown={e => {
+                                 if(e.key === 'Enter') {
+                                    const val = e.currentTarget.value.trim();
+                                    if(val) {
+                                       setFormData({...formData, hashtags: [...(formData.hashtags||[]), val.startsWith('#')?val:'#'+val]});
+                                       e.currentTarget.value = "";
+                                    }
+                                 }
+                              }}
+                            />
+                         </div>
+                      </div>
+                      <div>
+                         <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Hidden Tags</label>
+                         <div className="flex flex-wrap gap-2 p-3 rounded-xl border border-slate-200 bg-white min-h-[50px]">
+                            {formData.tags?.map((tag, i) => (
+                               <span key={i} className="px-2 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded-lg">{tag}</span>
+                            ))}
+                            <input 
+                              className="flex-1 min-w-[100px] outline-none text-xs" 
+                              placeholder="Add keyword..." 
+                              onKeyDown={e => {
+                                 if(e.key === 'Enter') {
+                                    const val = e.currentTarget.value.trim();
+                                    if(val) {
+                                       setFormData({...formData, tags: [...(formData.tags||[]), val]});
+                                       e.currentTarget.value = "";
+                                    }
+                                 }
+                              }}
+                            />
+                         </div>
+                      </div>
+                      <div>
+                          <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Schedule Date</label>
+                          <input type="datetime-local" className="w-full h-10 rounded-xl border border-slate-200 px-3 text-sm" onChange={e => setFormData({...formData, publish_date: e.target.value})} />
+                      </div>
+                   </div>
+                </div>
+             )}
+
+             {/* TAB 3: ASSETS */}
+             {activeTab === "assets" && (
+                <div className="space-y-4">
+                   <div className="flex justify-between">
+                      <p className="text-sm text-slate-500">Collected assets from selected ideas.</p>
+                      <button onClick={() => navigator.clipboard.writeText(formData.assets?.join("\n") || "")} className="text-xs font-bold text-blue-600 hover:underline">Copy All Links</button>
+                   </div>
+                   <div className="bg-white rounded-xl border border-slate-200 p-2">
+                      {(formData.assets || []).map((link, i) => (
+                         <div key={i} className="flex items-center gap-3 p-2 border-b border-slate-50 last:border-0 hover:bg-slate-50">
+                            <span className="text-xs font-mono text-slate-400">#{i+1}</span>
+                            <a href={link} target="_blank" className="text-xs text-blue-600 truncate flex-1">{link}</a>
+                         </div>
+                      ))}
+                   </div>
+                </div>
+             )}
+          </div>
+       </div>
     </div>
   );
 }
@@ -256,40 +311,36 @@ function ScriptDock({
 /* ================= PAGE LOGIC (MAIN) ================= */
 
 export default function Home() {
-  const ITEMS_PER_PAGE = 24;
-
   const [games, setGames] = useState<Game[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [ideas, setIdeas] = useState<DetailRow[]>([]);
-  const [scripts, setScripts] = useState<ScriptProject[]>([]);
-  const [currentScriptId, setCurrentScriptId] = useState<number | null>(null);
+  
+  // Selection Mode State
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [showEditor, setShowEditor] = useState(false);
 
-  // Filters state
+  // Filters
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [gameId, setGameId] = useState<number | "">("");
   const [groupId, setGroupId] = useState<number | "">("");
   const [loading, setLoading] = useState(true);
 
-  const activeScript = useMemo(() => scripts.find(s => s.id === currentScriptId) || null, [scripts, currentScriptId]);
-
-  useEffect(() => { const t = setTimeout(() => setDebouncedQ(q), 300); return () => clearTimeout(t); }, [q]);
-
-  // Initial Load
+  // Load Data
   useEffect(() => {
     Promise.all([
       supabase.from("games").select("*").order("title"),
       supabase.from("idea_groups").select("*").order("name"),
-      supabase.from("scripts").select("*").order("created_at", { ascending: false })
-    ]).then(([gs, grps, scrs]) => {
+    ]).then(([gs, grps]) => {
       setGames((gs.data ?? []) as Game[]);
       setGroups((grps.data ?? []) as Group[]);
-      setScripts((scrs.data ?? []) as ScriptProject[]);
-      if (scrs.data && scrs.data.length > 0) setCurrentScriptId(scrs.data[0].id);
     });
   }, []);
 
-  // Filter Logic
+  useEffect(() => { const t = setTimeout(() => setDebouncedQ(q), 300); return () => clearTimeout(t); }, [q]);
+
+  // Load Ideas
   useEffect(() => {
     async function load() {
       setLoading(true);
@@ -301,7 +352,6 @@ export default function Home() {
          if(ids.length === 0) { setIdeas([]); setLoading(false); return; }
          query = query.in("id", ids);
       }
-
       if (gameId) query = query.eq("game_id", gameId);
       if (debouncedQ.trim()) query = query.ilike("title", `%${debouncedQ.trim()}%`);
 
@@ -312,81 +362,89 @@ export default function Home() {
     load();
   }, [debouncedQ, gameId, groupId]);
 
-  // Actions
-  async function togglePinFast(id: number, currentStatus: boolean) {
-    setIdeas(prev => prev.map(i => i.id === id ? { ...i, pinned: !currentStatus } : i));
-    await supabase.from("details").update({ pinned: !currentStatus }).eq("id", id);
-  }
+  // Selection Logic
+  const toggleSelection = (id: number) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
 
-  async function createNewScript() {
-    const title = prompt("Project Name:");
-    if(!title) return;
-    const { data } = await supabase.from("scripts").insert({ title, content: "", assets: [] }).select().single();
-    if(data) { setScripts(p => [data, ...p]); setCurrentScriptId(data.id); }
-  }
-
-  async function handleAddToScript(desc: string, footage: FootageItem[]) {
-    if(!activeScript) { alert("Please open the Script Dock and create a project first!"); return; }
-    
-    const newContent = activeScript.content + (activeScript.content ? "\n\n" : "") + desc;
-    const newAssets = [...(activeScript.assets || []), ...(footage?.map(f => f.file_path) || [])];
-
-    const updated = { ...activeScript, content: newContent, assets: newAssets };
-    setScripts(prev => prev.map(s => s.id === activeScript.id ? updated : s));
-    await supabase.from("scripts").update({ content: newContent, assets: newAssets }).eq("id", activeScript.id);
-  }
-
-  async function updateScriptContent(newContent: string) {
-    if(!activeScript) return;
-    const updated = { ...activeScript, content: newContent };
-    setScripts(prev => prev.map(s => s.id === activeScript.id ? updated : s));
-    await supabase.from("scripts").update({ content: newContent }).eq("id", activeScript.id);
-  }
+  const handleSaveScript = async (data: Partial<ScriptProject>) => {
+    // Save to DB
+    const { error } = await supabase.from("scripts").insert(data);
+    if (!error) {
+       alert("Script saved to database!");
+       setIsSelectMode(false);
+       setSelectedIds([]);
+    } else {
+       alert("Error saving script: " + error.message);
+    }
+  };
 
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
       
-      {/* SCRIPT HUD */}
-      <ScriptDock 
-        currentScript={activeScript} 
-        scripts={scripts} 
-        onSelectScript={setCurrentScriptId}
-        onCreateScript={createNewScript}
-        onUpdateContent={updateScriptContent}
+      {/* EDITOR MODAL */}
+      <ScriptEditorModal 
+        isOpen={showEditor} 
+        onClose={() => setShowEditor(false)}
+        onSave={handleSaveScript}
+        initialData={{
+           ids: selectedIds,
+           ideas: ideas.filter(i => selectedIds.includes(i.id)),
+           games: games
+        }}
       />
 
-      {/* SIDEBAR (GIỮ NGUYÊN CODE CŨ NHƯNG CẨN THẬN IMPORT LINK) */}
+      {/* BOTTOM SELECTION BAR (Sticky) */}
+      {isSelectMode && (
+         <div className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200 p-4 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] animate-in slide-in-from-bottom-10">
+            <div className="mx-auto max-w-4xl flex items-center justify-between">
+               <div className="flex items-center gap-4">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-white font-bold text-sm">
+                     {selectedIds.length}
+                  </span>
+                  <span className="text-sm font-bold text-slate-600">Ideas Selected</span>
+                  <button onClick={() => setSelectedIds([])} className="text-xs text-rose-500 hover:underline">Clear</button>
+               </div>
+               <button 
+                 disabled={selectedIds.length === 0}
+                 onClick={() => setShowEditor(true)}
+                 className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-white font-bold shadow-lg hover:bg-blue-700 active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed"
+               >
+                 <PlayCircleIcon className="h-5 w-5" />
+                 Create Script
+               </button>
+            </div>
+         </div>
+      )}
+
+      {/* SIDEBAR (Simple) */}
       <aside className="fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-slate-200 bg-white hidden md:flex">
          <div className="flex h-20 items-center px-8 text-2xl font-black text-slate-900">GameKB<span className="text-blue-500">.</span></div>
-         <div className="flex-1 px-4 py-4 space-y-2">
-            <button onClick={() => {setGroupId(""); setQ("");}} className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold transition ${!groupId ? "bg-slate-900 text-white" : "text-slate-500 hover:bg-slate-100"}`}>All Ideas</button>
-            <Link href="/dashboard" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100">Dashboard</Link>
-            <Link href="/scripts" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100">Scripts</Link>
-            
-            <div className="pt-4 mt-4 border-t border-slate-100">
-               <h3 className="px-2 text-xs font-bold uppercase text-slate-400 mb-2">Groups</h3>
-               {groups.map(g => (
-                  <button key={g.id} onClick={() => setGroupId(g.id)} className={`flex w-full justify-between rounded-xl px-4 py-2 text-sm font-medium ${groupId === g.id ? "bg-blue-50 text-blue-700" : "text-slate-500 hover:bg-slate-50"}`}>
-                     {g.name}
-                  </button>
-               ))}
-            </div>
+         <div className="px-4 py-4 space-y-2">
+            <Link href="/" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold bg-slate-900 text-white">Home</Link>
+            <Link href="/scripts" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100">Scripts Manager</Link>
          </div>
       </aside>
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 pl-0 md:pl-72">
-        <div className="mx-auto max-w-[1900px] px-6 py-8 pb-32"> {/* pb-32 để không bị Script Dock che */}
+      <main className="flex-1 pl-0 md:pl-72 pb-32">
+        <div className="mx-auto max-w-[1900px] px-6 py-8">
           
-          <header className="mb-8 flex gap-4">
-             <input className="h-12 w-full rounded-2xl border border-slate-200 px-4 shadow-sm outline-none focus:ring-2 focus:ring-slate-200 transition" placeholder="Search ideas..." value={q} onChange={e=>setQ(e.target.value)} />
-             <Link href="/add" className="inline-flex h-12 px-6 items-center justify-center rounded-2xl bg-slate-900 text-white font-bold shadow-lg hover:bg-slate-800 transition">Create</Link>
-          </header>
+          <header className="mb-8 flex justify-between items-center gap-4">
+             <div className="flex-1 relative">
+                <input className="h-12 w-full rounded-2xl border border-slate-200 px-4 shadow-sm outline-none focus:ring-2 focus:ring-slate-200" placeholder="Search ideas..." value={q} onChange={e=>setQ(e.target.value)} />
+             </div>
+             
+             {/* TOGGLE SELECTION MODE */}
+             <button 
+               onClick={() => { setIsSelectMode(!isSelectMode); setSelectedIds([]); }}
+               className={`h-12 px-6 rounded-2xl font-bold border transition ${isSelectMode ? "bg-blue-50 border-blue-200 text-blue-600" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+             >
+               {isSelectMode ? "Exit Selection" : "Select Mode"}
+             </button>
 
-          <div className="mb-6 flex items-center justify-between">
-             <h2 className="text-2xl font-black text-slate-900">{loading ? "Loading..." : `${ideas.length} Ideas Found`}</h2>
-             {groupId && <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-sm font-bold">Group Active</span>}
-          </div>
+             <Link href="/add" className="h-12 px-6 flex items-center justify-center rounded-2xl bg-slate-900 text-white font-bold hover:bg-slate-800 transition">+ Add</Link>
+          </header>
 
           <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {ideas.map(r => (
@@ -394,13 +452,13 @@ export default function Home() {
                  key={r.id} 
                  r={r} 
                  game={games.find(g => g.id === r.game_id)} 
-                 onTogglePin={togglePinFast} 
-                 onAddToScript={handleAddToScript}
+                 isSelectMode={isSelectMode}
+                 isSelected={selectedIds.includes(r.id)}
+                 onToggleSelect={toggleSelection}
+                 onTogglePin={async (id) => {/* logic pin */}}
                />
             ))}
           </ul>
-
-          {!loading && ideas.length === 0 && <div className="py-20 text-center text-slate-400 italic">No content found.</div>}
         </div>
       </main>
     </div>
