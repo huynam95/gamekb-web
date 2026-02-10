@@ -10,15 +10,15 @@ type Game = { id: number; title: string; cover_url?: string | null };
 type Group = { id: number; name: string };
 type DetailRow = { id: number; title: string; priority: number; detail_type: string; game_id: number; pinned?: boolean; created_at?: string };
 
-// Cấu hình màu sắc Badge (Copy từ Home)
+// GLASSMORPHISM CONFIG (Đồng bộ với Home)
 const TYPE_CONFIG: Record<string, { label: string; className: string }> = {
-  small_detail: { label: "🔍 Small Detail", className: "bg-blue-500/80 border-blue-400/50 text-white" },
-  easter_egg: { label: "🥚 Easter Egg", className: "bg-purple-500/80 border-purple-400/50 text-white" },
-  npc_reaction: { label: "🗣️ NPC Reaction", className: "bg-emerald-500/80 border-emerald-400/50 text-white" },
-  physics: { label: "🍎 Physics", className: "bg-orange-500/80 border-orange-400/50 text-white" },
-  troll: { label: "🤡 Troll", className: "bg-pink-500/80 border-pink-400/50 text-white" },
-  punish: { label: "💀 Punish", className: "bg-red-500/80 border-red-400/50 text-white" },
-  default: { label: "📝 Note", className: "bg-slate-500/80 border-slate-400/50 text-white" }
+  small_detail: { label: "🔍 Small Detail", className: "bg-blue-500/20 border-blue-400/30 text-blue-100" },
+  easter_egg: { label: "🥚 Easter Egg", className: "bg-purple-500/20 border-purple-400/30 text-purple-100" },
+  npc_reaction: { label: "🗣️ NPC Reaction", className: "bg-emerald-500/20 border-emerald-400/30 text-emerald-100" },
+  physics: { label: "🍎 Physics", className: "bg-orange-500/20 border-orange-400/30 text-orange-100" },
+  troll: { label: "🤡 Troll", className: "bg-pink-500/20 border-pink-400/30 text-pink-100" },
+  punish: { label: "💀 Punish", className: "bg-red-500/20 border-red-400/30 text-red-100" },
+  default: { label: "📝 Note", className: "bg-slate-500/20 border-slate-400/30 text-slate-100" }
 };
 
 /* ================= COMPONENTS ================= */
@@ -32,7 +32,6 @@ function TypePill({ typeKey }: { typeKey: string }) {
   );
 }
 
-// CẬP NHẬT: IdeaItem có nút Pin (Giống hệt trang chủ)
 function IdeaItem({ r, game, onTogglePin }: { r: DetailRow; game?: Game; onTogglePin: (id: number, current: boolean) => void }) {
   const hasCover = !!game?.cover_url;
   return (
@@ -47,9 +46,14 @@ function IdeaItem({ r, game, onTogglePin }: { r: DetailRow; game?: Game; onToggl
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent opacity-90 transition-opacity group-hover:opacity-80" />
         
-        {/* === ACTION BAR (PIN BUTTON) === */}
+        {/* === TOP ACTION BAR === */}
         <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
-           {r.priority === 1 && <span className="rounded-lg bg-rose-600 px-2 py-1 text-[10px] font-bold uppercase text-white shadow-lg border border-rose-500">🔥 High</span>}
+           {/* Priority Badge */}
+           {r.priority === 1 && (
+             <span className="rounded-lg bg-rose-500/30 border border-rose-500/50 px-2 py-1 text-[10px] font-bold uppercase text-rose-100 backdrop-blur-md shadow-sm">
+               🔥 High
+             </span>
+           )}
            
            <button
              onClick={(e) => {
@@ -57,10 +61,10 @@ function IdeaItem({ r, game, onTogglePin }: { r: DetailRow; game?: Game; onToggl
                e.stopPropagation();
                onTogglePin(r.id, !!r.pinned);
              }}
-             className={`flex h-7 w-7 items-center justify-center rounded-full border transition-all duration-200 hover:scale-110 active:scale-95 cursor-pointer ${
+             className={`flex h-7 w-7 items-center justify-center rounded-full border transition-all duration-200 hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md ${
                r.pinned 
-                 ? "bg-amber-400 border-amber-300 text-white shadow-[0_0_15px_rgba(251,191,36,0.6)]" 
-                 : "bg-black/30 border-white/20 text-white/40 hover:bg-black/50 hover:text-amber-300 hover:border-amber-300/50 backdrop-blur-md"
+                 ? "bg-amber-400/90 border-amber-300 text-white shadow-[0_0_15px_rgba(251,191,36,0.6)]" 
+                 : "bg-white/10 border-white/20 text-white/60 hover:bg-white/20 hover:text-white hover:border-white/40"
              }`}
              title={r.pinned ? "Unpin this idea" : "Pin to favorites"}
            >
@@ -76,6 +80,11 @@ function IdeaItem({ r, game, onTogglePin }: { r: DetailRow; game?: Game; onToggl
            <h3 className="line-clamp-2 text-lg font-bold leading-tight text-white drop-shadow-md group-hover:text-blue-200 mb-3">{r.title}</h3>
            <div className="flex items-center flex-wrap gap-2">
              <TypePill typeKey={r.detail_type} />
+             {r.pinned && (
+               <span className="rounded-lg bg-amber-400/10 border border-amber-400/40 px-2 py-1 text-[10px] font-bold uppercase text-amber-200 backdrop-blur-md">
+                 ⭐ Pinned
+               </span>
+             )}
            </div>
         </div>
       </a>
@@ -142,7 +151,6 @@ export default function Dashboard() {
     const newStatus = !currentStatus;
     
     // Optimistic Update cho cả 3 danh sách
-    // (Vì 1 item có thể xuất hiện ở cả Recent và Pinned)
     setPinned(prev => prev.map(i => i.id === id ? { ...i, pinned: newStatus } : i));
     setDaily(prev => prev.map(i => i.id === id ? { ...i, pinned: newStatus } : i));
     setRecent(prev => prev.map(i => i.id === id ? { ...i, pinned: newStatus } : i));
