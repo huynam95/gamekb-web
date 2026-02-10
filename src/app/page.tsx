@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 import { PlayCircleIcon } from "@heroicons/react/24/solid";
-import { CheckIcon, TrashIcon, PencilSquareIcon } from "@heroicons/react/24/outline";
+import { CheckIcon, TrashIcon, PencilSquareIcon, PhotoIcon } from "@heroicons/react/24/outline";
 
 /* ================= TYPES ================= */
 
@@ -37,7 +37,6 @@ const TYPE_CONFIG: Record<string, { label: string; className: string }> = {
   default: { label: "📝 Note", className: "bg-slate-500/20 border-slate-400/30 text-slate-100" }
 };
 
-// YÊU CẦU 3: PRIORITY CHỈ CÓ 3 MỨC (GIỮ NGUYÊN NHƯ CODE BẠN GỬI)
 const PRIORITY_OPTIONS = [
   { value: 1, label: 'High', color: 'text-red-600', bg: 'bg-red-50' },
   { value: 2, label: 'Normal', color: 'text-blue-600', bg: 'bg-blue-50' },
@@ -69,12 +68,79 @@ function ComboBox({ placeholder, items, selectedId, onChange }: { placeholder: s
   );
 }
 
+// [MỚI] COMPONENT: GAME EDITOR MODAL (Sửa Game Title & Cover)
+function GameEditorModal({ 
+  game, isOpen, onClose, onUpdate 
+}: { 
+  game: Game | null; isOpen: boolean; onClose: () => void; onUpdate: (g: Game) => void 
+}) {
+  const [title, setTitle] = useState("");
+  const [cover, setCover] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (game) {
+      setTitle(game.title);
+      setCover(game.cover_url || "");
+    }
+  }, [game]);
+
+  async function handleSave() {
+    if (!game) return;
+    setLoading(true);
+    const { error } = await supabase.from("games").update({ title, cover_url: cover }).eq("id", game.id);
+    setLoading(false);
+    if (!error) {
+      onUpdate({ ...game, title, cover_url: cover });
+      onClose();
+    } else {
+      alert("Error updating game: " + error.message);
+    }
+  }
+
+  if (!isOpen || !game) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
+       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95">
+          <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+             <h3 className="font-bold text-gray-900">Edit Game Info</h3>
+             <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
+          </div>
+          <div className="p-6 space-y-4">
+             <div>
+                <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Game Title</label>
+                <input className="w-full h-10 border rounded-lg px-3 text-sm outline-none focus:border-blue-500" value={title} onChange={e=>setTitle(e.target.value)} />
+             </div>
+             <div>
+                <label className="block text-xs font-bold uppercase text-gray-500 mb-1">Cover Image URL</label>
+                <div className="flex gap-2">
+                   <input className="flex-1 h-10 border rounded-lg px-3 text-sm outline-none focus:border-blue-500" value={cover} onChange={e=>setCover(e.target.value)} placeholder="https://..." />
+                </div>
+                {cover && <img src={cover} alt="Preview" className="mt-2 h-32 w-full object-cover rounded-lg border" onError={(e) => (e.currentTarget.style.display = 'none')} />}
+             </div>
+             <div className="pt-2 flex justify-end gap-2">
+                <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+                <button onClick={handleSave} disabled={loading} className="px-4 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm">
+                   {loading ? "Saving..." : "Save Changes"}
+                </button>
+             </div>
+          </div>
+       </div>
+    </div>
+  );
+}
+
+
 // COMPONENT: IDEA CARD
-function IdeaItem({ r, game, isSelectMode, isSelected, onToggleSelect, onTogglePin }: { 
+function IdeaItem({ 
+  r, game, isSelectMode, isSelected, onToggleSelect, onTogglePin, onEditGame 
+}: { 
   r: DetailRow; game?: Game; 
   isSelectMode: boolean; isSelected: boolean; 
   onToggleSelect: (id: number) => void;
   onTogglePin: (id: number, current: boolean) => void; 
+  onEditGame: (game: Game) => void; // Prop mới để kích hoạt sửa game
 }) {
   const hasCover = !!game?.cover_url;
 
@@ -108,19 +174,31 @@ function IdeaItem({ r, game, isSelectMode, isSelected, onToggleSelect, onToggleP
 
         <div className="absolute inset-0 flex flex-col justify-end p-5">
            <div className="z-10">
-              {/* GAME LINK */}
-              <div className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                {isSelectMode ? (
-                   <span className="truncate">{game?.title}</span>
-                ) : (
-                   <Link 
-                     href={`/games/${r.game_id}`} 
-                     className="truncate hover:text-blue-400 hover:underline z-20"
-                     onClick={(e) => e.stopPropagation()}
+              {/* GAME INFO LINE: Tên Game + Nút sửa Game */}
+              <div className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 z-20 relative">
+                 {/* Link Game */}
+                 <Link 
+                   href={`/games/${r.game_id}`} 
+                   className="truncate hover:text-blue-400 hover:underline max-w-[80%]"
+                   onClick={(e) => e.stopPropagation()}
+                 >
+                   {game?.title}
+                 </Link>
+
+                 {/* NÚT EDIT GAME: Chỉ hiện khi Hover vào Card */}
+                 {!isSelectMode && game && (
+                   <button 
+                     onClick={(e) => {
+                       e.preventDefault();
+                       e.stopPropagation();
+                       onEditGame(game);
+                     }}
+                     className="p-1 rounded hover:bg-white/20 text-slate-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                     title="Edit Game Info"
                    >
-                     {game?.title}
-                   </Link>
-                )}
+                     <PencilSquareIcon className="h-3 w-3" />
+                   </button>
+                 )}
               </div>
 
               <h3 className="line-clamp-2 text-base font-bold leading-snug text-white mb-2">
@@ -133,24 +211,22 @@ function IdeaItem({ r, game, isSelectMode, isSelected, onToggleSelect, onToggleP
            </div>
         </div>
 
-        {/* --- ACTION BUTTONS (PIN & EDIT) --- */}
+        {/* --- ACTION BUTTONS (PIN & EDIT IDEA) --- */}
         {!isSelectMode && (
            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex flex-col gap-2">
-              {/* Nút PIN */}
               <button 
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTogglePin(r.id, !!r.pinned); }}
                 className={`flex h-8 w-8 items-center justify-center rounded-full backdrop-blur-md shadow-lg transition hover:scale-110 ${r.pinned ? 'bg-amber-400 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}
-                title="Pin"
+                title="Pin Idea"
               >
                  {r.pinned ? "★" : "☆"}
               </button>
 
-              {/* YÊU CẦU 2: HIỆN BÚT CHÌ (EDIT) - Đã có sẵn, đảm bảo z-index > link nền */}
               <Link 
                 href={`/idea/${r.id}/edit`} 
                 onClick={(e) => e.stopPropagation()}
                 className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-md shadow-lg hover:bg-blue-600 hover:scale-110 transition"
-                title="Edit Details"
+                title="Edit Idea"
               >
                  <PencilSquareIcon className="h-4 w-4" />
               </Link>
@@ -263,6 +339,9 @@ export default function Home() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showEditor, setShowEditor] = useState(false);
 
+  // Edit Game State (NEW)
+  const [editingGame, setEditingGame] = useState<Game | null>(null);
+
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -363,7 +442,7 @@ export default function Home() {
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
       
-      {/* EDITOR MODAL */}
+      {/* EDITOR MODAL (SCRIPT) */}
       <ScriptEditorModal 
         isOpen={showEditor} 
         onClose={() => setShowEditor(false)}
@@ -372,6 +451,16 @@ export default function Home() {
            ids: selectedIds,
            ideas: ideas.filter(i => selectedIds.includes(i.id)),
            games: games
+        }}
+      />
+
+      {/* [MỚI] GAME EDITOR MODAL */}
+      <GameEditorModal 
+        game={editingGame}
+        isOpen={!!editingGame}
+        onClose={() => setEditingGame(null)}
+        onUpdate={(updatedGame) => {
+           setGames(prev => prev.map(g => g.id === updatedGame.id ? updatedGame : g));
         }}
       />
 
@@ -391,7 +480,7 @@ export default function Home() {
          </div>
       )}
 
-      {/* SIDEBAR FULL (FIXED FLEXBOX) */}
+      {/* SIDEBAR FULL */}
       <aside className="fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-slate-200 bg-white hidden md:flex">
          <div className="flex h-20 items-center px-8 text-2xl font-black text-slate-900">GameKB<span className="text-blue-500">.</span></div>
          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
@@ -406,25 +495,15 @@ export default function Home() {
                {showCreateGroup && <div className="mb-2"><input className="w-full border rounded px-2 py-1 text-xs" value={newGroupName} onChange={e=>setNewGroupName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&createGroup()} placeholder="Name..." autoFocus/></div>}
                <div className="space-y-1">
                   {groups.map(g => (
-                     // YÊU CẦU 1: SIDEBAR - HOVER THÌ THÙNG RÁC CHE SỐ LƯỢNG
                      <div key={g.id} className="group/item relative flex items-center justify-between w-full hover:bg-slate-50 rounded-xl px-2 py-1 transition cursor-pointer">
-                        {/* Khu vực bấm để chọn group */}
                         <div onClick={() => setGroupId(g.id)} className={`flex-1 flex items-center gap-2 overflow-hidden py-2 ${groupId === g.id ? "text-blue-700 font-bold" : "text-slate-500"}`}>
                            <span className="truncate">{g.name}</span>
                         </div>
-
-                        {/* Khu vực bên phải: Chứa cả Số và Thùng rác đè nhau */}
                         <div className="w-8 flex justify-center shrink-0">
-                           {/* Số lượng: Hiện bình thường, ẩn khi hover group */}
                            <span className={`text-[10px] font-bold opacity-60 group-hover/item:hidden ${groupId === g.id ? "text-blue-700" : ""}`}>
                               {groupCounts.get(g.id)||0}
                            </span>
-
-                           {/* Thùng rác: Ẩn bình thường, hiện khi hover group */}
-                           <button 
-                             onClick={(e) => { e.stopPropagation(); deleteGroup(g); }} 
-                             className="hidden group-hover/item:block text-rose-500 hover:text-rose-700 transition"
-                           >
+                           <button onClick={(e) => { e.stopPropagation(); deleteGroup(g); }} className="hidden group-hover/item:block text-rose-500 hover:text-rose-700 transition">
                              <TrashIcon className="h-4 w-4"/>
                            </button>
                         </div>
@@ -488,6 +567,8 @@ export default function Home() {
                     setIdeas(prev => prev.map(i => i.id === id ? { ...i, pinned: !current } : i));
                     await supabase.from("details").update({ pinned: !current }).eq("id", id);
                  }}
+                 // Truyền hàm mở modal sửa game
+                 onEditGame={(g) => setEditingGame(g)}
                />
             ))}
           </ul>
