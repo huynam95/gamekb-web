@@ -9,28 +9,95 @@ type Game = { id: number; title: string; cover_url?: string | null; release_year
 type Group = { id: number; name: string };
 type DetailRow = { id: number; title: string; priority: number; detail_type: string; game_id: number; pinned?: boolean; created_at?: string };
 
+// Style chung cho nút và input
 const inputClass = "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition";
 const selectClass = "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition cursor-pointer";
 const btnPrimary = "inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold whitespace-nowrap cursor-pointer transition active:scale-[0.98] bg-slate-900 text-white shadow-md shadow-slate-900/10 hover:bg-slate-800";
 const btnPage = "inline-flex h-10 min-w-[40px] items-center justify-center rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed";
 
+/* ================= HELPER: TYPE CONFIG (MỚI) ================= */
+// Cấu hình màu sắc và tên hiển thị cho từng loại Idea
+const TYPE_CONFIG: Record<string, { label: string; className: string }> = {
+  small_detail: { 
+    label: "🔍 Small Detail", 
+    className: "bg-blue-500/80 border-blue-400/50 text-white" 
+  },
+  easter_egg: { 
+    label: "🥚 Easter Egg", 
+    className: "bg-purple-500/80 border-purple-400/50 text-white" 
+  },
+  npc_reaction: { 
+    label: "🗣️ NPC Reaction", 
+    className: "bg-emerald-500/80 border-emerald-400/50 text-white" 
+  },
+  physics: { 
+    label: "🍎 Physics", 
+    className: "bg-orange-500/80 border-orange-400/50 text-white" 
+  },
+  troll: { 
+    label: "🤡 Troll", 
+    className: "bg-pink-500/80 border-pink-400/50 text-white" 
+  },
+  punish: { 
+    label: "💀 Punish", 
+    className: "bg-red-500/80 border-red-400/50 text-white" 
+  },
+  // Default fallback
+  default: { 
+    label: "📝 Note", 
+    className: "bg-slate-500/80 border-slate-400/50 text-white" 
+  }
+};
+
 /* ================= COMPONENTS ================= */
 
-function Pill({ text }: { text: string }) { return <span className="inline-flex items-center rounded-md border border-white/20 bg-white/10 px-2 py-0.5 text-[10px] font-medium text-white/90 backdrop-blur-md">{text}</span>; }
-function typeLabel(t: string) { return t.replace(/_/g, " "); }
+// Component Pill mới: Nhận typeKey và tự render màu + text đẹp
+function TypePill({ typeKey }: { typeKey: string }) {
+  const config = TYPE_CONFIG[typeKey] || TYPE_CONFIG.default;
+  return (
+    <span className={`inline-flex items-center rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-wider shadow-sm backdrop-blur-md ${config.className}`}>
+      {config.label}
+    </span>
+  );
+}
 
 function IdeaItem({ r, game }: { r: DetailRow; game?: Game }) {
   const hasCover = !!game?.cover_url;
   return (
     <li className="group h-full animate-in fade-in zoom-in-95 duration-300">
       <a href={`/idea/${r.id}`} className="relative flex h-64 w-full flex-col justify-end overflow-hidden rounded-2xl border border-slate-200 bg-slate-900 shadow-sm transition-all duration-500 hover:shadow-xl hover:-translate-y-1">
-        {hasCover ? <div className="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover:scale-110" style={{ backgroundImage: `url(${game.cover_url})` }} /> : <div className="absolute inset-0 bg-slate-800 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-50" />}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent opacity-90 transition-opacity group-hover:opacity-80" />
+        {/* Background Image */}
+        {hasCover ? (
+          <div className="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover:scale-110" style={{ backgroundImage: `url(${game.cover_url})` }} />
+        ) : (
+          <div className="absolute inset-0 bg-slate-800 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-50" />
+        )}
+        
+        {/* Gradient Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent opacity-90 transition-opacity group-hover:opacity-80" />
+        
+        {/* Content */}
         <div className="relative z-10 flex flex-col p-5">
-           <div className="absolute top-4 right-4">{r.priority === 1 && <span className="rounded-lg bg-rose-500/90 px-2 py-1 text-[10px] font-bold uppercase text-white backdrop-blur-md">High</span>}</div>
-           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-blue-300/90"><span className="truncate">{game?.title || "Unknown"}</span></div>
-           <h3 className="line-clamp-2 text-lg font-bold leading-tight text-white group-hover:text-blue-200">{r.title}</h3>
-           <div className="mt-3 flex items-center gap-2"><Pill text={typeLabel(r.detail_type)} />{r.pinned && <span className="text-amber-400 text-xs">⭐ Pinned</span>}</div>
+           {/* Priority Badge (Top Right) */}
+           <div className="absolute top-4 right-4">
+             {r.priority === 1 && <span className="rounded-lg bg-rose-600 px-2 py-1 text-[10px] font-bold uppercase text-white shadow-lg border border-rose-500">🔥 High</span>}
+           </div>
+
+           {/* Game Title */}
+           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-blue-300/90 mb-1">
+             <span className="truncate">{game?.title || "Unknown"}</span>
+           </div>
+
+           {/* Idea Title */}
+           <h3 className="line-clamp-2 text-lg font-bold leading-tight text-white drop-shadow-md group-hover:text-blue-200 mb-3">
+             {r.title}
+           </h3>
+
+           {/* Bottom Badges */}
+           <div className="flex items-center flex-wrap gap-2">
+             <TypePill typeKey={r.detail_type} />
+             {r.pinned && <span className="rounded-lg bg-amber-400/20 border border-amber-400/50 px-2 py-1 text-[10px] font-bold uppercase text-amber-300 backdrop-blur-md">⭐ Pinned</span>}
+           </div>
         </div>
       </a>
     </li>
@@ -52,19 +119,17 @@ function ComboBox({ placeholder, items, selectedId, onChange }: { placeholder: s
 /* ================= MAIN HOME ================= */
 
 export default function Home() {
-  const ITEMS_PER_PAGE = 24; // Số lượng idea mỗi trang
+  const ITEMS_PER_PAGE = 24;
 
   const [games, setGames] = useState<Game[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupCounts, setGroupCounts] = useState<Map<number, number>>(new Map());
   
-  // Data State
-  const [ideas, setIdeas] = useState<DetailRow[]>([]); // Danh sách ĐÃ lọc
-  const [fullIdeas, setFullIdeas] = useState<DetailRow[]>([]); // Danh sách gốc của group (để random)
+  // Data
+  const [ideas, setIdeas] = useState<DetailRow[]>([]);
+  const [fullIdeas, setFullIdeas] = useState<DetailRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [randomMode, setRandomMode] = useState(false);
-
-  // Pagination State (MỚI)
   const [currentPage, setCurrentPage] = useState(1);
 
   // Filters
@@ -87,7 +152,6 @@ export default function Home() {
 
   useEffect(() => { const t = setTimeout(() => setDebouncedQ(q), 300); return () => clearTimeout(t); }, [q]);
 
-  // Load Metadata (Games, Groups)
   useEffect(() => {
     Promise.all([
       supabase.from("games").select("*").order("title"),
@@ -102,7 +166,6 @@ export default function Home() {
     });
   }, []);
 
-  // LOAD & FILTER IDEAS
   useEffect(() => {
     async function load() {
       setLoading(true);
@@ -124,8 +187,6 @@ export default function Home() {
       const res = (data ?? []) as DetailRow[];
       setIdeas(res);
       setFullIdeas(res);
-      
-      // Reset về trang 1 khi filter thay đổi
       setCurrentPage(1);
       setRandomMode(false);
       setLoading(false);
@@ -133,7 +194,6 @@ export default function Home() {
     load();
   }, [debouncedQ, gameId, groupId, type, priority]);
 
-  // Logic Sidebar
   async function createGroup() {
     if (!newGroupName.trim()) return;
     await supabase.from("idea_groups").insert({ name: newGroupName.trim() });
@@ -152,16 +212,12 @@ export default function Home() {
     setIdeas(s); setRandomMode(true); setCurrentPage(1);
   }
 
-  // --- PAGINATION LOGIC (MỚI) ---
   const totalPages = Math.ceil(ideas.length / ITEMS_PER_PAGE);
-  const currentIdeas = ideas.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE, 
-    currentPage * ITEMS_PER_PAGE
-  );
+  const currentIdeas = ideas.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   const goToPage = (p: number) => {
     setCurrentPage(p);
-    window.scrollTo({ top: 0, behavior: "smooth" }); // Cuộn lên đầu
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (
@@ -211,7 +267,6 @@ export default function Home() {
              </div>
           </header>
 
-          {/* LIST HEADER */}
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold">{loading ? "Loading..." : `${ideas.length} Results`}</h2>
             {groupId && (
@@ -222,35 +277,18 @@ export default function Home() {
             )}
           </div>
 
-          {/* GRID ITEMS (Dùng currentIdeas thay vì ideas) */}
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {currentIdeas.map(r => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}
           </ul>
           
           {!loading && ideas.length === 0 && <div className="py-20 text-center text-slate-400">No ideas found.</div>}
 
-          {/* PAGINATION CONTROLS (MỚI) */}
+          {/* PAGINATION */}
           {!loading && totalPages > 1 && (
             <div className="mt-12 flex justify-center items-center gap-2 pb-10">
-               <button 
-                 disabled={currentPage === 1} 
-                 onClick={() => goToPage(currentPage - 1)} 
-                 className={btnPage}
-               >
-                 ←
-               </button>
-               
-               <span className="text-sm font-bold text-slate-600 px-2">
-                 Page {currentPage} of {totalPages}
-               </span>
-
-               <button 
-                 disabled={currentPage === totalPages} 
-                 onClick={() => goToPage(currentPage + 1)} 
-                 className={btnPage}
-               >
-                 →
-               </button>
+               <button disabled={currentPage === 1} onClick={() => goToPage(currentPage - 1)} className={btnPage}>←</button>
+               <span className="text-sm font-bold text-slate-600 px-2">Page {currentPage} of {totalPages}</span>
+               <button disabled={currentPage === totalPages} onClick={() => goToPage(currentPage + 1)} className={btnPage}>→</button>
             </div>
           )}
 
