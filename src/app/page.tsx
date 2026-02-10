@@ -7,14 +7,26 @@ import { supabase } from "@/lib/supabaseClient";
 
 type Game = { id: number; title: string; cover_url?: string | null; release_year?: number | null; genres_text?: string | null };
 type Group = { id: number; name: string };
-type DetailRow = { id: number; title: string; description: string | null; priority: number; detail_type: string; game_id: number; pinned?: boolean; created_at?: string };
+// MỚI: Thêm type cho Footage
+type FootageItem = { file_path: string; title: string | null };
+// MỚI: Thêm footage vào DetailRow
+type DetailRow = { 
+  id: number; 
+  title: string; 
+  description: string | null; 
+  priority: number; 
+  detail_type: string; 
+  game_id: number; 
+  pinned?: boolean; 
+  created_at?: string;
+  footage?: FootageItem[]; // Mảng chứa link footage
+};
 
 const inputClass = "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition";
 const selectClass = "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition cursor-pointer";
 const btnPrimary = "inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold whitespace-nowrap cursor-pointer transition active:scale-[0.98] bg-slate-900 text-white shadow-md shadow-slate-900/10 hover:bg-slate-800";
 const btnPage = "inline-flex h-10 min-w-[40px] items-center justify-center rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer";
 
-// Config màu sắc Badge
 const TYPE_CONFIG: Record<string, { label: string; className: string }> = {
   small_detail: { label: "🔍 Small Detail", className: "bg-blue-500/20 border-blue-400/30 text-blue-100" },
   easter_egg: { label: "🥚 Easter Egg", className: "bg-purple-500/20 border-purple-400/30 text-purple-100" },
@@ -32,45 +44,39 @@ function TypePill({ typeKey }: { typeKey: string }) {
   return <span className={`inline-flex items-center rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-wider shadow-sm backdrop-blur-md ${config.className}`}>{config.label}</span>;
 }
 
-// CẬP NHẬT: IdeaItem có thêm nút "+" để Add to Script
-function IdeaItem({ r, game, onTogglePin, onAddToScript }: { r: DetailRow; game?: Game; onTogglePin: (id: number, current: boolean) => void; onAddToScript: (desc: string) => void }) {
+// CẬP NHẬT: onAddToScript nhận cả desc và footage
+function IdeaItem({ r, game, onTogglePin, onAddToScript }: { r: DetailRow; game?: Game; onTogglePin: (id: number, current: boolean) => void; onAddToScript: (desc: string, footage: FootageItem[]) => void }) {
   const hasCover = !!game?.cover_url;
 
   return (
     <li className="group h-full animate-in fade-in zoom-in-95 duration-300">
       <div className="relative flex h-64 w-full flex-col justify-end overflow-hidden rounded-2xl border border-slate-200 bg-slate-900 shadow-sm transition-all duration-500 hover:shadow-xl hover:-translate-y-1">
-        
-        {/* Background & Overlay */}
         {hasCover ? <div className="absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out group-hover:scale-110" style={{ backgroundImage: `url(${game.cover_url})` }} /> : <div className="absolute inset-0 bg-slate-800 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-50" />}
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent opacity-90 transition-opacity group-hover:opacity-80 pointer-events-none" />
         
-        {/* === TOP ACTION BAR === */}
         <div className="absolute top-3 right-3 z-30 flex items-center gap-2">
            {r.priority === 1 && <span className="rounded-lg bg-rose-500/30 border border-rose-500/50 px-2 py-1 text-[10px] font-bold uppercase text-rose-100 backdrop-blur-md shadow-sm">🔥 High</span>}
            
-           {/* Nút Add to Script */}
+           {/* Add Button */}
            <button
-             onClick={(e) => { e.stopPropagation(); onAddToScript(r.description || ""); }}
+             onClick={(e) => { e.stopPropagation(); onAddToScript(r.description || "", r.footage || []); }}
              className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white/80 hover:bg-emerald-500 hover:border-emerald-400 hover:text-white backdrop-blur-md transition-all active:scale-95 cursor-pointer"
-             title="Add description to Script"
+             title="Add to Script & Assets"
            >
              +
            </button>
 
-           {/* Nút Pin */}
+           {/* Pin Button */}
            <button
              onClick={(e) => { e.stopPropagation(); onTogglePin(r.id, !!r.pinned); }}
              className={`flex h-7 w-7 items-center justify-center rounded-full border transition-all duration-200 hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md ${r.pinned ? "bg-amber-400/90 border-amber-300 text-white shadow-[0_0_15px_rgba(251,191,36,0.6)]" : "bg-white/10 border-white/20 text-white/60 hover:bg-white/20 hover:text-white hover:border-white/40"}`}
-             title={r.pinned ? "Unpin" : "Pin"}
            >
              {r.pinned ? "★" : "☆"}
            </button>
         </div>
 
-        {/* Content Link */}
         <a href={`/idea/${r.id}`} className="absolute inset-0 z-10 block" />
 
-        {/* Content Text */}
         <div className="relative z-20 flex flex-col p-5 pointer-events-none">
            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-blue-300/90 mb-1">
              <span className="truncate">{game?.title || "Unknown"}</span>
@@ -79,6 +85,12 @@ function IdeaItem({ r, game, onTogglePin, onAddToScript }: { r: DetailRow; game?
            <div className="flex items-center flex-wrap gap-2">
              <TypePill typeKey={r.detail_type} />
              {r.pinned && <span className="rounded-lg bg-amber-400/10 border border-amber-400/40 px-2 py-1 text-[10px] font-bold uppercase text-amber-200 backdrop-blur-md">⭐ Pinned</span>}
+             {/* Hiển thị số lượng video nếu có */}
+             {r.footage && r.footage.length > 0 && (
+                <span className="rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-[10px] font-bold text-slate-200 backdrop-blur-md">
+                   🎥 {r.footage.length}
+                </span>
+             )}
            </div>
         </div>
       </div>
@@ -98,35 +110,30 @@ function ComboBox({ placeholder, items, selectedId, onChange }: { placeholder: s
   );
 }
 
-/* ================= COMPONENT: SCRIPT DOCK (MỚI) ================= */
+/* ================= COMPONENT: SCRIPT DOCK (CẢI TIẾN) ================= */
 
-function ScriptDock({ script, setScript }: { script: string, setScript: (s: string) => void }) {
+function ScriptDock({ script, setScript, assets, setAssets }: { script: string, setScript: (s: string) => void, assets: string[], setAssets: (a: string[]) => void }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"text" | "assets">("text");
   const [copied, setCopied] = useState(false);
 
-  // Tính toán thời gian (Trung bình đọc 2.5 từ / giây cho video nhanh)
   const wordCount = script.trim().split(/\s+/).filter(w => w.length > 0).length;
   const estimatedSeconds = Math.round(wordCount / 2.5);
   const isTooLong = estimatedSeconds > 60;
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(script);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  const handleCopyText = () => { navigator.clipboard.writeText(script); setCopied(true); setTimeout(() => setCopied(false), 2000); };
+  const handleCopyLinks = () => { navigator.clipboard.writeText(assets.join("\n")); setCopied(true); setTimeout(() => setCopied(false), 2000); };
+  const handleClear = () => { setScript(""); setAssets([]); };
 
   if (!isOpen) {
-     if (!script) return null; // Ẩn nếu ko có script và đang đóng
+     if (!script && assets.length === 0) return null;
      return (
         <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-4">
-           <button 
-             onClick={() => setIsOpen(true)}
-             className="flex items-center gap-3 rounded-2xl bg-slate-900 px-5 py-3 text-white shadow-2xl shadow-blue-900/20 hover:scale-105 hover:bg-slate-800 transition cursor-pointer"
-           >
+           <button onClick={() => setIsOpen(true)} className="flex items-center gap-3 rounded-2xl bg-slate-900 px-5 py-3 text-white shadow-2xl shadow-blue-900/20 hover:scale-105 hover:bg-slate-800 transition cursor-pointer">
              <span className="text-xl">📜</span>
              <div className="text-left">
-                <div className="text-xs font-bold uppercase text-slate-400">Current Script</div>
-                <div className="font-bold">{wordCount} words <span className="text-slate-500">•</span> {estimatedSeconds}s</div>
+                <div className="text-xs font-bold uppercase text-slate-400">Builder</div>
+                <div className="font-bold">{wordCount} words <span className="text-slate-500">|</span> {assets.length} links</div>
              </div>
            </button>
         </div>
@@ -134,37 +141,45 @@ function ScriptDock({ script, setScript }: { script: string, setScript: (s: stri
   }
 
   return (
-    <div className="fixed bottom-0 right-0 z-50 w-full border-t border-slate-200 bg-white shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:w-[600px] md:right-6 md:bottom-6 md:rounded-2xl md:border animate-in slide-in-from-bottom-10">
-       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-          <div className="flex items-center gap-2">
-             <span className="text-lg">📜</span>
-             <h3 className="font-bold text-slate-900">Script Builder</h3>
+    <div className="fixed bottom-0 right-0 z-50 w-full border-t border-slate-200 bg-white shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:w-[600px] md:right-6 md:bottom-6 md:rounded-2xl md:border animate-in slide-in-from-bottom-10 overflow-hidden">
+       {/* HEADER */}
+       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 bg-slate-50/50">
+          <div className="flex gap-2">
+             <button onClick={() => setActiveTab("text")} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${activeTab === "text" ? "bg-slate-900 text-white shadow" : "text-slate-500 hover:bg-slate-200"}`}>📝 Script ({estimatedSeconds}s)</button>
+             <button onClick={() => setActiveTab("assets")} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${activeTab === "assets" ? "bg-slate-900 text-white shadow" : "text-slate-500 hover:bg-slate-200"}`}>🔗 Source Links ({assets.length})</button>
           </div>
-          <div className="flex items-center gap-2">
-             <div className={`text-xs font-bold px-2 py-1 rounded ${isTooLong ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-600'}`}>
-                {estimatedSeconds}s / 60s
-             </div>
-             <button onClick={() => setIsOpen(false)} className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-500">▼</button>
-          </div>
+          <button onClick={() => setIsOpen(false)} className="h-8 w-8 rounded-full hover:bg-slate-200 text-slate-500 font-bold">✕</button>
        </div>
        
-       <div className="p-4">
-          <textarea 
-            className="h-64 w-full rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-relaxed text-slate-800 outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50 transition resize-none"
-            placeholder="Click '+' on any idea to add content here..."
-            value={script}
-            onChange={(e) => setScript(e.target.value)}
-          />
-          
-          <div className="mt-4 flex items-center justify-between">
-             <button onClick={() => setScript("")} className="text-xs font-bold text-rose-500 hover:text-rose-700 cursor-pointer">Clear All</button>
-             <button 
-               onClick={handleCopy}
-               className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 text-sm font-bold text-white shadow-lg shadow-slate-900/20 hover:bg-slate-800 active:scale-95 transition cursor-pointer"
-             >
-               {copied ? "✓ Copied!" : "Copy for ElevenLabs"}
-             </button>
-          </div>
+       <div className="p-4 h-72">
+          {activeTab === "text" ? (
+             <textarea 
+               className="h-full w-full rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-relaxed text-slate-800 outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50 transition resize-none"
+               placeholder="Script content..."
+               value={script}
+               onChange={(e) => setScript(e.target.value)}
+             />
+          ) : (
+             <div className="h-full w-full rounded-xl border border-slate-200 bg-slate-50 p-4 overflow-auto">
+               {assets.length === 0 ? <p className="text-xs text-slate-400 italic">No footage links collected.</p> : (
+                 <ul className="space-y-2">
+                    {assets.map((link, i) => (
+                      <li key={i} className="flex items-center gap-2 text-xs text-slate-700 bg-white p-2 rounded border border-slate-100">
+                        <span className="text-slate-400 select-none">#{i+1}</span>
+                        <a href={link} target="_blank" className="truncate text-blue-600 hover:underline flex-1">{link}</a>
+                      </li>
+                    ))}
+                 </ul>
+               )}
+             </div>
+          )}
+       </div>
+
+       <div className="flex items-center justify-between px-4 pb-4">
+          <button onClick={handleClear} className="text-xs font-bold text-rose-500 hover:text-rose-700 cursor-pointer">Clear All</button>
+          <button onClick={activeTab === "text" ? handleCopyText : handleCopyLinks} className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 text-xs font-bold text-white shadow-lg hover:bg-slate-800 active:scale-95 transition cursor-pointer">
+             {copied ? "✓ Copied!" : (activeTab === "text" ? "Copy Text (TTS)" : "Copy All Links")}
+          </button>
        </div>
     </div>
   );
@@ -186,8 +201,9 @@ export default function Home() {
   const [randomMode, setRandomMode] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Script Builder State (MỚI)
+  // Script Builder State (MỚI: Có thêm assets)
   const [script, setScript] = useState("");
+  const [assets, setAssets] = useState<string[]>([]);
 
   // Filters
   const [q, setQ] = useState("");
@@ -197,7 +213,6 @@ export default function Home() {
   const [type, setType] = useState<string | "">("");
   const [priority, setPriority] = useState<number | "">("");
 
-  // UI
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
 
@@ -233,7 +248,9 @@ export default function Home() {
         if (groupDetailIds.length === 0) { setIdeas([]); setFullIdeas([]); setLoading(false); return; }
       }
 
-      let query = supabase.from("details").select("*").eq("status", "idea");
+      // CẬP NHẬT QUERY: Thêm footage(file_path, title)
+      let query = supabase.from("details").select("*, footage(file_path, title)").eq("status", "idea");
+      
       if (groupDetailIds) query = query.in("id", groupDetailIds);
       if (gameId) query = query.eq("game_id", gameId);
       if (type) query = query.eq("detail_type", type);
@@ -258,13 +275,20 @@ export default function Home() {
     await supabase.from("details").update({ pinned: newStatus, pinned_at: newStatus ? new Date().toISOString() : null }).eq("id", id);
   }
 
-  // CẬP NHẬT: Hàm thêm vào Script
-  function addToScript(desc: string) {
-    if (!desc) return;
-    setScript(prev => {
-      const separator = prev.length > 0 ? "\n\n" : ""; // Xuống dòng kép để tách đoạn
-      return prev + separator + desc;
-    });
+  // CẬP NHẬT: Hàm thêm vào Script và Assets
+  function addToScript(desc: string, footage: FootageItem[]) {
+    // 1. Thêm Text
+    if (desc) {
+      setScript(prev => {
+        const separator = prev.length > 0 ? "\n\n" : ""; 
+        return prev + separator + desc;
+      });
+    }
+    // 2. Thêm Link Footage
+    if (footage && footage.length > 0) {
+      const links = footage.map(f => f.file_path).filter(Boolean) as string[];
+      setAssets(prev => [...prev, ...links]);
+    }
   }
 
   async function createGroup() {
@@ -296,8 +320,8 @@ export default function Home() {
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
       
-      {/* SCRIPT DOCK (Floating) */}
-      <ScriptDock script={script} setScript={setScript} />
+      {/* SCRIPT DOCK (Truyền thêm Assets) */}
+      <ScriptDock script={script} setScript={setScript} assets={assets} setAssets={setAssets} />
 
       {/* SIDEBAR */}
       <aside className="fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-slate-200 bg-white hidden md:flex">
@@ -360,7 +384,7 @@ export default function Home() {
                  r={r} 
                  game={gameMap.get(r.game_id)} 
                  onTogglePin={togglePinFast} 
-                 onAddToScript={addToScript} // TRUYỀN HÀM NÀY
+                 onAddToScript={addToScript}
                />
             ))}
           </ul>
