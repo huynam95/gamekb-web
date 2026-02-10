@@ -7,7 +7,7 @@ import {
   CheckCircleIcon, 
   PlayCircleIcon
 } from "@heroicons/react/24/solid";
-import { CheckIcon, PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { CheckIcon, TrashIcon } from "@heroicons/react/24/outline";
 
 /* ================= TYPES ================= */
 
@@ -34,7 +34,7 @@ type ScriptProject = {
 
 /* ================= CONFIG ================= */
 
-const ITEMS_PER_PAGE = 24; // Cấu hình số lượng idea mỗi trang
+const ITEMS_PER_PAGE = 24;
 
 const TYPE_CONFIG: Record<string, { label: string; className: string }> = {
   small_detail: { label: "Small Detail", className: "bg-blue-500/20 border-blue-400/30 text-blue-100" },
@@ -46,11 +46,29 @@ const TYPE_CONFIG: Record<string, { label: string; className: string }> = {
   default: { label: "Note", className: "bg-slate-500/20 border-slate-400/30 text-slate-100" }
 };
 
+const selectClass = "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition cursor-pointer";
+
 /* ================= COMPONENTS ================= */
 
 function TypePill({ typeKey }: { typeKey: string }) {
   const config = TYPE_CONFIG[typeKey] || TYPE_CONFIG.default;
   return <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider backdrop-blur-md ${config.className}`}>{config.label}</span>;
+}
+
+// COMPONENT: COMBOBOX (GAME SELECTOR)
+function ComboBox({ placeholder, items, selectedId, onChange }: { placeholder: string; items: { id: number; name: string }[]; selectedId: number | ""; onChange: (id: number | "") => void }) {
+  const [open, setOpen] = useState(false); const [query, setQuery] = useState(""); const boxRef = useRef<HTMLDivElement>(null);
+  const filtered = items.filter(x => x.name.toLowerCase().includes(query.toLowerCase())).slice(0, 50);
+  useEffect(() => { function f(e:any){if(boxRef.current && !boxRef.current.contains(e.target))setOpen(false)} document.addEventListener("mousedown", f); return ()=>document.removeEventListener("mousedown",f)},[]);
+  return (
+    <div ref={boxRef} className="relative w-full h-10">
+      <button className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-left text-sm text-slate-900 cursor-pointer flex items-center justify-between" onClick={() => setOpen(!open)}>
+        <span className="truncate">{items.find(x=>x.id===selectedId)?.name || <span className="text-slate-400">{placeholder}</span>}</span>
+        <span className="text-slate-400 text-xs">▼</span>
+      </button>
+      {open && <div className="absolute left-0 top-full z-20 mt-1 w-full min-w-[200px] rounded-xl border border-slate-200 bg-white shadow-xl p-2"><input className="w-full rounded-lg border px-2 py-1 text-sm mb-2 outline-none focus:border-blue-500" value={query} onChange={e=>setQuery(e.target.value)} autoFocus placeholder="Search..."/><div className="max-h-60 overflow-auto"><button className="w-full text-left p-2 hover:bg-slate-100 text-sm cursor-pointer rounded-lg" onClick={()=>{onChange("");setOpen(false)}}>All Games</button>{filtered.map(x=><button key={x.id} className="w-full text-left p-2 hover:bg-blue-50 text-sm cursor-pointer rounded-lg truncate" onClick={()=>{onChange(x.id);setOpen(false)}}>{x.name}</button>)}</div></div>}
+    </div>
+  );
 }
 
 // COMPONENT: IDEA CARD
@@ -75,7 +93,6 @@ function IdeaItem({ r, game, isSelectMode, isSelected, onToggleSelect, onToggleP
           : "border-slate-200 bg-slate-900"
       }`}
     >
-        {/* Background Layer */}
         {hasCover ? (
           <div className={`absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out opacity-60 ${isSelectMode ? '' : 'group-hover:scale-110 group-hover:opacity-40'}`} style={{ backgroundImage: `url(${game.cover_url})` }} />
         ) : (
@@ -83,7 +100,6 @@ function IdeaItem({ r, game, isSelectMode, isSelected, onToggleSelect, onToggleP
         )}
         <div className={`absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/60 to-transparent ${isSelected ? 'opacity-90 bg-blue-900/20' : ''}`} />
 
-        {/* SELECTION OVERLAY */}
         {isSelectMode && (
           <div className="absolute top-3 right-3 z-30">
              <div className={`h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? "bg-blue-500 border-blue-500 text-white" : "border-white/50 bg-black/20"}`}>
@@ -92,7 +108,6 @@ function IdeaItem({ r, game, isSelectMode, isSelected, onToggleSelect, onToggleP
           </div>
         )}
 
-        {/* Content Layer */}
         <div className="absolute inset-0 flex flex-col justify-end p-5">
            <div className="z-10">
               <div className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -108,7 +123,6 @@ function IdeaItem({ r, game, isSelectMode, isSelected, onToggleSelect, onToggleP
            </div>
         </div>
 
-        {/* Standard Actions (Hidden in Select Mode) */}
         {!isSelectMode && (
            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-20">
               <button 
@@ -227,7 +241,7 @@ export default function Home() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showEditor, setShowEditor] = useState(false);
 
-  // Pagination State (KHÔI PHỤC)
+  // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
 
   // Filters
@@ -235,6 +249,8 @@ export default function Home() {
   const [debouncedQ, setDebouncedQ] = useState("");
   const [gameId, setGameId] = useState<number | "">("");
   const [groupId, setGroupId] = useState<number | "">("");
+  const [type, setType] = useState<string | "">("");
+  const [priority, setPriority] = useState<number | "">("");
   const [loading, setLoading] = useState(true);
 
   // Sidebar UI
@@ -271,15 +287,17 @@ export default function Home() {
          query = query.in("id", ids);
       }
       if (gameId) query = query.eq("game_id", gameId);
+      if (type) query = query.eq("detail_type", type); // RESTORED FILTER
+      if (priority) query = query.eq("priority", priority); // RESTORED FILTER
       if (debouncedQ.trim()) query = query.ilike("title", `%${debouncedQ.trim()}%`);
 
       const { data } = await query.order("created_at", { ascending: false });
       setIdeas((data ?? []) as DetailRow[]);
-      setCurrentPage(1); // Reset về trang 1 khi lọc
+      setCurrentPage(1);
       setLoading(false);
     }
     load();
-  }, [debouncedQ, gameId, groupId]);
+  }, [debouncedQ, gameId, groupId, type, priority]);
 
   // Logic
   const toggleSelection = (id: number) => {
@@ -361,7 +379,6 @@ export default function Home() {
                <Link href="/scripts" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>📜</span> Scripts</Link>
                <Link href="/games/new" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>🕹️</span> Add Game</Link>
             </nav>
-
             <div className="pt-4 border-t border-slate-100">
                <div className="flex items-center justify-between px-2 mb-2"><h3 className="text-xs font-bold uppercase text-slate-400">Collections</h3><button onClick={()=>setShowCreateGroup(!showCreateGroup)} className="text-lg hover:text-blue-600 cursor-pointer">+</button></div>
                {showCreateGroup && <div className="mb-2"><input className="w-full border rounded px-2 py-1 text-xs" value={newGroupName} onChange={e=>setNewGroupName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&createGroup()} placeholder="Name..." autoFocus/></div>}
@@ -383,18 +400,30 @@ export default function Home() {
       {/* MAIN CONTENT */}
       <main className="flex-1 pl-0 md:pl-72 pb-32">
         <div className="mx-auto max-w-[1900px] px-6 py-8">
-          <header className="mb-8 flex justify-between items-center gap-4">
-             <div className="flex-1 relative">
-                <input className="h-12 w-full rounded-2xl border border-slate-200 px-4 shadow-sm outline-none focus:ring-2 focus:ring-slate-200" placeholder="Search ideas..." value={q} onChange={e=>setQ(e.target.value)} />
+          
+          {/* HEADER WITH FILTERS RESTORED */}
+          <header className="mb-8 space-y-4">
+             {/* Row 1: Search & Actions */}
+             <div className="flex gap-4">
+                <div className="flex-1 relative">
+                   <input className="h-12 w-full rounded-2xl border border-slate-200 px-4 shadow-sm outline-none focus:ring-2 focus:ring-slate-200" placeholder="Search ideas..." value={q} onChange={e=>setQ(e.target.value)} />
+                </div>
+                <button 
+                  onClick={() => { setIsSelectMode(!isSelectMode); setSelectedIds([]); }}
+                  className={`h-12 px-6 rounded-2xl font-bold border transition ${isSelectMode ? "bg-blue-50 border-blue-200 text-blue-600" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+                >
+                  {isSelectMode ? "Exit Selection" : "Select Mode"}
+                </button>
+                <Link href="/add" className="h-12 px-6 flex items-center justify-center rounded-2xl bg-slate-900 text-white font-bold hover:bg-slate-800 transition">+ Add</Link>
              </div>
-             {/* SELECTION TOGGLE */}
-             <button 
-               onClick={() => { setIsSelectMode(!isSelectMode); setSelectedIds([]); }}
-               className={`h-12 px-6 rounded-2xl font-bold border transition ${isSelectMode ? "bg-blue-50 border-blue-200 text-blue-600" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
-             >
-               {isSelectMode ? "Exit Selection" : "Select Mode"}
-             </button>
-             <Link href="/add" className="h-12 px-6 flex items-center justify-center rounded-2xl bg-slate-900 text-white font-bold hover:bg-slate-800 transition">+ Add</Link>
+
+             {/* Row 2: Filters */}
+             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-3/4">
+               <ComboBox placeholder="Game" items={games.map(g=>({id:g.id, name:g.title}))} selectedId={gameId} onChange={setGameId} />
+               <select className={selectClass} value={type} onChange={e=>setType(e.target.value)}><option value="">All Types</option><option value="small_detail">Small detail</option><option value="easter_egg">Easter egg</option></select>
+               <select className={selectClass} value={priority} onChange={e=>setPriority(e.target.value ? Number(e.target.value) : "")}><option value="">All Priority</option><option value={1}>High</option><option value={3}>Normal</option></select>
+               {(q||gameId||groupId||type||priority) && <button onClick={()=>{setQ("");setGameId("");setGroupId("");setType("");setPriority("")}} className="text-sm text-rose-500 cursor-pointer">Clear Filters</button>}
+             </div>
           </header>
 
           <div className="mb-6 flex items-center justify-between">
