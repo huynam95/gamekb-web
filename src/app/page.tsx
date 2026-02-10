@@ -12,7 +12,8 @@ import {
   MagnifyingGlassIcon,
   VideoCameraIcon,
   HashtagIcon,
-  TagIcon
+  TagIcon,
+  DocumentDuplicateIcon
 } from "@heroicons/react/24/outline";
 
 /* ================= TYPES ================= */
@@ -27,7 +28,7 @@ type DetailRow = {
 };
 
 type ScriptProject = { 
-  id: number; title: string; content: string; assets: string[];
+  id: number; title: string; content: string; assets: { url: string; name: string }[];
   description: string; hashtags: string[]; tags: string[];
   publish_date: string | null; status: string;
 };
@@ -122,6 +123,7 @@ function GameEditorModal({ game, isOpen, onClose, onUpdate }: { game: Game | nul
   );
 }
 
+// SCRIPT EDITOR MODAL - FIX ASSETS & METADATA
 function ScriptEditorModal({ 
   isOpen, onClose, initialData, onSave 
 }: { 
@@ -143,14 +145,18 @@ function ScriptEditorModal({
        }).filter(Boolean)));
 
        const fullDescription = initialData.ideas.map(i => `• ${i.title}: ${i.description || ""}`).join("\n\n");
-       const allAssets = initialData.ideas.flatMap(i => i.footage?.map(f => f.file_path) || []).filter(Boolean) as string[];
+       
+       // FIX: Lấy cả Name (title) và URL (file_path) của footage
+       const allAssets = initialData.ideas.flatMap(i => 
+         i.footage?.map(f => ({ url: f.file_path, name: f.title || f.file_path.split('/').pop() || "Video" })) || []
+       );
 
        setFormData({
-         title: `Shorts: ${titles[0]}${titles.length > 1 ? '...' : ''}`,
+         title: `Video Script: ${titles[0]}${titles.length > 1 ? '...' : ''}`,
          content: initialData.ideas.map(i => `[${i.title}]\n${i.description || ""}`).join("\n\n"),
          description: `Video tổng hợp các chi tiết thú vị.\n\n${fullDescription}`,
          assets: allAssets,
-         tags: [...gameNames, "Shorts", "Gaming", "Shorts Facts"],
+         tags: [...gameNames, "Shorts", "Gaming", "Game Facts"],
          hashtags: ["#shorts", "#gaming", ...gameNames.map(g => `#${g.replace(/\s+/g, '').toLowerCase()}`)],
          status: "Draft",
          publish_date: null
@@ -173,63 +179,66 @@ function ScriptEditorModal({
           <div className="flex px-6 border-b border-slate-100 bg-slate-50">
              {(["script", "details", "assets"] as const).map(tab => (
                <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-3 text-sm font-bold border-b-2 transition ${activeTab === tab ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"}`}>
-                 {tab === "script" ? "📝 Content" : tab === "details" ? "ℹ️ Metadata" : "🔗 Assets"}
+                 {tab === "script" ? "📝 Script Content" : tab === "details" ? "ℹ️ Metadata" : "🔗 Assets"}
                </button>
              ))}
           </div>
-          <div className="flex-1 overflow-y-auto p-6 bg-slate-50/30">
-             {activeTab === "script" && <textarea className="h-full w-full rounded-2xl border border-slate-200 p-5 text-sm leading-relaxed text-slate-800 outline-none focus:border-blue-500 font-mono shadow-inner" value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} />}
+          <div className="flex-1 overflow-y-auto p-8 bg-slate-50/30">
+             {activeTab === "script" && <textarea className="h-full w-full rounded-2xl border border-slate-200 p-6 text-sm leading-relaxed text-slate-800 outline-none focus:border-blue-500 font-mono shadow-inner" value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} />}
              
              {activeTab === "details" && <div className="space-y-6">
                 <div>
-                  <label className="text-[10px] font-bold uppercase text-slate-400 mb-1 block">Title</label>
-                  <input className="w-full h-11 rounded-xl border border-slate-200 px-4 text-sm font-bold outline-none focus:border-blue-500" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
+                  <label className="text-[10px] font-bold uppercase text-slate-400 mb-2 block">Title</label>
+                  <input className="w-full h-11 rounded-xl border border-slate-200 px-4 text-sm font-bold outline-none focus:border-blue-500 shadow-sm" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold uppercase text-slate-400 mb-1 block">Description</label>
-                  <textarea className="w-full h-32 rounded-xl border border-slate-200 p-4 text-xs outline-none focus:border-blue-500" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
+                  <label className="text-[10px] font-bold uppercase text-slate-400 mb-2 block">Description</label>
+                  <textarea className="w-full h-40 rounded-xl border border-slate-200 p-4 text-xs outline-none focus:border-blue-500 shadow-sm" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
                 </div>
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1"><HashtagIcon className="w-3 h-3"/> Hashtags</label>
+                <div className="grid grid-cols-2 gap-8">
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1 tracking-widest"><HashtagIcon className="w-3 h-3"/> Hashtags</label>
                     <div className="flex flex-wrap gap-2">
                       {formData.hashtags?.map((tag, i) => (
-                        <span key={i} className="px-2 py-1 bg-blue-50 text-blue-600 rounded-lg text-[11px] font-bold border border-blue-100">{tag}</span>
+                        <span key={i} className="px-2.5 py-1 bg-blue-50 text-blue-600 rounded-lg text-[11px] font-bold border border-blue-100 shadow-sm">{tag}</span>
                       ))}
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1"><TagIcon className="w-3 h-3"/> Tags</label>
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1 tracking-widest"><TagIcon className="w-3 h-3"/> Tags</label>
                     <div className="flex flex-wrap gap-2">
                       {formData.tags?.map((tag, i) => (
-                        <span key={i} className="px-2 py-1 bg-slate-100 text-slate-600 rounded-lg text-[11px] font-bold border border-slate-200">{tag}</span>
+                        <span key={i} className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-[11px] font-bold border border-slate-200 shadow-sm">{tag}</span>
                       ))}
                     </div>
                   </div>
                 </div>
              </div>}
 
-             {activeTab === "assets" && <div className="space-y-3">
-                <label className="text-[10px] font-bold uppercase text-slate-400 block tracking-widest">Footage & Resources</label>
+             {activeTab === "assets" && <div className="space-y-4">
+                <div className="flex justify-between items-center px-1">
+                  <label className="text-[10px] font-bold uppercase text-slate-400 block tracking-widest">Selected Footage</label>
+                  <button onClick={() => navigator.clipboard.writeText(formData.assets?.map(a => a.url).join('\n') || "")} className="text-[10px] flex items-center gap-1 font-bold text-blue-600 hover:underline">
+                    <DocumentDuplicateIcon className="w-3 h-3"/> Copy All Links
+                  </button>
+                </div>
                 <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm divide-y divide-slate-50">
                   {(formData.assets || []).length > 0 ? (
-                    formData.assets?.map((link, i) => {
-                      const fileName = link.split('/').pop()?.split('?')[0] || "Unnamed file";
-                      return (
-                        <div key={i} className="p-4 flex items-center gap-4 hover:bg-slate-50 transition group">
-                           <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-500">#{i+1}</div>
-                           <div className="flex-1 min-w-0">
-                              <p className="text-sm font-bold text-slate-700 truncate">{fileName}</p>
-                              <p className="text-[10px] text-blue-500 truncate font-mono">{link}</p>
-                           </div>
-                           <a href={link} target="_blank" className="p-2 rounded-lg bg-slate-100 text-slate-400 hover:bg-blue-600 hover:text-white transition">
-                              <VideoCameraIcon className="w-4 h-4" />
-                           </a>
-                        </div>
-                      )
-                    })
+                    formData.assets?.map((asset, i) => (
+                      <div key={i} className="p-4 flex items-center gap-4 hover:bg-slate-50 transition group">
+                         <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-500">#{i+1}</div>
+                         <div className="flex-1 min-w-0">
+                            {/* HIỂN THỊ TÊN VIDEO CHUẨN Ở ĐÂY */}
+                            <p className="text-sm font-bold text-slate-700 truncate">{asset.name}</p>
+                            <p className="text-[10px] text-slate-400 truncate font-mono">{asset.url}</p>
+                         </div>
+                         <a href={asset.url} target="_blank" className="p-2 rounded-lg bg-slate-100 text-slate-400 hover:bg-blue-600 hover:text-white transition shadow-sm">
+                            <VideoCameraIcon className="w-4 h-4" />
+                         </a>
+                      </div>
+                    ))
                   ) : (
-                    <div className="p-10 text-center text-slate-400 italic">No assets linked to these ideas.</div>
+                    <div className="p-12 text-center text-slate-400 italic text-sm">No assets linked to these ideas.</div>
                   )}
                 </div>
              </div>}
@@ -267,16 +276,20 @@ function IdeaItem({ r, game, isSelectMode, isSelected, onToggleSelect, onToggleP
   );
 }
 
+/* ================= PAGE LOGIC (MAIN) ================= */
+
 export default function Home() {
   const [games, setGames] = useState<Game[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupCounts, setGroupCounts] = useState<Map<number, number>>(new Map());
   const [ideas, setIdeas] = useState<DetailRow[]>([]);
+  
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showEditor, setShowEditor] = useState(false);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const [previewIdea, setPreviewIdea] = useState<DetailRow | null>(null);
+
   const [currentPage, setCurrentPage] = useState(1);
   const [q, setQ] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
@@ -285,6 +298,7 @@ export default function Home() {
   const [type, setType] = useState<string | "">("");
   const [priority, setPriority] = useState<number | "">("");
   const [loading, setLoading] = useState(true);
+
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
 
@@ -307,6 +321,7 @@ export default function Home() {
   useEffect(() => {
     async function load() {
       setLoading(true);
+      // QUAN TRỌNG: Load cả title của footage
       let query = supabase.from("details").select("*, footage(file_path, title)").eq("status", "idea");
       if (groupId) {
          const { data: items } = await supabase.from("idea_group_items").select("detail_id").eq("group_id", groupId);
@@ -361,24 +376,24 @@ export default function Home() {
       {isSelectMode && (
          <div className="fixed bottom-0 inset-x-0 z-[80] bg-white border-t border-slate-200 p-4 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] animate-in slide-in-from-bottom-10">
             <div className="mx-auto max-w-4xl flex items-center justify-between">
-               <div className="flex items-center gap-4"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-white font-bold text-sm">{selectedIds.length}</span><span className="text-sm font-bold text-slate-600">Selected</span></div>
+               <div className="flex items-center gap-4"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-white font-bold text-sm">{selectedIds.length}</span><span className="text-sm font-bold text-slate-600 uppercase tracking-widest">Ideas Selected</span></div>
                <button disabled={selectedIds.length === 0} onClick={() => setShowEditor(true)} className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-white font-bold shadow-lg hover:bg-blue-700 active:scale-95 transition disabled:opacity-50"><PlayCircleIcon className="h-5 w-5" /> Create Script</button>
             </div>
          </div>
       )}
 
       <aside className="fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-slate-200 bg-white hidden md:flex">
-         <div className="flex h-20 items-center px-8 text-2xl font-black text-slate-900">GameKB<span className="text-blue-500">.</span></div>
+         <div className="flex h-20 items-center px-8 text-2xl font-black text-slate-900 tracking-tighter">GameKB<span className="text-blue-500">.</span></div>
          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
             <nav className="space-y-2">
-               <button onClick={() => {setGroupId(""); setQ("");}} className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold transition ${!groupId ? "bg-slate-900 text-white shadow-lg" : "text-slate-500 hover:bg-slate-100"}`}><span>🏠</span> All Ideas</button>
+               <button onClick={() => {setGroupId(""); setQ("");}} className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold transition ${!groupId ? "bg-slate-900 text-white shadow-lg shadow-slate-200" : "text-slate-500 hover:bg-slate-100"}`}><span>🏠</span> All Ideas</button>
                <Link href="/dashboard" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>📊</span> Dashboard</Link>
                <Link href="/scripts" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>📜</span> Scripts</Link>
                <Link href="/games/new" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>🕹️</span> Add Game</Link>
             </nav>
             <div className="pt-4 border-t border-slate-100">
-               <div className="flex items-center justify-between px-2 mb-2 font-bold text-xs uppercase text-slate-400"><span>Collections</span><button onClick={()=>setShowCreateGroup(!showCreateGroup)} className="text-lg hover:text-blue-600">+</button></div>
-               {showCreateGroup && <div className="mb-2"><input className="w-full border rounded px-2 py-1 text-xs outline-none focus:border-blue-500" value={newGroupName} onChange={e=>setNewGroupName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&createGroup()} placeholder="Name..." autoFocus/></div>}
+               <div className="flex items-center justify-between px-2 mb-2 font-bold text-xs uppercase text-slate-400 tracking-widest"><span>Collections</span><button onClick={()=>setShowCreateGroup(!showCreateGroup)} className="text-lg hover:text-blue-600">+</button></div>
+               {showCreateGroup && <div className="mb-2"><input className="w-full border rounded-xl px-2 py-1 text-xs outline-none focus:border-blue-500" value={newGroupName} onChange={e=>setNewGroupName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&createGroup()} placeholder="Name..." autoFocus/></div>}
                <div className="space-y-1">
                   {groups.map(g => (
                      <div key={g.id} className="group/item relative flex items-center justify-between w-full hover:bg-slate-50 rounded-xl px-2 py-1 transition cursor-pointer">
@@ -402,7 +417,7 @@ export default function Home() {
                    <MagnifyingGlassIcon className="w-5 h-5 absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400" />
                    <input className="h-12 w-full rounded-2xl border border-slate-200 px-12 shadow-sm outline-none focus:ring-2 focus:ring-slate-200 font-medium" placeholder="Search ideas..." value={q} onChange={e=>setQ(e.target.value)} />
                 </div>
-                <button onClick={() => { setIsSelectMode(!isSelectMode); setSelectedIds([]); }} className={`h-12 px-6 rounded-2xl font-bold text-sm border transition ${isSelectMode ? "bg-blue-50 border-blue-200 text-blue-600" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}>{isSelectMode ? "Exit Select" : "Select Mode"}</button>
+                <button onClick={() => { setIsSelectMode(!isSelectMode); setSelectedIds([]); }} className={`h-12 px-6 rounded-2xl font-bold text-sm border transition ${isSelectMode ? "bg-blue-50 border-blue-200 text-blue-600" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm"}`}>{isSelectMode ? "Exit Select" : "Select Mode"}</button>
                 <Link href="/add" className="h-12 px-6 flex items-center justify-center rounded-2xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-800 transition shadow-md">+ Add Idea</Link>
              </div>
              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 lg:w-3/4">
@@ -419,7 +434,7 @@ export default function Home() {
              </div>
           </header>
 
-          <div className="mb-6 flex items-center justify-between"><h2 className="text-2xl font-black text-slate-900">{loading ? "Loading..." : `${ideas.length} Ideas Found`}</h2></div>
+          <div className="mb-6 flex items-center justify-between"><h2 className="text-2xl font-black text-slate-900 tracking-tight">{loading ? "Loading..." : `${ideas.length} Ideas Found`}</h2></div>
 
           <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {currentIdeas.map(r => (
@@ -430,7 +445,7 @@ export default function Home() {
           {!loading && totalPages > 1 && (
             <div className="mt-12 flex justify-center items-center gap-2 pb-10">
                <button disabled={currentPage === 1} onClick={() => goToPage(currentPage - 1)} className={btnPage}>←</button>
-               <span className="text-sm font-bold text-slate-600 px-4">Page {currentPage} / {totalPages}</span>
+               <span className="text-sm font-bold text-slate-600 px-4 uppercase tracking-widest">Page {currentPage} / {totalPages}</span>
                <button disabled={currentPage === totalPages} onClick={() => goToPage(currentPage + 1)} className={btnPage}>→</button>
             </div>
           )}
