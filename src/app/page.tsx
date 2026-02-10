@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
-/* ================= TYPES & STYLES (Giữ nguyên) ================= */
+/* ================= TYPES & STYLES ================= */
+
 type Game = { id: number; title: string; cover_url?: string | null; release_year?: number | null; genres_text?: string | null };
 type Group = { id: number; name: string };
 type DetailRow = { id: number; title: string; priority: number; detail_type: string; game_id: number; pinned?: boolean; created_at?: string };
@@ -11,8 +12,10 @@ type DetailRow = { id: number; title: string; priority: number; detail_type: str
 const inputClass = "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition";
 const selectClass = "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition cursor-pointer";
 const btnPrimary = "inline-flex h-10 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold whitespace-nowrap cursor-pointer transition active:scale-[0.98] bg-slate-900 text-white shadow-md shadow-slate-900/10 hover:bg-slate-800";
+const btnPage = "inline-flex h-10 min-w-[40px] items-center justify-center rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed";
 
-/* ================= COMPONENTS (IdeaItem, ComboBox...) ================= */
+/* ================= COMPONENTS ================= */
+
 function Pill({ text }: { text: string }) { return <span className="inline-flex items-center rounded-md border border-white/20 bg-white/10 px-2 py-0.5 text-[10px] font-medium text-white/90 backdrop-blur-md">{text}</span>; }
 function typeLabel(t: string) { return t.replace(/_/g, " "); }
 
@@ -46,18 +49,23 @@ function ComboBox({ placeholder, items, selectedId, onChange }: { placeholder: s
   );
 }
 
-/* ================= MAIN HOME (ALL IDEAS) ================= */
+/* ================= MAIN HOME ================= */
 
 export default function Home() {
+  const ITEMS_PER_PAGE = 24; // Số lượng idea mỗi trang
+
   const [games, setGames] = useState<Game[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupCounts, setGroupCounts] = useState<Map<number, number>>(new Map());
   
-  // Data
-  const [ideas, setIdeas] = useState<DetailRow[]>([]);
-  const [fullIdeas, setFullIdeas] = useState<DetailRow[]>([]);
+  // Data State
+  const [ideas, setIdeas] = useState<DetailRow[]>([]); // Danh sách ĐÃ lọc
+  const [fullIdeas, setFullIdeas] = useState<DetailRow[]>([]); // Danh sách gốc của group (để random)
   const [loading, setLoading] = useState(true);
   const [randomMode, setRandomMode] = useState(false);
+
+  // Pagination State (MỚI)
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Filters
   const [q, setQ] = useState("");
@@ -79,6 +87,7 @@ export default function Home() {
 
   useEffect(() => { const t = setTimeout(() => setDebouncedQ(q), 300); return () => clearTimeout(t); }, [q]);
 
+  // Load Metadata (Games, Groups)
   useEffect(() => {
     Promise.all([
       supabase.from("games").select("*").order("title"),
@@ -93,7 +102,7 @@ export default function Home() {
     });
   }, []);
 
-  // LOAD ALL IDEAS (Or Filtered)
+  // LOAD & FILTER IDEAS
   useEffect(() => {
     async function load() {
       setLoading(true);
@@ -111,10 +120,13 @@ export default function Home() {
       if (priority) query = query.eq("priority", priority);
       if (debouncedQ.trim()) query = query.ilike("title", `%${debouncedQ.trim()}%`);
 
-      const { data } = await query.order("created_at", { ascending: false }); // Mới nhất lên đầu
+      const { data } = await query.order("created_at", { ascending: false });
       const res = (data ?? []) as DetailRow[];
       setIdeas(res);
       setFullIdeas(res);
+      
+      // Reset về trang 1 khi filter thay đổi
+      setCurrentPage(1);
       setRandomMode(false);
       setLoading(false);
     }
@@ -126,7 +138,6 @@ export default function Home() {
     if (!newGroupName.trim()) return;
     await supabase.from("idea_groups").insert({ name: newGroupName.trim() });
     setShowCreateGroup(false); setNewGroupName("");
-    // Refresh groups logic (simplified)
     window.location.reload(); 
   }
 
@@ -138,8 +149,20 @@ export default function Home() {
 
   function pickRandom3() {
     const s = [...fullIdeas].sort(() => 0.5 - Math.random()).slice(0, 3);
-    setIdeas(s); setRandomMode(true);
+    setIdeas(s); setRandomMode(true); setCurrentPage(1);
   }
+
+  // --- PAGINATION LOGIC (MỚI) ---
+  const totalPages = Math.ceil(ideas.length / ITEMS_PER_PAGE);
+  const currentIdeas = ideas.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE, 
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  const goToPage = (p: number) => {
+    setCurrentPage(p);
+    window.scrollTo({ top: 0, behavior: "smooth" }); // Cuộn lên đầu
+  };
 
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
@@ -188,8 +211,9 @@ export default function Home() {
              </div>
           </header>
 
+          {/* LIST HEADER */}
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold">{loading ? "Loading..." : `${ideas.length} Ideas`}</h2>
+            <h2 className="text-xl font-bold">{loading ? "Loading..." : `${ideas.length} Results`}</h2>
             {groupId && (
                <div className="flex gap-2">
                  <button onClick={pickRandom3} className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-sm font-bold hover:bg-indigo-200">🎲 Random 3</button>
@@ -198,10 +222,38 @@ export default function Home() {
             )}
           </div>
 
+          {/* GRID ITEMS (Dùng currentIdeas thay vì ideas) */}
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-            {ideas.map(r => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}
+            {currentIdeas.map(r => <IdeaItem key={r.id} r={r} game={gameMap.get(r.game_id)} />)}
           </ul>
+          
           {!loading && ideas.length === 0 && <div className="py-20 text-center text-slate-400">No ideas found.</div>}
+
+          {/* PAGINATION CONTROLS (MỚI) */}
+          {!loading && totalPages > 1 && (
+            <div className="mt-12 flex justify-center items-center gap-2 pb-10">
+               <button 
+                 disabled={currentPage === 1} 
+                 onClick={() => goToPage(currentPage - 1)} 
+                 className={btnPage}
+               >
+                 ←
+               </button>
+               
+               <span className="text-sm font-bold text-slate-600 px-2">
+                 Page {currentPage} of {totalPages}
+               </span>
+
+               <button 
+                 disabled={currentPage === totalPages} 
+                 onClick={() => goToPage(currentPage + 1)} 
+                 className={btnPage}
+               >
+                 →
+               </button>
+            </div>
+          )}
+
         </div>
       </main>
     </div>
