@@ -3,10 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
-import { 
-  CheckCircleIcon, 
-  PlayCircleIcon
-} from "@heroicons/react/24/solid";
+import { PlayCircleIcon } from "@heroicons/react/24/solid";
 import { CheckIcon, TrashIcon } from "@heroicons/react/24/outline";
 
 /* ================= TYPES ================= */
@@ -21,30 +18,34 @@ type DetailRow = {
 };
 
 type ScriptProject = { 
-  id: number; 
-  title: string; 
-  content: string; 
-  assets: string[];
-  description: string;
-  hashtags: string[];
-  tags: string[];
-  publish_date: string | null;
-  status: string;
+  id: number; title: string; content: string; assets: string[];
+  description: string; hashtags: string[]; tags: string[];
+  publish_date: string | null; status: string;
 };
 
 /* ================= CONFIG ================= */
 
 const ITEMS_PER_PAGE = 24;
 
+// 1. CONFIG TYPE ĐẦY ĐỦ
 const TYPE_CONFIG: Record<string, { label: string; className: string }> = {
-  small_detail: { label: "Small Detail", className: "bg-blue-500/20 border-blue-400/30 text-blue-100" },
-  easter_egg: { label: "Easter Egg", className: "bg-purple-500/20 border-purple-400/30 text-purple-100" },
-  npc_reaction: { label: "NPC Reaction", className: "bg-emerald-500/20 border-emerald-400/30 text-emerald-100" },
-  physics: { label: "Physics", className: "bg-orange-500/20 border-orange-400/30 text-orange-100" },
-  troll: { label: "Troll", className: "bg-pink-500/20 border-pink-400/30 text-pink-100" },
-  punish: { label: "Punish", className: "bg-red-500/20 border-red-400/30 text-red-100" },
-  default: { label: "Note", className: "bg-slate-500/20 border-slate-400/30 text-slate-100" }
+  small_detail: { label: "🔍 Small Detail", className: "bg-blue-500/20 border-blue-400/30 text-blue-100" },
+  easter_egg: { label: "🥚 Easter Egg", className: "bg-purple-500/20 border-purple-400/30 text-purple-100" },
+  npc_reaction: { label: "🗣️ NPC Reaction", className: "bg-emerald-500/20 border-emerald-400/30 text-emerald-100" },
+  physics: { label: "🍎 Physics", className: "bg-orange-500/20 border-orange-400/30 text-orange-100" },
+  troll: { label: "🤡 Troll", className: "bg-pink-500/20 border-pink-400/30 text-pink-100" },
+  punish: { label: "💀 Punish", className: "bg-red-500/20 border-red-400/30 text-red-100" },
+  default: { label: "📝 Note", className: "bg-slate-500/20 border-slate-400/30 text-slate-100" }
 };
+
+// 2. CONFIG PRIORITY ĐẦY ĐỦ
+const PRIORITY_OPTIONS = [
+  { value: 1, label: "🔥 High (1)" },
+  { value: 2, label: "⬆️ Medium (2)" },
+  { value: 3, label: "➡️ Normal (3)" },
+  { value: 4, label: "⬇️ Low (4)" },
+  { value: 5, label: "❄️ Tiny (5)" }
+];
 
 const selectClass = "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition cursor-pointer";
 
@@ -133,7 +134,6 @@ function IdeaItem({ r, game, isSelectMode, isSelected, onToggleSelect, onToggleP
               </button>
            </div>
         )}
-
         <a href={`/idea/${r.id}`} className={`absolute inset-0 z-0 ${isSelectMode ? 'pointer-events-none' : ''}`} />
     </li>
   );
@@ -287,8 +287,8 @@ export default function Home() {
          query = query.in("id", ids);
       }
       if (gameId) query = query.eq("game_id", gameId);
-      if (type) query = query.eq("detail_type", type); // RESTORED FILTER
-      if (priority) query = query.eq("priority", priority); // RESTORED FILTER
+      if (type) query = query.eq("detail_type", type); 
+      if (priority) query = query.eq("priority", priority);
       if (debouncedQ.trim()) query = query.ilike("title", `%${debouncedQ.trim()}%`);
 
       const { data } = await query.order("created_at", { ascending: false });
@@ -401,7 +401,7 @@ export default function Home() {
       <main className="flex-1 pl-0 md:pl-72 pb-32">
         <div className="mx-auto max-w-[1900px] px-6 py-8">
           
-          {/* HEADER WITH FILTERS RESTORED */}
+          {/* HEADER WITH FILTERS */}
           <header className="mb-8 space-y-4">
              {/* Row 1: Search & Actions */}
              <div className="flex gap-4">
@@ -420,8 +420,21 @@ export default function Home() {
              {/* Row 2: Filters */}
              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:w-3/4">
                <ComboBox placeholder="Game" items={games.map(g=>({id:g.id, name:g.title}))} selectedId={gameId} onChange={setGameId} />
-               <select className={selectClass} value={type} onChange={e=>setType(e.target.value)}><option value="">All Types</option><option value="small_detail">Small detail</option><option value="easter_egg">Easter egg</option></select>
-               <select className={selectClass} value={priority} onChange={e=>setPriority(e.target.value ? Number(e.target.value) : "")}><option value="">All Priority</option><option value={1}>High</option><option value={3}>Normal</option></select>
+               
+               {/* TYPE SELECTOR (Dynamically generated) */}
+               <select className={selectClass} value={type} onChange={e=>setType(e.target.value)}>
+                  <option value="">All Types</option>
+                  {Object.entries(TYPE_CONFIG).filter(([k]) => k !== 'default').map(([key, val]) => (
+                     <option key={key} value={key}>{val.label}</option>
+                  ))}
+               </select>
+
+               {/* PRIORITY SELECTOR (Dynamically generated) */}
+               <select className={selectClass} value={priority} onChange={e=>setPriority(e.target.value ? Number(e.target.value) : "")}>
+                  <option value="">All Priority</option>
+                  {PRIORITY_OPTIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+               </select>
+
                {(q||gameId||groupId||type||priority) && <button onClick={()=>{setQ("");setGameId("");setGroupId("");setType("");setPriority("")}} className="text-sm text-rose-500 cursor-pointer">Clear Filters</button>}
              </div>
           </header>
