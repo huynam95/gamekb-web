@@ -14,7 +14,9 @@ import {
   HashtagIcon,
   TagIcon,
   DocumentDuplicateIcon,
-  GlobeAltIcon
+  GlobeAltIcon,
+  MagnifyingGlassIcon, // Thêm icon search
+  XMarkIcon
 } from "@heroicons/react/24/outline";
 
 /* ================= TYPES & CONFIG ================= */
@@ -185,7 +187,7 @@ function ScriptCard({ script, onClick, onDelete }: { script: ScriptProject, onCl
              <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">{script.assets?.length || 0} Assets</span>
           </div>
        </div>
-       <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="absolute top-4 right-4 p-2 bg-white rounded-full shadow-md text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all z-10"><TrashIcon className="w-4 h-4" /></button>
+       <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="absolute top-4 right-4 p-2 bg-white rounded-full shadow-md text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all z-10"><TrashIcon className="h-4 w-4" /></button>
     </div>
   );
 }
@@ -194,17 +196,23 @@ function ScriptCard({ script, onClick, onDelete }: { script: ScriptProject, onCl
 
 export default function ScriptsPage() {
   const [scripts, setScripts] = useState<ScriptProject[]>([]);
+  const [filteredScripts, setFilteredScripts] = useState<ScriptProject[]>([]); // Danh sách sau khi search
   const [editingScript, setEditingScript] = useState<ScriptProject | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupCounts, setGroupCounts] = useState<Map<number, number>>(new Map());
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
+  
+  // Search state
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     async function load() {
       const { data } = await supabase.from("scripts").select("*").order("created_at", { ascending: false });
-      setScripts((data || []) as ScriptProject[]);
+      const scriptData = (data || []) as ScriptProject[];
+      setScripts(scriptData);
+      setFilteredScripts(scriptData);
 
       const grps = await supabase.from("idea_groups").select("*").order("name");
       const grpItems = await supabase.from("idea_group_items").select("group_id");
@@ -215,6 +223,20 @@ export default function ScriptsPage() {
     }
     load();
   }, []);
+
+  // Logic Search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const filtered = scripts.filter(s => 
+        s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.status.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredScripts(filtered);
+    }, 300); // Debounce 300ms
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, scripts]);
 
   const handleUpdateScript = async (updatedData: Partial<ScriptProject>) => {
     if (!editingScript) return;
@@ -276,18 +298,46 @@ export default function ScriptsPage() {
 
       <main className="flex-1 pl-0 md:pl-72 pb-32 min-w-0">
         <div className="mx-auto max-w-[1900px] px-6 py-8">
-           <div className="flex items-center justify-between mb-8">
-             <div><h1 className="text-3xl font-black text-slate-900">Video Projects</h1><p className="text-slate-400 text-sm font-bold mt-1">Archive of your scripts and published content</p></div>
+           <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+             <div>
+               <h1 className="text-3xl font-black text-slate-900">Video Projects</h1>
+               <p className="text-slate-400 text-sm font-bold mt-1">Archive of your scripts and published content</p>
+             </div>
+             
+             {/* Thanh Search */}
+             <div className="relative w-full md:w-96">
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <input 
+                  type="text"
+                  placeholder="Search projects by title, status..."
+                  className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all text-sm"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                {searchQuery && (
+                  <button 
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 hover:bg-slate-100 rounded-full"
+                  >
+                    <XMarkIcon className="w-4 h-4 text-slate-400" />
+                  </button>
+                )}
+             </div>
            </div>
 
-           {scripts.length === 0 ? (
+           {filteredScripts.length === 0 ? (
               <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-200">
                  <DocumentTextIcon className="w-16 h-16 text-slate-200 mx-auto mb-4" />
-                 <h3 className="text-lg font-bold text-slate-400 tracking-widest uppercase">No projects found</h3>
+                 <h3 className="text-lg font-bold text-slate-400 tracking-widest uppercase">
+                    {searchQuery ? "No matching projects" : "No projects found"}
+                 </h3>
+                 {searchQuery && (
+                   <button onClick={() => setSearchQuery("")} className="text-blue-500 text-sm font-bold mt-2 hover:underline">Clear search</button>
+                 )}
               </div>
            ) : (
               <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-                 {scripts.map(s => (
+                 {filteredScripts.map(s => (
                     <ScriptCard key={s.id} script={s} onClick={() => { setEditingScript(s); setIsModalOpen(true); }} onDelete={() => handleDeleteScript(s.id)} />
                  ))}
               </div>
