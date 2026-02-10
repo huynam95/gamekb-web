@@ -2,25 +2,16 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import Link from "next/link"; // CẬP NHẬT
 
 /* ================= TYPES & STYLES ================= */
 
 type Game = { id: number; title: string; cover_url?: string | null; release_year?: number | null; genres_text?: string | null };
 type Group = { id: number; name: string };
-// MỚI: Thêm type cho Footage
 type FootageItem = { file_path: string; title: string | null };
-// MỚI: Thêm footage vào DetailRow
-type DetailRow = { 
-  id: number; 
-  title: string; 
-  description: string | null; 
-  priority: number; 
-  detail_type: string; 
-  game_id: number; 
-  pinned?: boolean; 
-  created_at?: string;
-  footage?: FootageItem[]; // Mảng chứa link footage
-};
+type DetailRow = { id: number; title: string; description: string | null; priority: number; detail_type: string; game_id: number; pinned?: boolean; created_at?: string; footage?: FootageItem[]; };
+// MỚI: Type Script
+type ScriptProject = { id: number; title: string; content: string; assets: string[] };
 
 const inputClass = "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition";
 const selectClass = "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition cursor-pointer";
@@ -44,7 +35,6 @@ function TypePill({ typeKey }: { typeKey: string }) {
   return <span className={`inline-flex items-center rounded-lg border px-2 py-1 text-[10px] font-bold uppercase tracking-wider shadow-sm backdrop-blur-md ${config.className}`}>{config.label}</span>;
 }
 
-// CẬP NHẬT: onAddToScript nhận cả desc và footage
 function IdeaItem({ r, game, onTogglePin, onAddToScript }: { r: DetailRow; game?: Game; onTogglePin: (id: number, current: boolean) => void; onAddToScript: (desc: string, footage: FootageItem[]) => void }) {
   const hasCover = !!game?.cover_url;
 
@@ -56,41 +46,17 @@ function IdeaItem({ r, game, onTogglePin, onAddToScript }: { r: DetailRow; game?
         
         <div className="absolute top-3 right-3 z-30 flex items-center gap-2">
            {r.priority === 1 && <span className="rounded-lg bg-rose-500/30 border border-rose-500/50 px-2 py-1 text-[10px] font-bold uppercase text-rose-100 backdrop-blur-md shadow-sm">🔥 High</span>}
-           
-           {/* Add Button */}
-           <button
-             onClick={(e) => { e.stopPropagation(); onAddToScript(r.description || "", r.footage || []); }}
-             className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white/80 hover:bg-emerald-500 hover:border-emerald-400 hover:text-white backdrop-blur-md transition-all active:scale-95 cursor-pointer"
-             title="Add to Script & Assets"
-           >
-             +
-           </button>
-
-           {/* Pin Button */}
-           <button
-             onClick={(e) => { e.stopPropagation(); onTogglePin(r.id, !!r.pinned); }}
-             className={`flex h-7 w-7 items-center justify-center rounded-full border transition-all duration-200 hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md ${r.pinned ? "bg-amber-400/90 border-amber-300 text-white shadow-[0_0_15px_rgba(251,191,36,0.6)]" : "bg-white/10 border-white/20 text-white/60 hover:bg-white/20 hover:text-white hover:border-white/40"}`}
-           >
-             {r.pinned ? "★" : "☆"}
-           </button>
+           <button onClick={(e) => { e.stopPropagation(); onAddToScript(r.description || "", r.footage || []); }} className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white/80 hover:bg-emerald-500 hover:border-emerald-400 hover:text-white backdrop-blur-md transition-all active:scale-95 cursor-pointer" title="Add to Active Script">+</button>
+           <button onClick={(e) => { e.stopPropagation(); onTogglePin(r.id, !!r.pinned); }} className={`flex h-7 w-7 items-center justify-center rounded-full border transition-all duration-200 hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md ${r.pinned ? "bg-amber-400/90 border-amber-300 text-white shadow-[0_0_15px_rgba(251,191,36,0.6)]" : "bg-white/10 border-white/20 text-white/60 hover:bg-white/20 hover:text-white hover:border-white/40"}`}>{r.pinned ? "★" : "☆"}</button>
         </div>
-
         <a href={`/idea/${r.id}`} className="absolute inset-0 z-10 block" />
-
         <div className="relative z-20 flex flex-col p-5 pointer-events-none">
-           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-blue-300/90 mb-1">
-             <span className="truncate">{game?.title || "Unknown"}</span>
-           </div>
+           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-blue-300/90 mb-1"><span className="truncate">{game?.title || "Unknown"}</span></div>
            <h3 className="line-clamp-2 text-lg font-bold leading-tight text-white drop-shadow-md group-hover:text-blue-200 mb-3">{r.title}</h3>
            <div className="flex items-center flex-wrap gap-2">
              <TypePill typeKey={r.detail_type} />
              {r.pinned && <span className="rounded-lg bg-amber-400/10 border border-amber-400/40 px-2 py-1 text-[10px] font-bold uppercase text-amber-200 backdrop-blur-md">⭐ Pinned</span>}
-             {/* Hiển thị số lượng video nếu có */}
-             {r.footage && r.footage.length > 0 && (
-                <span className="rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-[10px] font-bold text-slate-200 backdrop-blur-md">
-                   🎥 {r.footage.length}
-                </span>
-             )}
+             {r.footage && r.footage.length > 0 && <span className="rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-[10px] font-bold text-slate-200 backdrop-blur-md">🎥 {r.footage.length}</span>}
            </div>
         </div>
       </div>
@@ -110,30 +76,45 @@ function ComboBox({ placeholder, items, selectedId, onChange }: { placeholder: s
   );
 }
 
-/* ================= COMPONENT: SCRIPT DOCK (CẢI TIẾN) ================= */
+/* ================= COMPONENT: SMART SCRIPT DOCK (KẾT NỐI DB) ================= */
 
-function ScriptDock({ script, setScript, assets, setAssets }: { script: string, setScript: (s: string) => void, assets: string[], setAssets: (a: string[]) => void }) {
+function ScriptDock({ 
+  currentScript, 
+  scripts, 
+  onSelectScript, 
+  onUpdateContent, 
+  onCreateScript 
+}: { 
+  currentScript: ScriptProject | null, 
+  scripts: ScriptProject[], 
+  onSelectScript: (id: number) => void,
+  onUpdateContent: (content: string) => void,
+  onCreateScript: () => void
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"text" | "assets">("text");
   const [copied, setCopied] = useState(false);
 
-  const wordCount = script.trim().split(/\s+/).filter(w => w.length > 0).length;
+  const wordCount = currentScript?.content ? currentScript.content.trim().split(/\s+/).filter(w => w.length > 0).length : 0;
   const estimatedSeconds = Math.round(wordCount / 2.5);
   const isTooLong = estimatedSeconds > 60;
+  const assetCount = currentScript?.assets?.length || 0;
 
-  const handleCopyText = () => { navigator.clipboard.writeText(script); setCopied(true); setTimeout(() => setCopied(false), 2000); };
-  const handleCopyLinks = () => { navigator.clipboard.writeText(assets.join("\n")); setCopied(true); setTimeout(() => setCopied(false), 2000); };
-  const handleClear = () => { setScript(""); setAssets([]); };
+  const handleCopyText = () => { navigator.clipboard.writeText(currentScript?.content || ""); setCopied(true); setTimeout(() => setCopied(false), 2000); };
+  const handleCopyLinks = () => { navigator.clipboard.writeText((currentScript?.assets || []).join("\n")); setCopied(true); setTimeout(() => setCopied(false), 2000); };
 
   if (!isOpen) {
-     if (!script && assets.length === 0) return null;
      return (
         <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-4">
            <button onClick={() => setIsOpen(true)} className="flex items-center gap-3 rounded-2xl bg-slate-900 px-5 py-3 text-white shadow-2xl shadow-blue-900/20 hover:scale-105 hover:bg-slate-800 transition cursor-pointer">
              <span className="text-xl">📜</span>
              <div className="text-left">
-                <div className="text-xs font-bold uppercase text-slate-400">Builder</div>
-                <div className="font-bold">{wordCount} words <span className="text-slate-500">|</span> {assets.length} links</div>
+                <div className="text-xs font-bold uppercase text-slate-400">Project Dock</div>
+                {currentScript ? (
+                    <div className="font-bold max-w-[120px] truncate">{currentScript.title}</div>
+                ) : (
+                    <div className="font-bold">No Active Project</div>
+                )}
              </div>
            </button>
         </div>
@@ -142,28 +123,51 @@ function ScriptDock({ script, setScript, assets, setAssets }: { script: string, 
 
   return (
     <div className="fixed bottom-0 right-0 z-50 w-full border-t border-slate-200 bg-white shadow-[0_-10px_40px_rgba(0,0,0,0.1)] md:w-[600px] md:right-6 md:bottom-6 md:rounded-2xl md:border animate-in slide-in-from-bottom-10 overflow-hidden">
-       {/* HEADER */}
-       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 bg-slate-50/50">
-          <div className="flex gap-2">
-             <button onClick={() => setActiveTab("text")} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${activeTab === "text" ? "bg-slate-900 text-white shadow" : "text-slate-500 hover:bg-slate-200"}`}>📝 Script ({estimatedSeconds}s)</button>
-             <button onClick={() => setActiveTab("assets")} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${activeTab === "assets" ? "bg-slate-900 text-white shadow" : "text-slate-500 hover:bg-slate-200"}`}>🔗 Source Links ({assets.length})</button>
+       {/* HEADER: SELECT SCRIPT */}
+       <div className="border-b border-slate-100 px-4 py-3 bg-slate-50/50">
+          <div className="flex items-center justify-between mb-3">
+             <div className="flex items-center gap-2">
+                <span className="text-lg">📜</span>
+                <select 
+                   className="bg-transparent font-bold text-slate-900 outline-none cursor-pointer max-w-[200px]"
+                   value={currentScript?.id || ""}
+                   onChange={(e) => {
+                      if(e.target.value === "new") onCreateScript();
+                      else onSelectScript(Number(e.target.value));
+                   }}
+                >
+                   <option value="" disabled>Select a Project...</option>
+                   {scripts.map(s => <option key={s.id} value={s.id}>{s.title}</option>)}
+                   <option value="new">+ New Project</option>
+                </select>
+                <Link href="/scripts" className="text-xs text-blue-600 hover:underline">Manage</Link>
+             </div>
+             <button onClick={() => setIsOpen(false)} className="h-8 w-8 rounded-full hover:bg-slate-200 text-slate-500 font-bold">✕</button>
           </div>
-          <button onClick={() => setIsOpen(false)} className="h-8 w-8 rounded-full hover:bg-slate-200 text-slate-500 font-bold">✕</button>
+          
+          {currentScript && (
+             <div className="flex gap-2">
+                <button onClick={() => setActiveTab("text")} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${activeTab === "text" ? "bg-slate-900 text-white shadow" : "text-slate-500 hover:bg-slate-200"}`}>📝 Script ({estimatedSeconds}s)</button>
+                <button onClick={() => setActiveTab("assets")} className={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${activeTab === "assets" ? "bg-slate-900 text-white shadow" : "text-slate-500 hover:bg-slate-200"}`}>🔗 Assets ({assetCount})</button>
+             </div>
+          )}
        </div>
        
        <div className="p-4 h-72">
-          {activeTab === "text" ? (
+          {!currentScript ? (
+             <div className="flex h-full items-center justify-center text-slate-400 text-sm">Select or create a project to start.</div>
+          ) : activeTab === "text" ? (
              <textarea 
                className="h-full w-full rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-relaxed text-slate-800 outline-none focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-50 transition resize-none"
-               placeholder="Script content..."
-               value={script}
-               onChange={(e) => setScript(e.target.value)}
+               placeholder="Click '+' on ideas to add content here..."
+               value={currentScript.content || ""}
+               onChange={(e) => onUpdateContent(e.target.value)}
              />
           ) : (
              <div className="h-full w-full rounded-xl border border-slate-200 bg-slate-50 p-4 overflow-auto">
-               {assets.length === 0 ? <p className="text-xs text-slate-400 italic">No footage links collected.</p> : (
+               {assetCount === 0 ? <p className="text-xs text-slate-400 italic">No assets.</p> : (
                  <ul className="space-y-2">
-                    {assets.map((link, i) => (
+                    {(currentScript.assets || []).map((link, i) => (
                       <li key={i} className="flex items-center gap-2 text-xs text-slate-700 bg-white p-2 rounded border border-slate-100">
                         <span className="text-slate-400 select-none">#{i+1}</span>
                         <a href={link} target="_blank" className="truncate text-blue-600 hover:underline flex-1">{link}</a>
@@ -175,12 +179,13 @@ function ScriptDock({ script, setScript, assets, setAssets }: { script: string, 
           )}
        </div>
 
-       <div className="flex items-center justify-between px-4 pb-4">
-          <button onClick={handleClear} className="text-xs font-bold text-rose-500 hover:text-rose-700 cursor-pointer">Clear All</button>
-          <button onClick={activeTab === "text" ? handleCopyText : handleCopyLinks} className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 text-xs font-bold text-white shadow-lg hover:bg-slate-800 active:scale-95 transition cursor-pointer">
-             {copied ? "✓ Copied!" : (activeTab === "text" ? "Copy Text (TTS)" : "Copy All Links")}
-          </button>
-       </div>
+       {currentScript && (
+          <div className="flex items-center justify-end px-4 pb-4">
+             <button onClick={activeTab === "text" ? handleCopyText : handleCopyLinks} className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 text-xs font-bold text-white shadow-lg hover:bg-slate-800 active:scale-95 transition cursor-pointer">
+                {copied ? "✓ Copied!" : (activeTab === "text" ? "Copy Text" : "Copy Links")}
+             </button>
+          </div>
+       )}
     </div>
   );
 }
@@ -201,9 +206,11 @@ export default function Home() {
   const [randomMode, setRandomMode] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Script Builder State (MỚI: Có thêm assets)
-  const [script, setScript] = useState("");
-  const [assets, setAssets] = useState<string[]>([]);
+  // Script State (MỚI: Quản lý project từ DB)
+  const [scripts, setScripts] = useState<ScriptProject[]>([]);
+  const [currentScriptId, setCurrentScriptId] = useState<number | null>(null);
+
+  const activeScript = useMemo(() => scripts.find(s => s.id === currentScriptId) || null, [scripts, currentScriptId]);
 
   // Filters
   const [q, setQ] = useState("");
@@ -212,7 +219,6 @@ export default function Home() {
   const [groupId, setGroupId] = useState<number | "">("");
   const [type, setType] = useState<string | "">("");
   const [priority, setPriority] = useState<number | "">("");
-
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
 
@@ -224,17 +230,24 @@ export default function Home() {
 
   useEffect(() => { const t = setTimeout(() => setDebouncedQ(q), 300); return () => clearTimeout(t); }, [q]);
 
+  // LOAD INITIAL DATA (Meta + Scripts)
   useEffect(() => {
     Promise.all([
       supabase.from("games").select("*").order("title"),
       supabase.from("idea_groups").select("*").order("name"),
-      supabase.from("idea_group_items").select("group_id")
-    ]).then(([gs, grps, items]) => {
+      supabase.from("idea_group_items").select("group_id"),
+      supabase.from("scripts").select("*").order("created_at", { ascending: false }) // Load scripts
+    ]).then(([gs, grps, items, scrs]) => {
       setGames((gs.data ?? []) as Game[]);
       setGroups((grps.data ?? []) as Group[]);
+      setScripts((scrs.data ?? []) as ScriptProject[]);
+      
       const m = new Map<number, number>();
       for (const row of items.data ?? []) { const gid = Number((row as any).group_id); m.set(gid, (m.get(gid) ?? 0) + 1); }
       setGroupCounts(m);
+      
+      // Auto select most recent script
+      if (scrs.data && scrs.data.length > 0) setCurrentScriptId(scrs.data[0].id);
     });
   }, []);
 
@@ -248,7 +261,6 @@ export default function Home() {
         if (groupDetailIds.length === 0) { setIdeas([]); setFullIdeas([]); setLoading(false); return; }
       }
 
-      // CẬP NHẬT QUERY: Thêm footage(file_path, title)
       let query = supabase.from("details").select("*, footage(file_path, title)").eq("status", "idea");
       
       if (groupDetailIds) query = query.in("id", groupDetailIds);
@@ -275,21 +287,42 @@ export default function Home() {
     await supabase.from("details").update({ pinned: newStatus, pinned_at: newStatus ? new Date().toISOString() : null }).eq("id", id);
   }
 
-  // CẬP NHẬT: Hàm thêm vào Script và Assets
-  function addToScript(desc: string, footage: FootageItem[]) {
-    // 1. Thêm Text
-    if (desc) {
-      setScript(prev => {
-        const separator = prev.length > 0 ? "\n\n" : ""; 
-        return prev + separator + desc;
-      });
-    }
-    // 2. Thêm Link Footage
-    if (footage && footage.length > 0) {
-      const links = footage.map(f => f.file_path).filter(Boolean) as string[];
-      setAssets(prev => [...prev, ...links]);
+  // --- SCRIPT LOGIC ---
+
+  async function createNewScript() {
+    const title = prompt("New Project Name:");
+    if(!title) return;
+    const { data } = await supabase.from("scripts").insert({ title, content: "", assets: [] }).select().single();
+    if(data) {
+        setScripts(prev => [data as ScriptProject, ...prev]);
+        setCurrentScriptId(data.id);
     }
   }
+
+  async function handleAddToScript(desc: string, footage: FootageItem[]) {
+    if(!activeScript) { alert("Please select or create a project in the dock first!"); return; }
+    
+    // Update local state first
+    const newContent = activeScript.content + (activeScript.content ? "\n\n" : "") + desc;
+    const newAssets = [...(activeScript.assets || [])];
+    if (footage) footage.forEach(f => newAssets.push(f.file_path));
+
+    const updatedScript = { ...activeScript, content: newContent, assets: newAssets };
+    setScripts(prev => prev.map(s => s.id === activeScript.id ? updatedScript : s));
+
+    // Save to DB
+    await supabase.from("scripts").update({ content: newContent, assets: newAssets }).eq("id", activeScript.id);
+  }
+
+  async function updateScriptContent(newContent: string) {
+      if(!activeScript) return;
+      // Debounce could be added here for performance, but for now direct update is fine for UX
+      const updatedScript = { ...activeScript, content: newContent };
+      setScripts(prev => prev.map(s => s.id === activeScript.id ? updatedScript : s));
+      await supabase.from("scripts").update({ content: newContent }).eq("id", activeScript.id);
+  }
+
+  // --- END SCRIPT LOGIC ---
 
   async function createGroup() {
     if (!newGroupName.trim()) return;
@@ -320,8 +353,14 @@ export default function Home() {
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
       
-      {/* SCRIPT DOCK (Truyền thêm Assets) */}
-      <ScriptDock script={script} setScript={setScript} assets={assets} setAssets={setAssets} />
+      {/* CONNECTED SCRIPT DOCK */}
+      <ScriptDock 
+        currentScript={activeScript} 
+        scripts={scripts} 
+        onSelectScript={setCurrentScriptId}
+        onCreateScript={createNewScript}
+        onUpdateContent={updateScriptContent}
+      />
 
       {/* SIDEBAR */}
       <aside className="fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-slate-200 bg-white hidden md:flex">
@@ -330,9 +369,10 @@ export default function Home() {
            <nav className="space-y-2">
              <button onClick={() => {setGroupId(""); setQ("");}} className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold transition cursor-pointer ${!groupId ? "bg-slate-900 text-white shadow-lg" : "text-slate-500 hover:bg-slate-100"}`}><span>🏠</span> All Ideas</button>
              <a href="/dashboard" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>📊</span> Dashboard</a>
+             <a href="/scripts" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>📜</span> Scripts</a>
              <a href="/games/new" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>🕹️</span> Add Game</a>
            </nav>
-
+           {/* ... (Giữ nguyên phần Groups) ... */}
            <div className="pt-4 border-t border-slate-100">
              <div className="flex items-center justify-between px-2 mb-2"><h3 className="text-xs font-bold uppercase text-slate-400">Collections</h3><button onClick={()=>setShowCreateGroup(!showCreateGroup)} className="text-lg hover:text-blue-600 cursor-pointer">+</button></div>
              {showCreateGroup && <div className="mb-2"><input className="w-full border rounded px-2 py-1 text-xs" value={newGroupName} onChange={e=>setNewGroupName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&createGroup()} placeholder="Name..." autoFocus/></div>}
@@ -384,7 +424,7 @@ export default function Home() {
                  r={r} 
                  game={gameMap.get(r.game_id)} 
                  onTogglePin={togglePinFast} 
-                 onAddToScript={addToScript}
+                 onAddToScript={handleAddToScript}
                />
             ))}
           </ul>
