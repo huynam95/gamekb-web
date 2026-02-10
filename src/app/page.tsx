@@ -37,6 +37,7 @@ const TYPE_CONFIG: Record<string, { label: string; className: string }> = {
   default: { label: "📝 Note", className: "bg-slate-500/20 border-slate-400/30 text-slate-100" }
 };
 
+// Config Priority: Normal = 2. Hãy đảm bảo DB cũng lưu là 2.
 const PRIORITY_OPTIONS = [
   { value: 1, label: 'High', color: 'text-red-600', bg: 'bg-red-50' },
   { value: 2, label: 'Normal', color: 'text-blue-600', bg: 'bg-blue-50' },
@@ -68,7 +69,7 @@ function ComboBox({ placeholder, items, selectedId, onChange }: { placeholder: s
   );
 }
 
-// [MỚI] COMPONENT: GAME EDITOR MODAL (Sửa Game Title & Cover)
+// COMPONENT: GAME EDITOR MODAL
 function GameEditorModal({ 
   game, isOpen, onClose, onUpdate 
 }: { 
@@ -132,7 +133,7 @@ function GameEditorModal({
 }
 
 
-// COMPONENT: IDEA CARD
+// COMPONENT: IDEA CARD (ĐÃ XÓA BÚT CHÌ THỪA)
 function IdeaItem({ 
   r, game, isSelectMode, isSelected, onToggleSelect, onTogglePin, onEditGame 
 }: { 
@@ -140,7 +141,7 @@ function IdeaItem({
   isSelectMode: boolean; isSelected: boolean; 
   onToggleSelect: (id: number) => void;
   onTogglePin: (id: number, current: boolean) => void; 
-  onEditGame: (game: Game) => void; // Prop mới để kích hoạt sửa game
+  onEditGame: (game: Game) => void;
 }) {
   const hasCover = !!game?.cover_url;
 
@@ -174,9 +175,8 @@ function IdeaItem({
 
         <div className="absolute inset-0 flex flex-col justify-end p-5">
            <div className="z-10">
-              {/* GAME INFO LINE: Tên Game + Nút sửa Game */}
+              {/* GAME INFO LINE: Tên Game + Nút sửa Game (Giữ lại cái này) */}
               <div className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 z-20 relative">
-                 {/* Link Game */}
                  <Link 
                    href={`/games/${r.game_id}`} 
                    className="truncate hover:text-blue-400 hover:underline max-w-[80%]"
@@ -185,7 +185,7 @@ function IdeaItem({
                    {game?.title}
                  </Link>
 
-                 {/* NÚT EDIT GAME: Chỉ hiện khi Hover vào Card */}
+                 {/* NÚT EDIT GAME: Chỉ hiện khi Hover */}
                  {!isSelectMode && game && (
                    <button 
                      onClick={(e) => {
@@ -211,7 +211,7 @@ function IdeaItem({
            </div>
         </div>
 
-        {/* --- ACTION BUTTONS (PIN & EDIT IDEA) --- */}
+        {/* --- ACTION BUTTONS (CHỈ CÒN PIN) --- */}
         {!isSelectMode && (
            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex flex-col gap-2">
               <button 
@@ -221,15 +221,8 @@ function IdeaItem({
               >
                  {r.pinned ? "★" : "☆"}
               </button>
-
-              <Link 
-                href={`/idea/${r.id}/edit`} 
-                onClick={(e) => e.stopPropagation()}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-md shadow-lg hover:bg-blue-600 hover:scale-110 transition"
-                title="Edit Idea"
-              >
-                 <PencilSquareIcon className="h-4 w-4" />
-              </Link>
+              
+              {/* ĐÃ XÓA: Bút chì Edit Idea thừa ở đây */}
            </div>
         )}
         <a href={`/idea/${r.id}`} className={`absolute inset-0 z-0 ${isSelectMode ? 'pointer-events-none' : ''}`} />
@@ -237,7 +230,7 @@ function IdeaItem({
   );
 }
 
-// COMPONENT: SCRIPT EDITOR MODAL
+// COMPONENT: SCRIPT EDITOR MODAL (Giữ nguyên)
 function ScriptEditorModal({ 
   isOpen, onClose, initialData, onSave 
 }: { 
@@ -339,7 +332,7 @@ export default function Home() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showEditor, setShowEditor] = useState(false);
 
-  // Edit Game State (NEW)
+  // Edit Game State
   const [editingGame, setEditingGame] = useState<Game | null>(null);
 
   // Pagination State
@@ -389,7 +382,12 @@ export default function Home() {
       }
       if (gameId) query = query.eq("game_id", gameId);
       if (type) query = query.eq("detail_type", type); 
-      if (priority) query = query.eq("priority", priority);
+      
+      // FIX LOGIC FILTER: Đảm bảo priority là số
+      if (priority !== "") {
+         query = query.eq("priority", priority);
+      }
+      
       if (debouncedQ.trim()) query = query.ilike("title", `%${debouncedQ.trim()}%`);
 
       const { data } = await query.order("created_at", { ascending: false });
@@ -454,7 +452,7 @@ export default function Home() {
         }}
       />
 
-      {/* [MỚI] GAME EDITOR MODAL */}
+      {/* GAME EDITOR MODAL */}
       <GameEditorModal 
         game={editingGame}
         isOpen={!!editingGame}
@@ -541,7 +539,12 @@ export default function Home() {
                      <option key={key} value={key}>{val.label}</option>
                   ))}
                </select>
-               <select className={selectClass} value={priority} onChange={e=>setPriority(e.target.value ? Number(e.target.value) : "")}>
+               <select 
+                 className={selectClass} 
+                 value={priority} 
+                 // Fix: Explicitly cast to Number, handle empty string
+                 onChange={e=>setPriority(e.target.value === "" ? "" : Number(e.target.value))}
+               >
                   <option value="">All Priority</option>
                   {PRIORITY_OPTIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                </select>
@@ -567,7 +570,6 @@ export default function Home() {
                     setIdeas(prev => prev.map(i => i.id === id ? { ...i, pinned: !current } : i));
                     await supabase.from("details").update({ pinned: !current }).eq("id", id);
                  }}
-                 // Truyền hàm mở modal sửa game
                  onEditGame={(g) => setEditingGame(g)}
                />
             ))}
