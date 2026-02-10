@@ -11,18 +11,20 @@ import {
   FireIcon, 
   PuzzlePieceIcon,
   CheckIcon,
-  PencilSquareIcon
+  PencilSquareIcon,
+  EyeIcon
 } from "@heroicons/react/24/outline";
 
 /* ================= TYPES & CONFIG ================= */
 
 type Game = { id: number; title: string; cover_url?: string | null };
 type Group = { id: number; name: string };
+type FootageItem = { file_path: string; title: string | null };
 type DetailRow = { 
   id: number; title: string; description: string | null; priority: number; 
   detail_type: string; game_id: number; pinned?: boolean; created_at?: string; 
-  game?: Game; // Join relation
-  footage?: { file_path: string }[];
+  game?: Game; 
+  footage?: FootageItem[];
 };
 
 type ScriptProject = { 
@@ -48,190 +50,91 @@ function TypePill({ typeKey }: { typeKey: string }) {
   return <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider backdrop-blur-md ${config.className}`}>{config.label}</span>;
 }
 
-// COMPONENT: STAT CARD
 function StatCard({ title, value, icon: Icon, color }: { title: string, value: number, icon: any, color: string }) {
   return (
     <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4 hover:shadow-md transition">
-      <div className={`p-4 rounded-xl ${color} bg-opacity-10 text-white`}>
+      <div className={`p-4 rounded-xl ${color} bg-opacity-10`}>
          <Icon className={`w-8 h-8 ${color.replace('bg-', 'text-')}`} />
       </div>
       <div>
-        <p className="text-slate-500 text-sm font-bold uppercase tracking-wider">{title}</p>
+        <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">{title}</p>
         <h4 className="text-3xl font-black text-slate-900">{value}</h4>
       </div>
     </div>
   );
 }
 
-// COMPONENT: GAME EDITOR MODAL (Copy từ Home)
-function GameEditorModal({ 
-  game, isOpen, onClose, onUpdate 
-}: { 
-  game: Game | null; isOpen: boolean; onClose: () => void; onUpdate: (g: Game) => void 
-}) {
+function QuickViewModal({ idea, isOpen, onClose }: { idea: DetailRow | null; isOpen: boolean; onClose: () => void }) {
+  if (!isOpen || !idea) return null;
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in" onClick={onClose}>
+      <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
+        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+          <h3 className="font-bold text-slate-900 truncate pr-4">{idea.title}</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">✕</button>
+        </div>
+        <div className="p-6 space-y-4 text-sm leading-relaxed text-slate-600 whitespace-pre-wrap max-h-[60vh] overflow-y-auto">
+          {idea.description || "No description available."}
+        </div>
+        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+          <button onClick={onClose} className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-lg hover:bg-slate-800 transition">Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GameEditorModal({ game, isOpen, onClose, onUpdate }: { game: Game | null; isOpen: boolean; onClose: () => void; onUpdate: (g: Game) => void }) {
   const [title, setTitle] = useState("");
   const [cover, setCover] = useState("");
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (game) {
-      setTitle(game.title);
-      setCover(game.cover_url || "");
-    }
-  }, [game]);
-
+  useEffect(() => { if (game) { setTitle(game.title); setCover(game.cover_url || ""); } }, [game]);
   async function handleSave() {
-    if (!game) return;
-    setLoading(true);
+    if (!game) return; setLoading(true);
     const { error } = await supabase.from("games").update({ title, cover_url: cover }).eq("id", game.id);
     setLoading(false);
-    if (!error) {
-      onUpdate({ ...game, title, cover_url: cover });
-      onClose();
-    } else {
-      alert("Error updating game: " + error.message);
-    }
+    if (!error) { onUpdate({ ...game, title, cover_url: cover }); onClose(); }
   }
-
   if (!isOpen || !game) return null;
-
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
-       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95">
-          <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-             <h3 className="font-bold text-gray-900">Edit Game Info</h3>
-             <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
-          </div>
-          <div className="p-6 space-y-4">
-             <div><label className="block text-xs font-bold uppercase text-gray-500 mb-1">Game Title</label><input className="w-full h-10 border rounded-lg px-3 text-sm outline-none focus:border-blue-500" value={title} onChange={e=>setTitle(e.target.value)} /></div>
-             <div><label className="block text-xs font-bold uppercase text-gray-500 mb-1">Cover Image URL</label><input className="w-full h-10 border rounded-lg px-3 text-sm outline-none focus:border-blue-500" value={cover} onChange={e=>setCover(e.target.value)} placeholder="https://..." /></div>
-             <div className="pt-2 flex justify-end gap-2"><button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button><button onClick={handleSave} disabled={loading} className="px-4 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm">{loading ? "Saving..." : "Save Changes"}</button></div>
-          </div>
-       </div>
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95">
+        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center"><h3 className="font-bold text-gray-900 text-sm">Edit Game Info</h3><button onClick={onClose} className="text-gray-400">✕</button></div>
+        <div className="p-5 space-y-4">
+          <div><label className="text-[10px] font-bold uppercase text-gray-400 mb-1 block tracking-wider">Title</label><input className="w-full h-10 border rounded-lg px-3 text-sm outline-none focus:border-blue-500 shadow-sm" value={title} onChange={e=>setTitle(e.target.value)} /></div>
+          <div><label className="text-[10px] font-bold uppercase text-gray-400 mb-1 block tracking-wider">Cover URL</label><input className="w-full h-10 border rounded-lg px-3 text-sm outline-none focus:border-blue-500 shadow-sm" value={cover} onChange={e=>setCover(e.target.value)} /></div>
+          <div className="flex justify-end gap-2 pt-2"><button onClick={onClose} className="px-4 py-2 text-xs font-bold text-gray-400">Cancel</button><button onClick={handleSave} disabled={loading} className="px-5 py-2 text-xs font-bold text-white bg-blue-600 rounded-lg shadow-sm">{loading ? "Saving..." : "Save Changes"}</button></div>
+        </div>
+      </div>
     </div>
   );
 }
 
-// COMPONENT: IDEA CARD (DẠNG THẺ GRID - COPY TỪ HOME)
-function IdeaItem({ 
-  r, game, isSelectMode, isSelected, onToggleSelect, onTogglePin, onEditGame 
-}: { 
-  r: DetailRow; game?: Game; 
-  isSelectMode: boolean; isSelected: boolean; 
-  onToggleSelect: (id: number) => void;
-  onTogglePin: (id: number, current: boolean) => void; 
-  onEditGame: (game: Game) => void;
+function IdeaItem({ r, game, isSelectMode, isSelected, onToggleSelect, onTogglePin, onEditGame, onQuickView }: { 
+  r: DetailRow; game?: Game; isSelectMode: boolean; isSelected: boolean; 
+  onToggleSelect: (id: number) => void; onTogglePin: (id: number, current: boolean) => void; 
+  onEditGame: (game: Game) => void; onQuickView: (idea: DetailRow) => void;
 }) {
   const hasCover = !!game?.cover_url;
-
   return (
-    <li 
-      onClick={() => isSelectMode && onToggleSelect(r.id)}
-      className={`group relative h-64 w-full overflow-hidden rounded-2xl border shadow-sm transition-all duration-300 ${
-        isSelectMode 
-          ? "cursor-pointer active:scale-95" 
-          : "hover:shadow-2xl hover:-translate-y-1"
-      } ${
-        isSelected 
-          ? "border-blue-500 ring-2 ring-blue-500 ring-offset-2 ring-offset-slate-50" 
-          : "border-slate-200 bg-slate-900"
-      }`}
-    >
-        {hasCover ? (
-          <div className={`absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out opacity-60 ${isSelectMode ? '' : 'group-hover:scale-110 group-hover:opacity-40'}`} style={{ backgroundImage: `url(${game.cover_url})` }} />
-        ) : (
-          <div className="absolute inset-0 bg-slate-800 opacity-50" />
-        )}
+    <li onClick={() => isSelectMode && onToggleSelect(r.id)} className={`group relative h-64 w-full overflow-hidden rounded-2xl border shadow-sm transition-all duration-300 ${isSelectMode ? "cursor-pointer active:scale-95" : "hover:shadow-2xl hover:-translate-y-1"} ${isSelected ? "border-blue-500 ring-2 ring-blue-500 ring-offset-2 ring-offset-slate-50" : "border-slate-200 bg-slate-900"}`}>
+        {hasCover ? <div className={`absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out opacity-60 ${isSelectMode ? '' : 'group-hover:scale-110 group-hover:opacity-40'}`} style={{ backgroundImage: `url(${game.cover_url})` }} /> : <div className="absolute inset-0 bg-slate-800 opacity-50" />}
         <div className={`absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/60 to-transparent ${isSelected ? 'opacity-90 bg-blue-900/20' : ''}`} />
-
-        {isSelectMode && (
-          <div className="absolute top-3 right-3 z-30">
-             <div className={`h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? "bg-blue-500 border-blue-500 text-white" : "border-white/50 bg-black/20"}`}>
-                {isSelected && <CheckIcon className="h-4 w-4 stroke-[3]" />}
-             </div>
+        {isSelectMode && <div className="absolute top-3 right-3 z-30"><div className={`h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? "bg-blue-500 border-blue-500 text-white" : "border-white/50 bg-black/20"}`}>{isSelected && <CheckIcon className="h-4 w-4 stroke-[3]" />}</div></div>}
+        <div className="absolute inset-0 flex flex-col justify-end p-5"><div className="z-10">
+          <div className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 z-20 relative">
+            <span className="truncate max-w-[80%]">{game?.title}</span>
+            {!isSelectMode && game && <button onClick={(e)=>{e.stopPropagation(); onEditGame(game)}} className="p-1 rounded hover:bg-white/20 text-slate-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"><PencilSquareIcon className="h-3 w-3"/></button>}
           </div>
-        )}
-
-        <div className="absolute inset-0 flex flex-col justify-end p-5">
-           <div className="z-10">
-              <div className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 z-20 relative">
-                 <Link href={`/games/${r.game_id}`} className="truncate hover:text-blue-400 hover:underline max-w-[80%]" onClick={(e) => e.stopPropagation()}>{game?.title}</Link>
-                 {!isSelectMode && game && (
-                   <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEditGame(game); }} className="p-1 rounded hover:bg-white/20 text-slate-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity" title="Edit Game Info"><PencilSquareIcon className="h-3 w-3" /></button>
-                 )}
-              </div>
-              <h3 className="line-clamp-2 text-base font-bold leading-snug text-white mb-2">{r.title}</h3>
-              <div className="flex items-center gap-2"><TypePill typeKey={r.detail_type} />{r.pinned && <span className="text-[10px] font-bold text-amber-400">★ Pinned</span>}</div>
-           </div>
-        </div>
-
-        {!isSelectMode && (
-           <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex flex-col gap-2">
-              <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTogglePin(r.id, !!r.pinned); }} className={`flex h-8 w-8 items-center justify-center rounded-full backdrop-blur-md shadow-lg transition hover:scale-110 ${r.pinned ? 'bg-amber-400 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`} title="Pin Idea">{r.pinned ? "★" : "☆"}</button>
-           </div>
-        )}
-        <a href={`/idea/${r.id}`} className={`absolute inset-0 z-0 ${isSelectMode ? 'pointer-events-none' : ''}`} />
+          <h3 className="line-clamp-2 text-base font-bold leading-snug text-white mb-2">{r.title}</h3>
+          <div className="flex items-center gap-2"><TypePill typeKey={r.detail_type} />{r.pinned && <span className="text-[10px] font-bold text-amber-400">★ Pinned</span>}</div>
+        </div></div>
+        {!isSelectMode && <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex flex-col gap-2">
+           <button onClick={(e)=>{e.stopPropagation(); onTogglePin(r.id, !!r.pinned)}} className={`flex h-8 w-8 items-center justify-center rounded-full backdrop-blur-md shadow-lg transition hover:scale-110 ${r.pinned ? 'bg-amber-400 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}>{r.pinned ? "★" : "☆"}</button>
+           <button onClick={(e)=>{e.stopPropagation(); onQuickView(r)}} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-md shadow-lg hover:bg-emerald-500 hover:scale-110 transition" title="Quick Preview"><EyeIcon className="h-4 w-4"/></button>
+        </div>}
+        <a href={`/idea/${r.id}`} className={`absolute inset-0 z-0 ${isSelectMode ? 'hidden' : ''}`} />
     </li>
-  );
-}
-
-// COMPONENT: SCRIPT EDITOR MODAL (Copy từ Home)
-function ScriptEditorModal({ 
-  isOpen, onClose, initialData, onSave 
-}: { 
-  isOpen: boolean; onClose: () => void; 
-  initialData: { ids: number[], ideas: DetailRow[] };
-  onSave: (data: Partial<ScriptProject>) => void;
-}) {
-  const [formData, setFormData] = useState<Partial<ScriptProject>>({
-    title: "", content: "", description: "", hashtags: [], tags: [], publish_date: null, status: "Draft", assets: []
-  });
-  const [activeTab, setActiveTab] = useState<"details" | "script" | "assets">("script");
-
-  useEffect(() => {
-    if (isOpen && initialData.ideas.length > 0) {
-       const titles = initialData.ideas.map(i => i.title);
-       const gameNames = Array.from(new Set(initialData.ideas.map(i => i.game?.title || "").filter(Boolean)));
-       const generatedContent = initialData.ideas.map(i => `[${i.title}]\n${i.description || ""}`).join("\n\n");
-       const generatedAssets = initialData.ideas.flatMap(i => i.footage?.map(f => f.file_path) || []).filter(Boolean) as string[];
-       setFormData({
-         title: `Shorts: ${titles[0]}...`,
-         content: generatedContent,
-         description: `Video tổng hợp các chi tiết thú vị.\n\nTimestamps:\n0:00 Intro\n...`,
-         assets: generatedAssets,
-         tags: [...gameNames, "Shorts", "Gaming"],
-         hashtags: ["#shorts", "#gaming", ...gameNames.map(g => `#${g.replace(/\s+/g, '')}`)],
-         status: "Draft"
-       });
-    }
-  }, [isOpen, initialData]);
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-       <div className="bg-white w-full max-w-4xl h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-             <div><h2 className="text-xl font-black text-slate-900">Create Video Script</h2></div>
-             <div className="flex gap-2">
-                <button onClick={onClose} className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl">Cancel</button>
-                <button onClick={() => { onSave(formData); onClose(); }} className="px-6 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg shadow-blue-600/20">Save Project</button>
-             </div>
-          </div>
-          <div className="flex px-6 border-b border-slate-100 bg-slate-50">
-             {(["script", "details", "assets"] as const).map(tab => (
-               <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-3 text-sm font-bold border-b-2 transition ${activeTab === tab ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"}`}>
-                 {tab === "script" ? "📝 Content" : tab === "details" ? "ℹ️ Metadata" : "🔗 Assets"}
-               </button>
-             ))}
-          </div>
-          <div className="flex-1 overflow-y-auto p-6 bg-slate-50/30">
-             {activeTab === "script" && <textarea className="h-full w-full rounded-2xl border border-slate-200 p-5 text-sm leading-relaxed outline-none font-mono" value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} />}
-             {activeTab === "details" && <div className="space-y-4"><div><label className="text-xs font-bold text-slate-500">Title</label><input className="w-full h-10 rounded-xl border px-3" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} /></div></div>}
-             {activeTab === "assets" && <div className="bg-white rounded-xl border p-2">{(formData.assets || []).map((link, i) => <div key={i} className="p-2 border-b text-xs text-blue-600 truncate">{link}</div>)}</div>}
-          </div>
-       </div>
-    </div>
   );
 }
 
@@ -244,56 +147,34 @@ export default function Dashboard() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupCounts, setGroupCounts] = useState<Map<number, number>>(new Map());
   
-  // Selection Mode
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [showEditor, setShowEditor] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [editingGame, setEditingGame] = useState<Game | null>(null);
+  const [previewIdea, setPreviewIdea] = useState<DetailRow | null>(null);
 
   useEffect(() => {
     async function loadData() {
-      // 1. Fetch Stats
       const ideasRes = await supabase.from("details").select("id, priority, status", { count: 'exact' });
       const scriptsRes = await supabase.from("scripts").select("id", { count: 'exact' });
       const gamesRes = await supabase.from("games").select("id", { count: 'exact' });
       
-      const total = ideasRes.count || 0;
-      const high = ideasRes.data?.filter(i => i.priority === 1).length || 0;
-      
       setStats({
-        total: total,
-        high: high,
+        total: ideasRes.count || 0,
+        high: ideasRes.data?.filter(i => i.priority === 1).length || 0,
         scripts: scriptsRes.count || 0,
         games: gamesRes.count || 0
       });
 
-      // 2. Fetch Pinned Ideas
-      const pinnedRes = await supabase
-        .from("details")
-        .select("*, game:games(*), footage(file_path)") // Lấy đủ thông tin game để sửa
-        .eq("status", "idea")
-        .eq("pinned", true)
-        .order("created_at", { ascending: false });
-      
+      const pinnedRes = await supabase.from("details").select("*, game:games(*), footage(file_path)").eq("status", "idea").eq("pinned", true).order("created_at", { ascending: false });
       setPinnedIdeas((pinnedRes.data || []) as DetailRow[]);
 
-      // 3. Fetch Recent Ideas (10 items, excluding pinned if needed, but here just raw recent)
-      const recentRes = await supabase
-        .from("details")
-        .select("*, game:games(*), footage(file_path)")
-        .eq("status", "idea")
-        .eq("pinned", false) // Chỉ lấy những cái chưa pin để tránh trùng
-        .order("created_at", { ascending: false })
-        .limit(10);
-      
+      const recentRes = await supabase.from("details").select("*, game:games(*), footage(file_path)").eq("status", "idea").eq("pinned", false).order("created_at", { ascending: false }).limit(10);
       setRecentIdeas((recentRes.data || []) as DetailRow[]);
 
-      // 4. Fetch Sidebar Data
       const grps = await supabase.from("idea_groups").select("*").order("name");
       const grpItems = await supabase.from("idea_group_items").select("group_id");
-      
       setGroups((grps.data || []) as Group[]);
       const m = new Map<number, number>();
       for (const row of grpItems.data ?? []) { const gid = Number((row as any).group_id); m.set(gid, (m.get(gid) ?? 0) + 1); }
@@ -302,18 +183,8 @@ export default function Dashboard() {
     loadData();
   }, []);
 
-  // --- ACTIONS ---
   const toggleSelection = (id: number) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  };
-
-  const handleSaveScript = async (data: Partial<ScriptProject>) => {
-    const { error } = await supabase.from("scripts").insert(data);
-    if (!error) {
-       alert("Script created!");
-       setIsSelectMode(false);
-       setSelectedIds([]);
-    }
   };
 
   async function createGroup() {
@@ -328,48 +199,18 @@ export default function Dashboard() {
     window.location.reload();
   }
 
-  // Update Game Local State after Edit
   const updateGameInList = (updatedGame: Game) => {
      const updateList = (list: DetailRow[]) => list.map(item => item.game_id === updatedGame.id ? { ...item, game: updatedGame } : item);
      setPinnedIdeas(updateList(pinnedIdeas));
      setRecentIdeas(updateList(recentIdeas));
   };
 
-  const allIdeas = [...pinnedIdeas, ...recentIdeas]; // Helper for modal data
-
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
       
       {/* MODALS */}
-      <ScriptEditorModal 
-        isOpen={showEditor} 
-        onClose={() => setShowEditor(false)}
-        onSave={handleSaveScript}
-        initialData={{ ids: selectedIds, ideas: allIdeas.filter(i => selectedIds.includes(i.id)) }}
-      />
-      
-      <GameEditorModal 
-        game={editingGame}
-        isOpen={!!editingGame}
-        onClose={() => setEditingGame(null)}
-        onUpdate={updateGameInList}
-      />
-
-      {/* BOTTOM SELECTION BAR (Sticky) */}
-      {isSelectMode && (
-         <div className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200 p-4 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] animate-in slide-in-from-bottom-10 md:pl-72">
-            <div className="mx-auto max-w-4xl flex items-center justify-between">
-               <div className="flex items-center gap-4">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-white font-bold text-sm">{selectedIds.length}</span>
-                  <span className="text-sm font-bold text-slate-600">Selected</span>
-                  <button onClick={() => setSelectedIds([])} className="text-xs text-rose-500 hover:underline">Clear</button>
-               </div>
-               <button disabled={selectedIds.length === 0} onClick={() => setShowEditor(true)} className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-white font-bold shadow-lg hover:bg-blue-700 active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed">
-                 <PlayCircleIcon className="h-5 w-5" /> Create Script
-               </button>
-            </div>
-         </div>
-      )}
+      <GameEditorModal game={editingGame} isOpen={!!editingGame} onClose={() => setEditingGame(null)} onUpdate={updateGameInList} />
+      <QuickViewModal idea={previewIdea} isOpen={!!previewIdea} onClose={() => setPreviewIdea(null)} />
 
       {/* SIDEBAR */}
       <aside className="fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-slate-200 bg-white hidden md:flex">
@@ -382,12 +223,12 @@ export default function Dashboard() {
                <Link href="/games/new" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>🕹️</span> Add Game</Link>
             </nav>
             <div className="pt-4 border-t border-slate-100">
-               <div className="flex items-center justify-between px-2 mb-2"><h3 className="text-xs font-bold uppercase text-slate-400">Collections</h3><button onClick={()=>setShowCreateGroup(!showCreateGroup)} className="text-lg hover:text-blue-600 cursor-pointer">+</button></div>
-               {showCreateGroup && <div className="mb-2"><input className="w-full border rounded px-2 py-1 text-xs" value={newGroupName} onChange={e=>setNewGroupName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&createGroup()} placeholder="Name..." autoFocus/></div>}
+               <div className="flex items-center justify-between px-2 mb-2 font-bold text-[10px] uppercase text-slate-400"><span>Collections</span><button onClick={()=>setShowCreateGroup(!showCreateGroup)} className="text-lg hover:text-blue-600">+</button></div>
+               {showCreateGroup && <div className="mb-2"><input className="w-full border rounded px-2 py-1 text-xs outline-none focus:border-blue-500" value={newGroupName} onChange={e=>setNewGroupName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&createGroup()} placeholder="Name..." autoFocus/></div>}
                <div className="space-y-1">
                   {groups.map(g => (
                      <div key={g.id} className="group/item relative flex items-center justify-between w-full hover:bg-slate-50 rounded-xl px-2 py-1 transition cursor-pointer">
-                        <div className="flex-1 flex items-center gap-2 overflow-hidden py-2 text-slate-500">
+                        <div className="flex-1 flex items-center gap-2 overflow-hidden py-2 text-slate-500 font-medium text-sm">
                            <span className="truncate">{g.name}</span>
                         </div>
                         <div className="w-8 flex justify-center shrink-0">
@@ -409,16 +250,11 @@ export default function Dashboard() {
            
            <div className="flex items-center justify-between mb-8">
              <h1 className="text-3xl font-black text-slate-900">Dashboard</h1>
-             <button 
-                onClick={() => { setIsSelectMode(!isSelectMode); setSelectedIds([]); }}
-                className={`h-10 px-4 rounded-xl font-bold border text-sm transition ${isSelectMode ? "bg-blue-50 border-blue-200 text-blue-600" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
-              >
-                {isSelectMode ? "Cancel Selection" : "Select Mode"}
-             </button>
+             <button onClick={() => { setIsSelectMode(!isSelectMode); setSelectedIds([]); }} className={`h-10 px-4 rounded-xl font-bold border text-sm transition ${isSelectMode ? "bg-blue-50 border-blue-200 text-blue-600" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}>{isSelectMode ? "Exit Select" : "Select Mode"}</button>
            </div>
 
            {/* STATS ROW */}
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
               <StatCard title="Total Ideas" value={stats.total} icon={DocumentTextIcon} color="bg-blue-500" />
               <StatCard title="High Priority" value={stats.high} icon={FireIcon} color="bg-red-500" />
               <StatCard title="Total Games" value={stats.games} icon={PuzzlePieceIcon} color="bg-emerald-500" />
@@ -427,23 +263,13 @@ export default function Dashboard() {
 
            {/* SECTION: PINNED IDEAS */}
            {pinnedIdeas.length > 0 && (
-             <div className="mb-10">
-               <h3 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2">
+             <div className="mb-12">
+               <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2">
                  <span className="text-amber-500">★</span> Pinned Ideas
                </h3>
                <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                   {pinnedIdeas.map(r => (
-                     <IdeaItem 
-                       key={r.id} r={r} game={r.game} 
-                       isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} 
-                       onToggleSelect={toggleSelection} 
-                       onTogglePin={async (id, current) => {
-                          setPinnedIdeas(prev => prev.filter(i => i.id !== id)); // Remove from pinned list visually
-                          setRecentIdeas(prev => [r, ...prev]); // Move back to recent list visually (optional)
-                          await supabase.from("details").update({ pinned: !current }).eq("id", id);
-                       }}
-                       onEditGame={(g) => setEditingGame(g)}
-                     />
+                     <IdeaItem key={r.id} r={r} game={r.game} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={async (id, current) => { await supabase.from("details").update({ pinned: !current }).eq("id", id); window.location.reload(); }} onEditGame={(g) => setEditingGame(g)} onQuickView={(idea) => setPreviewIdea(idea)} />
                   ))}
                </ul>
              </div>
@@ -451,20 +277,10 @@ export default function Dashboard() {
 
            {/* SECTION: RECENT IDEAS */}
            <div>
-             <h3 className="text-lg font-black text-slate-800 mb-4">✨ Recently Added (Top 10)</h3>
+             <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2">✨ Recently Added</h3>
              <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                 {recentIdeas.map(r => (
-                   <IdeaItem 
-                     key={r.id} r={r} game={r.game} 
-                     isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} 
-                     onToggleSelect={toggleSelection} 
-                     onTogglePin={async (id, current) => {
-                        setRecentIdeas(prev => prev.filter(i => i.id !== id));
-                        setPinnedIdeas(prev => [r, ...prev]);
-                        await supabase.from("details").update({ pinned: !current }).eq("id", id);
-                     }}
-                     onEditGame={(g) => setEditingGame(g)}
-                   />
+                   <IdeaItem key={r.id} r={r} game={r.game} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={async (id, current) => { await supabase.from("details").update({ pinned: !current }).eq("id", id); window.location.reload(); }} onEditGame={(g) => setEditingGame(g)} onQuickView={(idea) => setPreviewIdea(idea)} />
                 ))}
              </ul>
            </div>
