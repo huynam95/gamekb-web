@@ -5,10 +5,6 @@ import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 import { 
   CheckCircleIcon, 
-  CalendarIcon, 
-  HashtagIcon, 
-  TagIcon, 
-  XMarkIcon, 
   PlayCircleIcon
 } from "@heroicons/react/24/solid";
 import { CheckIcon, PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
@@ -38,6 +34,8 @@ type ScriptProject = {
 
 /* ================= CONFIG ================= */
 
+const ITEMS_PER_PAGE = 24; // Cấu hình số lượng idea mỗi trang
+
 const TYPE_CONFIG: Record<string, { label: string; className: string }> = {
   small_detail: { label: "Small Detail", className: "bg-blue-500/20 border-blue-400/30 text-blue-100" },
   easter_egg: { label: "Easter Egg", className: "bg-purple-500/20 border-purple-400/30 text-purple-100" },
@@ -55,7 +53,7 @@ function TypePill({ typeKey }: { typeKey: string }) {
   return <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider backdrop-blur-md ${config.className}`}>{config.label}</span>;
 }
 
-// COMPONENT: IDEA CARD (Selection Ready)
+// COMPONENT: IDEA CARD
 function IdeaItem({ r, game, isSelectMode, isSelected, onToggleSelect, onTogglePin }: { 
   r: DetailRow; game?: Game; 
   isSelectMode: boolean; isSelected: boolean; 
@@ -200,6 +198,7 @@ function ScriptEditorModal({
                    <div className="space-y-4">
                       <div><label className="block text-xs font-bold uppercase text-slate-500 mb-1">Hashtags (#)</label><div className="flex flex-wrap gap-2 p-3 rounded-xl border border-slate-200 bg-white min-h-[50px]">{formData.hashtags?.map((tag, i) => (<span key={i} className="px-2 py-1 bg-blue-50 text-blue-600 text-xs font-bold rounded-lg">{tag}</span>))}<input className="flex-1 min-w-[100px] outline-none text-xs" placeholder="Add tag..." onKeyDown={e => { if(e.key === 'Enter') { const val = e.currentTarget.value.trim(); if(val) { setFormData({...formData, hashtags: [...(formData.hashtags||[]), val.startsWith('#')?val:'#'+val]}); e.currentTarget.value = ""; }}}} /></div></div>
                       <div><label className="block text-xs font-bold uppercase text-slate-500 mb-1">Hidden Tags</label><div className="flex flex-wrap gap-2 p-3 rounded-xl border border-slate-200 bg-white min-h-[50px]">{formData.tags?.map((tag, i) => (<span key={i} className="px-2 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded-lg">{tag}</span>))}<input className="flex-1 min-w-[100px] outline-none text-xs" placeholder="Add keyword..." onKeyDown={e => { if(e.key === 'Enter') { const val = e.currentTarget.value.trim(); if(val) { setFormData({...formData, tags: [...(formData.tags||[]), val]}); e.currentTarget.value = ""; }}}} /></div></div>
+                      <div><label className="block text-xs font-bold uppercase text-slate-500 mb-1">Schedule Date</label><input type="datetime-local" className="w-full h-10 rounded-xl border border-slate-200 px-3 text-sm" onChange={e => setFormData({...formData, publish_date: e.target.value})} /></div>
                    </div>
                 </div>
              )}
@@ -227,6 +226,9 @@ export default function Home() {
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showEditor, setShowEditor] = useState(false);
+
+  // Pagination State (KHÔI PHỤC)
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Filters
   const [q, setQ] = useState("");
@@ -273,6 +275,7 @@ export default function Home() {
 
       const { data } = await query.order("created_at", { ascending: false });
       setIdeas((data ?? []) as DetailRow[]);
+      setCurrentPage(1); // Reset về trang 1 khi lọc
       setLoading(false);
     }
     load();
@@ -307,6 +310,16 @@ export default function Home() {
     window.location.reload();
   }
 
+  // --- PAGINATION LOGIC ---
+  const totalPages = Math.ceil(ideas.length / ITEMS_PER_PAGE);
+  const currentIdeas = ideas.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  const goToPage = (p: number) => {
+    setCurrentPage(p);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const btnPage = "inline-flex h-10 min-w-[40px] items-center justify-center rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer";
+
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
       
@@ -338,7 +351,7 @@ export default function Home() {
          </div>
       )}
 
-      {/* SIDEBAR FULL (RESTORED) */}
+      {/* SIDEBAR FULL */}
       <aside className="fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-slate-200 bg-white hidden md:flex">
          <div className="flex h-20 items-center px-8 text-2xl font-black text-slate-900">GameKB<span className="text-blue-500">.</span></div>
          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
@@ -374,7 +387,11 @@ export default function Home() {
              <div className="flex-1 relative">
                 <input className="h-12 w-full rounded-2xl border border-slate-200 px-4 shadow-sm outline-none focus:ring-2 focus:ring-slate-200" placeholder="Search ideas..." value={q} onChange={e=>setQ(e.target.value)} />
              </div>
-             <button onClick={() => { setIsSelectMode(!isSelectMode); setSelectedIds([]); }} className={`h-12 px-6 rounded-2xl font-bold border transition ${isSelectMode ? "bg-blue-50 border-blue-200 text-blue-600" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
+             {/* SELECTION TOGGLE */}
+             <button 
+               onClick={() => { setIsSelectMode(!isSelectMode); setSelectedIds([]); }}
+               className={`h-12 px-6 rounded-2xl font-bold border transition ${isSelectMode ? "bg-blue-50 border-blue-200 text-blue-600" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+             >
                {isSelectMode ? "Exit Selection" : "Select Mode"}
              </button>
              <Link href="/add" className="h-12 px-6 flex items-center justify-center rounded-2xl bg-slate-900 text-white font-bold hover:bg-slate-800 transition">+ Add</Link>
@@ -386,7 +403,7 @@ export default function Home() {
           </div>
 
           <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-            {ideas.map(r => (
+            {currentIdeas.map(r => (
                <IdeaItem 
                  key={r.id} 
                  r={r} 
@@ -401,6 +418,16 @@ export default function Home() {
                />
             ))}
           </ul>
+
+          {/* PAGINATION CONTROLS */}
+          {!loading && totalPages > 1 && (
+            <div className="mt-12 flex justify-center items-center gap-2 pb-10">
+               <button disabled={currentPage === 1} onClick={() => goToPage(currentPage - 1)} className={btnPage}>←</button>
+               <span className="text-sm font-bold text-slate-600 px-2">Page {currentPage} of {totalPages}</span>
+               <button disabled={currentPage === totalPages} onClick={() => goToPage(currentPage + 1)} className={btnPage}>→</button>
+            </div>
+          )}
+
         </div>
       </main>
     </div>
