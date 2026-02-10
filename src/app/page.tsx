@@ -37,12 +37,11 @@ const TYPE_CONFIG: Record<string, { label: string; className: string }> = {
   default: { label: "📝 Note", className: "bg-slate-500/20 border-slate-400/30 text-slate-100" }
 };
 
+// YÊU CẦU 3: PRIORITY CHỈ CÓ 3 MỨC (GIỮ NGUYÊN NHƯ CODE BẠN GỬI)
 const PRIORITY_OPTIONS = [
-  { value: 1, label: "🔥 High (1)" },
-  { value: 2, label: "⬆️ Medium (2)" },
-  { value: 3, label: "➡️ Normal (3)" },
-  { value: 4, label: "⬇️ Low (4)" },
-  { value: 5, label: "❄️ Tiny (5)" }
+  { value: 1, label: 'High', color: 'text-red-600', bg: 'bg-red-50' },
+  { value: 2, label: 'Normal', color: 'text-blue-600', bg: 'bg-blue-50' },
+  { value: 3, label: 'Low', color: 'text-gray-500', bg: 'bg-gray-100' },
 ];
 
 const selectClass = "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition cursor-pointer";
@@ -70,7 +69,7 @@ function ComboBox({ placeholder, items, selectedId, onChange }: { placeholder: s
   );
 }
 
-// COMPONENT: IDEA CARD (Đã thêm nút Edit và Link Game)
+// COMPONENT: IDEA CARD
 function IdeaItem({ r, game, isSelectMode, isSelected, onToggleSelect, onTogglePin }: { 
   r: DetailRow; game?: Game; 
   isSelectMode: boolean; isSelected: boolean; 
@@ -109,7 +108,7 @@ function IdeaItem({ r, game, isSelectMode, isSelected, onToggleSelect, onToggleP
 
         <div className="absolute inset-0 flex flex-col justify-end p-5">
            <div className="z-10">
-              {/* GAME LINK: Cho phép bấm vào tên game để sửa game */}
+              {/* GAME LINK */}
               <div className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 {isSelectMode ? (
                    <span className="truncate">{game?.title}</span>
@@ -134,6 +133,7 @@ function IdeaItem({ r, game, isSelectMode, isSelected, onToggleSelect, onToggleP
            </div>
         </div>
 
+        {/* --- ACTION BUTTONS (PIN & EDIT) --- */}
         {!isSelectMode && (
            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex flex-col gap-2">
               {/* Nút PIN */}
@@ -145,9 +145,9 @@ function IdeaItem({ r, game, isSelectMode, isSelected, onToggleSelect, onToggleP
                  {r.pinned ? "★" : "☆"}
               </button>
 
-              {/* Nút EDIT IDEA (MỚI) */}
+              {/* YÊU CẦU 2: HIỆN BÚT CHÌ (EDIT) - Đã có sẵn, đảm bảo z-index > link nền */}
               <Link 
-                href={`/idea/${r.id}/edit`} // Giả sử route edit là /idea/[id]/edit
+                href={`/idea/${r.id}/edit`} 
                 onClick={(e) => e.stopPropagation()}
                 className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-md shadow-lg hover:bg-blue-600 hover:scale-110 transition"
                 title="Edit Details"
@@ -406,13 +406,28 @@ export default function Home() {
                {showCreateGroup && <div className="mb-2"><input className="w-full border rounded px-2 py-1 text-xs" value={newGroupName} onChange={e=>setNewGroupName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&createGroup()} placeholder="Name..." autoFocus/></div>}
                <div className="space-y-1">
                   {groups.map(g => (
-                     // FIX: Sử dụng Flexbox + flex-1 để tên group không đè lên nút xóa
-                     <div key={g.id} className="group/item relative flex items-center justify-between w-full hover:bg-slate-50 rounded-xl px-2 py-1 transition">
-                        <button onClick={() => setGroupId(g.id)} className={`flex flex-1 items-center justify-between py-2 px-2 text-sm font-medium cursor-pointer overflow-hidden ${groupId===g.id ? "bg-blue-50 text-blue-700 rounded-lg" : "text-slate-500"}`}>
-                           <span className="truncate pr-2">{g.name}</span>
-                           <span className="text-[10px] font-bold opacity-60 shrink-0">{groupCounts.get(g.id)||0}</span>
-                        </button>
-                        <button onClick={()=>deleteGroup(g)} className="hidden group-hover/item:block p-2 text-xs text-rose-400 hover:text-rose-600 cursor-pointer shrink-0"><TrashIcon className="h-4 w-4"/></button>
+                     // YÊU CẦU 1: SIDEBAR - HOVER THÌ THÙNG RÁC CHE SỐ LƯỢNG
+                     <div key={g.id} className="group/item relative flex items-center justify-between w-full hover:bg-slate-50 rounded-xl px-2 py-1 transition cursor-pointer">
+                        {/* Khu vực bấm để chọn group */}
+                        <div onClick={() => setGroupId(g.id)} className={`flex-1 flex items-center gap-2 overflow-hidden py-2 ${groupId === g.id ? "text-blue-700 font-bold" : "text-slate-500"}`}>
+                           <span className="truncate">{g.name}</span>
+                        </div>
+
+                        {/* Khu vực bên phải: Chứa cả Số và Thùng rác đè nhau */}
+                        <div className="w-8 flex justify-center shrink-0">
+                           {/* Số lượng: Hiện bình thường, ẩn khi hover group */}
+                           <span className={`text-[10px] font-bold opacity-60 group-hover/item:hidden ${groupId === g.id ? "text-blue-700" : ""}`}>
+                              {groupCounts.get(g.id)||0}
+                           </span>
+
+                           {/* Thùng rác: Ẩn bình thường, hiện khi hover group */}
+                           <button 
+                             onClick={(e) => { e.stopPropagation(); deleteGroup(g); }} 
+                             className="hidden group-hover/item:block text-rose-500 hover:text-rose-700 transition"
+                           >
+                             <TrashIcon className="h-4 w-4"/>
+                           </button>
+                        </div>
                      </div>
                   ))}
                </div>
