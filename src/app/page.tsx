@@ -67,7 +67,7 @@ function ComboBox({ placeholder, items, selectedId, onChange }: { placeholder: s
   return (
     <div ref={boxRef} className="relative w-full">
       <button className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-left text-sm text-slate-900 cursor-pointer flex items-center justify-between shadow-sm" onClick={() => setOpen(!open)}>
-        <span className="truncate">{items.find(x=>x.id===selectedId)?.name || <span className="text-slate-400">{placeholder}</span>}</span>
+        <span className="truncate font-medium">{items.find(x=>x.id===selectedId)?.name || <span className="text-slate-400">{placeholder}</span>}</span>
         <span className="text-slate-400 text-xs">▼</span>
       </button>
       {open && <div className="absolute left-0 top-full z-[70] mt-2 w-full min-w-[240px] rounded-2xl border border-slate-200 bg-white shadow-2xl p-2 animate-in fade-in slide-in-from-top-2"><input className="w-full rounded-xl border px-3 py-2 text-sm mb-2 outline-none focus:border-blue-500 bg-slate-50" value={query} onChange={e=>setQuery(e.target.value)} autoFocus placeholder="Search game..."/><div className="max-h-60 overflow-auto"><button className="w-full text-left p-2 hover:bg-slate-100 text-sm cursor-pointer rounded-lg font-bold text-slate-500" onClick={()=>{onChange("");setOpen(false)}}>All Games</button>{filtered.map(x=><button key={x.id} className="w-full text-left p-2 hover:bg-blue-50 text-sm cursor-pointer rounded-lg truncate" onClick={()=>{onChange(x.id);setOpen(false)}}>{x.name}</button>)}</div></div>}
@@ -83,7 +83,7 @@ function QuickViewModal({ idea, isOpen, onClose }: { idea: DetailRow | null; isO
       <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
           <h3 className="font-black text-slate-900 truncate pr-4">{idea.title}</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 font-bold text-xl">✕</button>
         </div>
         <div className="p-6 space-y-4">
           <div>
@@ -97,7 +97,7 @@ function QuickViewModal({ idea, isOpen, onClose }: { idea: DetailRow | null; isO
               <label className="text-[10px] font-bold uppercase text-slate-400 block mb-2 tracking-widest">Assets ({idea.footage.length})</label>
               <div className="flex gap-2 overflow-x-auto pb-2">
                 {idea.footage.map((f, i) => (
-                  <div key={i} className="h-16 w-28 bg-slate-200 rounded-xl flex-shrink-0 flex items-center justify-center text-[9px] font-mono text-slate-500 p-2 overflow-hidden text-center break-all">
+                  <div key={i} className="h-16 w-28 bg-slate-200 rounded-xl flex-shrink-0 flex items-center justify-center text-[9px] font-mono text-slate-500 p-2 overflow-hidden text-center break-all shadow-inner">
                     {f.file_path.split('/').pop()}
                   </div>
                 ))}
@@ -106,7 +106,7 @@ function QuickViewModal({ idea, isOpen, onClose }: { idea: DetailRow | null; isO
           )}
         </div>
         <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
-          <button onClick={onClose} className="px-6 py-2 bg-slate-900 text-white text-sm font-bold rounded-xl hover:bg-slate-800 transition">Close Preview</button>
+          <button onClick={onClose} className="px-6 py-2 bg-slate-900 text-white text-sm font-bold rounded-xl hover:bg-slate-800 transition shadow-lg">Close Preview</button>
         </div>
       </div>
     </div>
@@ -131,9 +131,9 @@ function GameEditorModal({ game, isOpen, onClose, onUpdate }: { game: Game | nul
       <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95">
         <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center"><h3 className="font-black text-gray-900">Edit Game</h3><button onClick={onClose} className="text-gray-400">✕</button></div>
         <div className="p-6 space-y-4">
-          <div><label className="text-[10px] font-bold uppercase text-gray-400 mb-1 block">Title</label><input className="w-full h-11 border rounded-xl px-3 outline-none focus:border-blue-500" value={title} onChange={e=>setTitle(e.target.value)} /></div>
-          <div><label className="text-[10px] font-bold uppercase text-gray-400 mb-1 block">Cover URL</label><input className="w-full h-11 border rounded-xl px-3 outline-none focus:border-blue-500" value={cover} onChange={e=>setCover(e.target.value)} /></div>
-          <div className="flex justify-end gap-2 pt-2"><button onClick={onClose} className="px-4 py-2 text-sm font-bold text-gray-500">Cancel</button><button onClick={handleSave} disabled={loading} className="px-6 py-2 text-sm font-bold text-white bg-blue-600 rounded-xl">{loading ? "Saving..." : "Save"}</button></div>
+          <div><label className="text-[10px] font-bold uppercase text-gray-400 mb-1 block">Title</label><input className="w-full h-11 border rounded-xl px-3 outline-none focus:border-blue-500 shadow-sm" value={title} onChange={e=>setTitle(e.target.value)} /></div>
+          <div><label className="text-[10px] font-bold uppercase text-gray-400 mb-1 block">Cover URL</label><input className="w-full h-11 border rounded-xl px-3 outline-none focus:border-blue-500 shadow-sm" value={cover} onChange={e=>setCover(e.target.value)} /></div>
+          <div className="flex justify-end gap-2 pt-2"><button onClick={onClose} className="px-4 py-2 text-sm font-bold text-gray-500">Cancel</button><button onClick={handleSave} disabled={loading} className="px-6 py-2 text-sm font-bold text-white bg-blue-600 rounded-xl shadow-lg">{loading ? "Saving..." : "Save Changes"}</button></div>
         </div>
       </div>
     </div>
@@ -148,21 +148,24 @@ function IdeaItem({ r, game, isSelectMode, isSelected, onToggleSelect, onToggleP
 }) {
   const hasCover = !!game?.cover_url;
   return (
-    <li onClick={() => isSelectMode && onToggleSelect(r.id)} className={`group relative h-64 w-full overflow-hidden rounded-3xl border transition-all duration-300 ${isSelectMode ? "cursor-pointer active:scale-95" : "hover:shadow-2xl hover:-translate-y-1"} ${isSelected ? "border-blue-500 ring-2 ring-blue-500" : "border-slate-200 bg-slate-900"}`}>
+    <li onClick={() => isSelectMode && onToggleSelect(r.id)} className={`group relative h-64 w-full overflow-hidden rounded-[2rem] border transition-all duration-300 ${isSelectMode ? "cursor-pointer active:scale-95" : "hover:shadow-2xl hover:-translate-y-1"} ${isSelected ? "border-blue-500 ring-4 ring-blue-500/20" : "border-slate-200 bg-slate-900 shadow-sm"}`}>
         {hasCover ? <div className={`absolute inset-0 bg-cover bg-center transition-transform duration-700 opacity-60 ${isSelectMode ? '' : 'group-hover:scale-110 group-hover:opacity-40'}`} style={{ backgroundImage: `url(${game.cover_url})` }} /> : <div className="absolute inset-0 bg-slate-800 opacity-50" />}
         <div className={`absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent ${isSelected ? 'opacity-90 bg-blue-900/20' : ''}`} />
-        {isSelectMode && <div className="absolute top-4 right-4 z-30"><div className={`h-6 w-6 rounded-full border-2 flex items-center justify-center ${isSelected ? "bg-blue-500 border-blue-500 text-white" : "border-white/50 bg-black/20"}`}>{isSelected && <CheckIcon className="h-4 w-4 stroke-[3]" />}</div></div>}
-        <div className="absolute inset-0 flex flex-col justify-end p-5"><div className="z-10">
-          <div className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase text-slate-400 z-20 relative">
+        
+        {isSelectMode && <div className="absolute top-4 right-4 z-30"><div className={`h-7 w-7 rounded-full border-2 flex items-center justify-center ${isSelected ? "bg-blue-500 border-blue-500 text-white shadow-lg" : "border-white/50 bg-black/20"}`}>{isSelected && <CheckIcon className="h-4 w-4 stroke-[3]" />}</div></div>}
+        
+        <div className="absolute inset-0 flex flex-col justify-end p-6"><div className="z-10">
+          <div className="mb-1.5 flex items-center gap-2 text-[10px] font-black uppercase text-slate-300 z-20 relative tracking-wider">
             <span className="truncate max-w-[80%]">{game?.title}</span>
             {!isSelectMode && game && <button onClick={(e)=>{e.stopPropagation(); onEditGame(game)}} className="p-1 rounded bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"><PencilSquareIcon className="h-3 w-3"/></button>}
           </div>
-          <h3 className="line-clamp-2 text-base font-bold text-white mb-2 leading-tight">{r.title}</h3>
+          <h3 className="line-clamp-2 text-base font-black text-white mb-2 leading-tight drop-shadow-md">{r.title}</h3>
           <div className="flex items-center gap-2"><TypePill typeKey={r.detail_type} />{r.pinned && <span className="text-[10px] font-bold text-amber-400">★ Pinned</span>}</div>
         </div></div>
+
         {!isSelectMode && <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex flex-col gap-2">
-           <button onClick={(e)=>{e.stopPropagation(); onTogglePin(r.id, !!r.pinned)}} className={`flex h-8 w-8 items-center justify-center rounded-full backdrop-blur-md shadow-lg transition ${r.pinned ? 'bg-amber-400 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}>{r.pinned ? "★" : "☆"}</button>
-           <button onClick={(e)=>{e.stopPropagation(); onQuickView(r)}} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-md shadow-lg hover:bg-emerald-500 hover:scale-110 transition"><EyeIcon className="h-4 w-4"/></button>
+           <button onClick={(e)=>{e.stopPropagation(); onTogglePin(r.id, !!r.pinned)}} className={`flex h-9 w-9 items-center justify-center rounded-full backdrop-blur-md shadow-lg transition-all ${r.pinned ? 'bg-amber-400 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`} title="Pin Idea">{r.pinned ? "★" : "☆"}</button>
+           <button onClick={(e)=>{e.stopPropagation(); onQuickView(r)}} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-md shadow-lg hover:bg-emerald-500 hover:scale-110 transition-all" title="Quick Preview"><EyeIcon className="h-4 w-4"/></button>
         </div>}
         <a href={`/idea/${r.id}`} className={`absolute inset-0 z-0 ${isSelectMode ? 'hidden' : ''}`} />
     </li>
@@ -191,13 +194,13 @@ function ScriptEditorModal({ isOpen, onClose, initialData, onSave }: { isOpen: b
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
-       <div className="bg-white w-full max-w-4xl h-[90vh] rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95">
-          <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100">
-             <div><h2 className="text-xl font-black text-slate-900">Create Script</h2><p className="text-xs text-slate-400">{initialData.ideas.length} ideas selected</p></div>
-             <div className="flex gap-2"><button onClick={onClose} className="px-5 py-2 text-sm font-bold text-slate-400">Cancel</button><button onClick={() => { onSave(formData); onClose(); }} className="px-8 py-2 text-sm font-bold text-white bg-blue-600 rounded-xl shadow-lg shadow-blue-200">Save Project</button></div>
+       <div className="bg-white w-full max-w-4xl h-[90vh] rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95">
+          <div className="flex items-center justify-between px-10 py-8 border-b border-slate-100">
+             <div><h2 className="text-2xl font-black text-slate-900">Create New Script</h2><p className="text-sm text-slate-400 font-medium">{initialData.ideas.length} ideas selected</p></div>
+             <div className="flex gap-3"><button onClick={onClose} className="px-6 py-2 font-bold text-slate-400 hover:text-slate-600 transition">Cancel</button><button onClick={() => { onSave(formData); onClose(); }} className="px-8 py-3 font-bold text-white bg-blue-600 rounded-2xl shadow-xl shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all">Save Project</button></div>
           </div>
-          <div className="flex px-8 border-b border-slate-100 bg-slate-50">{(["script", "details", "assets"] as const).map(tab => (<button key={tab} onClick={() => setActiveTab(tab)} className={`px-6 py-4 text-sm font-bold border-b-2 transition ${activeTab === tab ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400"}`}>{tab === "script" ? "📝 Script" : tab === "details" ? "ℹ️ Metadata" : "🔗 Assets"}</button>))}</div>
-          <div className="flex-1 overflow-y-auto p-8">{activeTab === "script" && (<textarea className="h-full w-full rounded-2xl border border-slate-200 p-6 text-sm leading-relaxed outline-none focus:ring-4 focus:ring-blue-50 font-mono" value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} />)}</div>
+          <div className="flex px-10 border-b border-slate-100 bg-slate-50/50">{(["script", "details", "assets"] as const).map(tab => (<button key={tab} onClick={() => setActiveTab(tab)} className={`px-6 py-5 text-sm font-black uppercase tracking-widest border-b-4 transition-all ${activeTab === tab ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-600"}`}>{tab === "script" ? "Script" : tab === "details" ? "Metadata" : "Assets"}</button>))}</div>
+          <div className="flex-1 overflow-y-auto p-10">{activeTab === "script" && (<textarea className="h-full w-full rounded-3xl border border-slate-200 p-8 text-base leading-relaxed outline-none focus:ring-8 focus:ring-blue-50 font-mono shadow-inner" value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} placeholder="Start drafting your script here..." />)}</div>
        </div>
     </div>
   );
@@ -273,7 +276,7 @@ export default function Home() {
 
   const handleSaveScript = async (data: Partial<ScriptProject>) => {
     const { error } = await supabase.from("scripts").insert(data);
-    if (!error) { alert("Script saved!"); setIsSelectMode(false); setSelectedIds([]); }
+    if (!error) { alert("Script saved successfully!"); setIsSelectMode(false); setSelectedIds([]); }
   };
 
   async function createGroup() {
@@ -283,7 +286,7 @@ export default function Home() {
   }
 
   async function deleteGroup(id: number) {
-    if(!confirm("Delete?")) return;
+    if(!confirm("Delete this collection?")) return;
     await supabase.from("idea_groups").delete().eq("id", id);
     window.location.reload();
   }
@@ -291,7 +294,7 @@ export default function Home() {
   const totalPages = Math.ceil(ideas.length / ITEMS_PER_PAGE);
   const currentIdeas = ideas.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
   const goToPage = (p: number) => { setCurrentPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); };
-  const btnPage = "inline-flex h-12 min-w-[48px] items-center justify-center rounded-2xl border border-slate-200 bg-white text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed";
+  const btnPage = "inline-flex h-12 min-w-[54px] items-center justify-center rounded-2xl border border-slate-200 bg-white text-sm font-black text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed";
 
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
@@ -303,34 +306,34 @@ export default function Home() {
 
       {/* SELECTION BAR */}
       {isSelectMode && (
-         <div className="fixed bottom-0 inset-x-0 z-[80] bg-white border-t border-slate-200 p-4 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] animate-in slide-in-from-bottom-10">
+         <div className="fixed bottom-0 inset-x-0 z-[80] bg-white border-t border-slate-200 p-5 shadow-[0_-15px_50px_rgba(0,0,0,0.1)] animate-in slide-in-from-bottom-10">
             <div className="mx-auto max-w-4xl flex items-center justify-between">
-               <div className="flex items-center gap-4"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-white font-black text-sm">{selectedIds.length}</span><span className="text-sm font-bold text-slate-600 uppercase tracking-wider">Selected</span></div>
-               <button disabled={selectedIds.length === 0} onClick={() => setShowEditor(true)} className="flex items-center gap-2 rounded-2xl bg-blue-600 px-8 py-3 text-white font-bold shadow-xl shadow-blue-200 hover:bg-blue-700 active:scale-95 transition disabled:opacity-30"><PlayCircleIcon className="h-5 w-5" /> Create Script</button>
+               <div className="flex items-center gap-5"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-white font-black text-sm shadow-xl shadow-slate-300">{selectedIds.length}</span><span className="text-xs font-black text-slate-500 uppercase tracking-widest">Selected Ideas</span></div>
+               <button disabled={selectedIds.length === 0} onClick={() => setShowEditor(true)} className="flex items-center gap-3 rounded-2xl bg-blue-600 px-10 py-4 text-white font-black shadow-2xl shadow-blue-300 hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-30"><PlayCircleIcon className="h-6 w-6" /> Create Script</button>
             </div>
          </div>
       )}
 
       {/* SIDEBAR */}
       <aside className="fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-slate-200 bg-white hidden md:flex">
-         <div className="flex h-20 items-center px-8 text-2xl font-black text-slate-900 tracking-tighter">GameKB<span className="text-blue-500">.</span></div>
-         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
-            <nav className="space-y-1">
-               <button onClick={() => {setGroupId(""); setQ("");}} className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold transition ${!groupId ? "bg-slate-900 text-white shadow-xl shadow-slate-200" : "text-slate-500 hover:bg-slate-100"}`}><span>🏠</span> All Ideas</button>
-               <Link href="/dashboard" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>📊</span> Dashboard</Link>
-               <Link href="/scripts" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>📜</span> Scripts</Link>
-               <Link href="/games/new" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>🕹️</span> Add Game</Link>
+         <div className="flex h-24 items-center px-10 text-3xl font-black text-slate-900 tracking-tighter">GameKB<span className="text-blue-600">.</span></div>
+         <div className="flex-1 overflow-y-auto px-5 py-2 space-y-8">
+            <nav className="space-y-1.5">
+               <button onClick={() => {setGroupId(""); setQ("");}} className={`flex w-full items-center gap-4 rounded-2xl px-5 py-3.5 text-sm font-black transition-all ${!groupId ? "bg-slate-900 text-white shadow-2xl shadow-slate-300" : "text-slate-500 hover:bg-slate-100"}`}><span>🏠</span> All Ideas</button>
+               <Link href="/dashboard" className="flex w-full items-center gap-4 rounded-2xl px-5 py-3.5 text-sm font-black text-slate-500 hover:bg-slate-100 transition-all"><span>📊</span> Dashboard</Link>
+               <Link href="/scripts" className="flex w-full items-center gap-4 rounded-2xl px-5 py-3.5 text-sm font-black text-slate-500 hover:bg-slate-100 transition-all"><span>📜</span> Scripts</Link>
+               <Link href="/games/new" className="flex w-full items-center gap-4 rounded-2xl px-5 py-3.5 text-sm font-black text-slate-500 hover:bg-slate-100 transition-all"><span>🕹️</span> Add Game</Link>
             </nav>
-            <div className="pt-4 border-t border-slate-100">
-               <div className="flex items-center justify-between px-2 mb-2 font-black text-[10px] uppercase text-slate-400 tracking-widest"><span>Collections</span><button onClick={()=>setShowCreateGroup(!showCreateGroup)} className="text-lg hover:text-blue-600">+</button></div>
-               {showCreateGroup && <div className="mb-2"><input className="w-full border rounded-xl px-3 py-2 text-xs" value={newGroupName} onChange={e=>setNewGroupName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&createGroup()} placeholder="Name..." autoFocus/></div>}
+            <div className="pt-6 border-t border-slate-100">
+               <div className="flex items-center justify-between px-3 mb-4 font-black text-[10px] uppercase text-slate-400 tracking-widest"><span>Collections</span><button onClick={()=>setShowCreateGroup(!showCreateGroup)} className="text-xl hover:text-blue-600 font-bold">+</button></div>
+               {showCreateGroup && <div className="mb-4"><input className="w-full border-2 rounded-2xl px-4 py-2.5 text-xs outline-none focus:border-blue-500 bg-slate-50 shadow-inner" value={newGroupName} onChange={e=>setNewGroupName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&createGroup()} placeholder="Name..." autoFocus/></div>}
                <div className="space-y-1">
                   {groups.map(g => (
-                     <div key={g.id} className="group/item relative flex items-center justify-between w-full hover:bg-slate-50 rounded-xl px-2 transition">
-                        <div onClick={() => setGroupId(g.id)} className={`flex-1 flex items-center gap-2 overflow-hidden py-3 cursor-pointer ${groupId === g.id ? "text-blue-600 font-bold" : "text-slate-500 font-medium"}`}><span className="truncate">{g.name}</span></div>
+                     <div key={g.id} className="group/item relative flex items-center justify-between w-full hover:bg-slate-50 rounded-2xl px-2 transition-all">
+                        <div onClick={() => setGroupId(g.id)} className={`flex-1 flex items-center gap-3 overflow-hidden py-3.5 px-3 cursor-pointer ${groupId === g.id ? "text-blue-600 font-black" : "text-slate-500 font-bold"}`}><span className="truncate">{g.name}</span></div>
                         <div className="w-8 flex justify-center shrink-0">
-                           <span className={`text-[10px] font-black opacity-40 group-hover/item:hidden ${groupId === g.id ? "text-blue-600" : ""}`}>{groupCounts.get(g.id)||0}</span>
-                           <button onClick={(e) => { e.stopPropagation(); deleteGroup(g.id); }} className="hidden group-hover/item:block text-rose-500 hover:text-rose-700"><TrashIcon className="h-4 w-4"/></button>
+                           <span className={`text-[10px] font-black opacity-30 group-hover/item:hidden ${groupId === g.id ? "text-blue-600" : ""}`}>{groupCounts.get(g.id)||0}</span>
+                           <button onClick={(e) => { e.stopPropagation(); deleteGroup(g.id); }} className="hidden group-hover/item:block text-rose-500 hover:text-rose-700 transition-colors"><TrashIcon className="h-4 w-4"/></button>
                         </div>
                      </div>
                   ))}
@@ -341,42 +344,42 @@ export default function Home() {
 
       {/* MAIN */}
       <main className="flex-1 pl-0 md:pl-72 pb-32 min-w-0">
-        <div className="mx-auto max-w-[1600px] px-8 py-8">
-          <header className="mb-10 space-y-6">
-             <div className="flex gap-4">
+        <div className="mx-auto max-w-[1700px] px-10 py-10">
+          <header className="mb-12 space-y-8">
+             <div className="flex gap-5">
                 <div className="flex-1 relative">
-                   <MagnifyingGlassIcon className="w-5 h-5 absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400" />
-                   <input className="h-14 w-full rounded-[1.25rem] border border-slate-200 pl-12 pr-4 shadow-sm outline-none focus:ring-4 focus:ring-slate-100 font-medium transition-all" placeholder="Search ideas..." value={q} onChange={e=>setQ(e.target.value)} />
+                   <MagnifyingGlassIcon className="w-6 h-6 absolute left-5 top-1/2 transform -translate-y-1/2 text-slate-400" />
+                   <input className="h-16 w-full rounded-3xl border border-slate-200 pl-14 pr-6 shadow-sm outline-none focus:ring-8 focus:ring-slate-100 font-bold text-lg transition-all" placeholder="Search ideas..." value={q} onChange={e=>setQ(e.target.value)} />
                 </div>
-                <button onClick={() => { setIsSelectMode(!isSelectMode); setSelectedIds([]); }} className={`h-14 px-8 rounded-[1.25rem] font-black text-sm border transition-all ${isSelectMode ? "bg-blue-50 border-blue-200 text-blue-600" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}>{isSelectMode ? "Cancel Select" : "Select Mode"}</button>
-                <Link href="/add" className="h-14 px-8 flex items-center justify-center rounded-[1.25rem] bg-slate-900 text-white font-black text-sm hover:shadow-2xl hover:shadow-slate-300 transition-all">+ Add Idea</Link>
+                <button onClick={() => { setIsSelectMode(!isSelectMode); setSelectedIds([]); }} className={`h-16 px-10 rounded-3xl font-black text-sm border transition-all ${isSelectMode ? "bg-blue-50 border-blue-300 text-blue-600" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm"}`}>{isSelectMode ? "Exit Select" : "Select Mode"}</button>
+                <Link href="/add" className="h-16 px-10 flex items-center justify-center rounded-3xl bg-slate-900 text-white font-black text-sm hover:shadow-2xl hover:shadow-slate-300 transition-all">+ New Idea</Link>
              </div>
-             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-               <ComboBox placeholder="Filter by Game" items={games.map(g=>({id:g.id, name:g.title}))} selectedId={gameId} onChange={setGameId} />
+             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+               <ComboBox placeholder="All Games" items={games.map(g=>({id:g.id, name:g.title}))} selectedId={gameId} onChange={setGameId} />
                <select className={selectClass} value={type} onChange={e=>setType(e.target.value)}>
                   <option value="">All Types</option>
                   {Object.entries(TYPE_CONFIG).filter(([k]) => k !== 'default').map(([key, val]) => (<option key={key} value={key}>{val.label}</option>))}
                </select>
-               <select className={selectClass} value={priority} onChange={e=>setPriority(e.target.value)}>
+               <select className={selectClass} value={priority} onChange={e=>setPriority(e.target.value === "" ? "" : Number(e.target.value))}>
                   <option value="">All Priorities</option>
                   {PRIORITY_OPTIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                </select>
-               {(q||gameId||groupId||type||priority) && <button onClick={()=>{setQ("");setGameId("");setGroupId("");setType("");setPriority("")}} className="text-xs font-black uppercase text-rose-500 tracking-widest hover:underline">Clear Filters</button>}
+               {(q||gameId||groupId||type||priority) && <button onClick={()=>{setQ("");setGameId("");setGroupId("");setType("");setPriority("")}} className="text-xs font-black uppercase text-rose-500 tracking-widest hover:underline px-2">Clear Filters</button>}
              </div>
           </header>
 
-          <div className="mb-8 flex items-center justify-between"><h2 className="text-3xl font-black text-slate-900 tracking-tight">{loading ? "Loading..." : `${ideas.length} Ideas Found`}</h2></div>
+          <div className="mb-10 flex items-center justify-between"><h2 className="text-4xl font-black text-slate-900 tracking-tighter">{loading ? "Loading..." : `${ideas.length} Ideas Found`}</h2></div>
 
-          <ul className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          <ul className="grid gap-10 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {currentIdeas.map(r => (
                <IdeaItem key={r.id} r={r} game={games.find(g => g.id === r.game_id)} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={async (id, current) => { setIdeas(prev => prev.map(i => i.id === id ? { ...i, pinned: !current } : i)); await supabase.from("details").update({ pinned: !current }).eq("id", id); }} onEditGame={setEditingGame} onQuickView={setPreviewIdea} />
             ))}
           </ul>
 
           {!loading && totalPages > 1 && (
-            <div className="mt-16 flex justify-center items-center gap-3 pb-10">
+            <div className="mt-20 flex justify-center items-center gap-4 pb-10">
                <button disabled={currentPage === 1} onClick={() => goToPage(currentPage - 1)} className={btnPage}>←</button>
-               <span className="text-sm font-black text-slate-400 px-4 uppercase tracking-widest">Page {currentPage} / {totalPages}</span>
+               <span className="text-[10px] font-black text-slate-400 px-6 uppercase tracking-[0.3em]">Page {currentPage} / {totalPages}</span>
                <button disabled={currentPage === totalPages} onClick={() => goToPage(currentPage + 1)} className={btnPage}>→</button>
             </div>
           )}
