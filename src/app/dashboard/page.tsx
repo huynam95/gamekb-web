@@ -10,20 +10,20 @@ import {
   DocumentTextIcon, 
   FireIcon, 
   PuzzlePieceIcon,
-  CheckIcon
+  CheckIcon,
+  PencilSquareIcon
 } from "@heroicons/react/24/outline";
 
 /* ================= TYPES & CONFIG ================= */
 
+type Game = { id: number; title: string; cover_url?: string | null };
+type Group = { id: number; name: string };
 type DetailRow = { 
   id: number; title: string; description: string | null; priority: number; 
-  detail_type: string; game_id: number; created_at: string; 
-  game?: { title: string }; // Join relation
+  detail_type: string; game_id: number; pinned?: boolean; created_at?: string; 
+  game?: Game; // Join relation
   footage?: { file_path: string }[];
 };
-
-type Group = { id: number; name: string };
-type Game = { id: number; title: string };
 
 type ScriptProject = { 
   id: number; title: string; content: string; assets: string[];
@@ -31,13 +31,22 @@ type ScriptProject = {
   publish_date: string | null; status: string;
 };
 
-const PRIORITY_OPTIONS = [
-  { value: 1, label: 'High', color: 'text-red-700 bg-red-50 border-red-200' },
-  { value: 2, label: 'Normal', color: 'text-blue-700 bg-blue-50 border-blue-200' },
-  { value: 3, label: 'Low', color: 'text-gray-600 bg-gray-100 border-gray-200' },
-];
+const TYPE_CONFIG: Record<string, { label: string; className: string }> = {
+  small_detail: { label: "🔍 Small Detail", className: "bg-blue-500/20 border-blue-400/30 text-blue-100" },
+  easter_egg: { label: "🥚 Easter Egg", className: "bg-purple-500/20 border-purple-400/30 text-purple-100" },
+  npc_reaction: { label: "🗣️ NPC Reaction", className: "bg-emerald-500/20 border-emerald-400/30 text-emerald-100" },
+  physics: { label: "🍎 Physics", className: "bg-orange-500/20 border-orange-400/30 text-orange-100" },
+  troll: { label: "🤡 Troll", className: "bg-pink-500/20 border-pink-400/30 text-pink-100" },
+  punish: { label: "💀 Punish", className: "bg-red-500/20 border-red-400/30 text-red-100" },
+  default: { label: "📝 Note", className: "bg-slate-500/20 border-slate-400/30 text-slate-100" }
+};
 
 /* ================= COMPONENTS ================= */
+
+function TypePill({ typeKey }: { typeKey: string }) {
+  const config = TYPE_CONFIG[typeKey] || TYPE_CONFIG.default;
+  return <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider backdrop-blur-md ${config.className}`}>{config.label}</span>;
+}
 
 // COMPONENT: STAT CARD
 function StatCard({ title, value, icon: Icon, color }: { title: string, value: number, icon: any, color: string }) {
@@ -54,7 +63,119 @@ function StatCard({ title, value, icon: Icon, color }: { title: string, value: n
   );
 }
 
-// COMPONENT: SCRIPT EDITOR MODAL (Copy y hệt từ Home)
+// COMPONENT: GAME EDITOR MODAL (Copy từ Home)
+function GameEditorModal({ 
+  game, isOpen, onClose, onUpdate 
+}: { 
+  game: Game | null; isOpen: boolean; onClose: () => void; onUpdate: (g: Game) => void 
+}) {
+  const [title, setTitle] = useState("");
+  const [cover, setCover] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (game) {
+      setTitle(game.title);
+      setCover(game.cover_url || "");
+    }
+  }, [game]);
+
+  async function handleSave() {
+    if (!game) return;
+    setLoading(true);
+    const { error } = await supabase.from("games").update({ title, cover_url: cover }).eq("id", game.id);
+    setLoading(false);
+    if (!error) {
+      onUpdate({ ...game, title, cover_url: cover });
+      onClose();
+    } else {
+      alert("Error updating game: " + error.message);
+    }
+  }
+
+  if (!isOpen || !game) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
+       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95">
+          <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+             <h3 className="font-bold text-gray-900">Edit Game Info</h3>
+             <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
+          </div>
+          <div className="p-6 space-y-4">
+             <div><label className="block text-xs font-bold uppercase text-gray-500 mb-1">Game Title</label><input className="w-full h-10 border rounded-lg px-3 text-sm outline-none focus:border-blue-500" value={title} onChange={e=>setTitle(e.target.value)} /></div>
+             <div><label className="block text-xs font-bold uppercase text-gray-500 mb-1">Cover Image URL</label><input className="w-full h-10 border rounded-lg px-3 text-sm outline-none focus:border-blue-500" value={cover} onChange={e=>setCover(e.target.value)} placeholder="https://..." /></div>
+             <div className="pt-2 flex justify-end gap-2"><button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button><button onClick={handleSave} disabled={loading} className="px-4 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm">{loading ? "Saving..." : "Save Changes"}</button></div>
+          </div>
+       </div>
+    </div>
+  );
+}
+
+// COMPONENT: IDEA CARD (DẠNG THẺ GRID - COPY TỪ HOME)
+function IdeaItem({ 
+  r, game, isSelectMode, isSelected, onToggleSelect, onTogglePin, onEditGame 
+}: { 
+  r: DetailRow; game?: Game; 
+  isSelectMode: boolean; isSelected: boolean; 
+  onToggleSelect: (id: number) => void;
+  onTogglePin: (id: number, current: boolean) => void; 
+  onEditGame: (game: Game) => void;
+}) {
+  const hasCover = !!game?.cover_url;
+
+  return (
+    <li 
+      onClick={() => isSelectMode && onToggleSelect(r.id)}
+      className={`group relative h-64 w-full overflow-hidden rounded-2xl border shadow-sm transition-all duration-300 ${
+        isSelectMode 
+          ? "cursor-pointer active:scale-95" 
+          : "hover:shadow-2xl hover:-translate-y-1"
+      } ${
+        isSelected 
+          ? "border-blue-500 ring-2 ring-blue-500 ring-offset-2 ring-offset-slate-50" 
+          : "border-slate-200 bg-slate-900"
+      }`}
+    >
+        {hasCover ? (
+          <div className={`absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out opacity-60 ${isSelectMode ? '' : 'group-hover:scale-110 group-hover:opacity-40'}`} style={{ backgroundImage: `url(${game.cover_url})` }} />
+        ) : (
+          <div className="absolute inset-0 bg-slate-800 opacity-50" />
+        )}
+        <div className={`absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/60 to-transparent ${isSelected ? 'opacity-90 bg-blue-900/20' : ''}`} />
+
+        {isSelectMode && (
+          <div className="absolute top-3 right-3 z-30">
+             <div className={`h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? "bg-blue-500 border-blue-500 text-white" : "border-white/50 bg-black/20"}`}>
+                {isSelected && <CheckIcon className="h-4 w-4 stroke-[3]" />}
+             </div>
+          </div>
+        )}
+
+        <div className="absolute inset-0 flex flex-col justify-end p-5">
+           <div className="z-10">
+              <div className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 z-20 relative">
+                 <Link href={`/games/${r.game_id}`} className="truncate hover:text-blue-400 hover:underline max-w-[80%]" onClick={(e) => e.stopPropagation()}>{game?.title}</Link>
+                 {!isSelectMode && game && (
+                   <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEditGame(game); }} className="p-1 rounded hover:bg-white/20 text-slate-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity" title="Edit Game Info"><PencilSquareIcon className="h-3 w-3" /></button>
+                 )}
+              </div>
+              <h3 className="line-clamp-2 text-base font-bold leading-snug text-white mb-2">{r.title}</h3>
+              <div className="flex items-center gap-2"><TypePill typeKey={r.detail_type} />{r.pinned && <span className="text-[10px] font-bold text-amber-400">★ Pinned</span>}</div>
+           </div>
+        </div>
+
+        {!isSelectMode && (
+           <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex flex-col gap-2">
+              <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onTogglePin(r.id, !!r.pinned); }} className={`flex h-8 w-8 items-center justify-center rounded-full backdrop-blur-md shadow-lg transition hover:scale-110 ${r.pinned ? 'bg-amber-400 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`} title="Pin Idea">{r.pinned ? "★" : "☆"}</button>
+           </div>
+        )}
+        <a href={`/idea/${r.id}`} className={`absolute inset-0 z-0 ${isSelectMode ? 'pointer-events-none' : ''}`} />
+    </li>
+  );
+}
+
+// COMPONENT: SCRIPT EDITOR MODAL (Copy từ Home)
 function ScriptEditorModal({ 
   isOpen, onClose, initialData, onSave 
 }: { 
@@ -71,20 +192,15 @@ function ScriptEditorModal({
     if (isOpen && initialData.ideas.length > 0) {
        const titles = initialData.ideas.map(i => i.title);
        const gameNames = Array.from(new Set(initialData.ideas.map(i => i.game?.title || "").filter(Boolean)));
-
        const generatedContent = initialData.ideas.map(i => `[${i.title}]\n${i.description || ""}`).join("\n\n");
        const generatedAssets = initialData.ideas.flatMap(i => i.footage?.map(f => f.file_path) || []).filter(Boolean) as string[];
-       const generatedDesc = `Video tổng hợp các chi tiết thú vị.\n\nTimestamps:\n0:00 Intro\n...`;
-       const generatedTags = [...gameNames, "Shorts", "Gaming", "Facts"];
-       const generatedHashtags = ["#shorts", "#gaming", ...gameNames.map(g => `#${g.replace(/\s+/g, '')}`)];
-
        setFormData({
-         title: `Script: ${titles[0]}...`,
+         title: `Shorts: ${titles[0]}...`,
          content: generatedContent,
-         description: generatedDesc,
+         description: `Video tổng hợp các chi tiết thú vị.\n\nTimestamps:\n0:00 Intro\n...`,
          assets: generatedAssets,
-         tags: generatedTags,
-         hashtags: generatedHashtags,
+         tags: [...gameNames, "Shorts", "Gaming"],
+         hashtags: ["#shorts", "#gaming", ...gameNames.map(g => `#${g.replace(/\s+/g, '')}`)],
          status: "Draft"
        });
     }
@@ -110,18 +226,9 @@ function ScriptEditorModal({
              ))}
           </div>
           <div className="flex-1 overflow-y-auto p-6 bg-slate-50/30">
-             {activeTab === "script" && (
-                <textarea className="h-full w-full rounded-2xl border border-slate-200 p-5 text-sm leading-relaxed text-slate-800 outline-none focus:border-blue-500 font-mono" value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} />
-             )}
-             {activeTab === "details" && (
-                <div className="space-y-4">
-                   <div><label className="text-xs font-bold text-slate-500">Title</label><input className="w-full h-10 rounded-xl border px-3" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} /></div>
-                   <div><label className="text-xs font-bold text-slate-500">Desc</label><textarea className="w-full h-24 rounded-xl border p-3" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>
-                </div>
-             )}
-             {activeTab === "assets" && (
-                <div className="bg-white rounded-xl border p-2">{(formData.assets || []).map((link, i) => <div key={i} className="p-2 border-b text-xs text-blue-600 truncate">{link}</div>)}</div>
-             )}
+             {activeTab === "script" && <textarea className="h-full w-full rounded-2xl border border-slate-200 p-5 text-sm leading-relaxed outline-none font-mono" value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} />}
+             {activeTab === "details" && <div className="space-y-4"><div><label className="text-xs font-bold text-slate-500">Title</label><input className="w-full h-10 rounded-xl border px-3" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} /></div></div>}
+             {activeTab === "assets" && <div className="bg-white rounded-xl border p-2">{(formData.assets || []).map((link, i) => <div key={i} className="p-2 border-b text-xs text-blue-600 truncate">{link}</div>)}</div>}
           </div>
        </div>
     </div>
@@ -132,16 +239,18 @@ function ScriptEditorModal({
 
 export default function Dashboard() {
   const [stats, setStats] = useState({ total: 0, high: 0, scripts: 0, games: 0 });
+  const [pinnedIdeas, setPinnedIdeas] = useState<DetailRow[]>([]);
   const [recentIdeas, setRecentIdeas] = useState<DetailRow[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupCounts, setGroupCounts] = useState<Map<number, number>>(new Map());
   
-  // Selection Mode (For Script Creation)
+  // Selection Mode
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showEditor, setShowEditor] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
+  const [editingGame, setEditingGame] = useState<Game | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -160,22 +269,32 @@ export default function Dashboard() {
         games: gamesRes.count || 0
       });
 
-      // 2. Fetch Recent Ideas (Limit 10)
+      // 2. Fetch Pinned Ideas
+      const pinnedRes = await supabase
+        .from("details")
+        .select("*, game:games(*), footage(file_path)") // Lấy đủ thông tin game để sửa
+        .eq("status", "idea")
+        .eq("pinned", true)
+        .order("created_at", { ascending: false });
+      
+      setPinnedIdeas((pinnedRes.data || []) as DetailRow[]);
+
+      // 3. Fetch Recent Ideas (10 items, excluding pinned if needed, but here just raw recent)
       const recentRes = await supabase
         .from("details")
-        .select("*, game:games(title), footage(file_path)")
+        .select("*, game:games(*), footage(file_path)")
         .eq("status", "idea")
+        .eq("pinned", false) // Chỉ lấy những cái chưa pin để tránh trùng
         .order("created_at", { ascending: false })
-        .limit(20);
+        .limit(10);
       
       setRecentIdeas((recentRes.data || []) as DetailRow[]);
 
-      // 3. Fetch Sidebar Data
+      // 4. Fetch Sidebar Data
       const grps = await supabase.from("idea_groups").select("*").order("name");
       const grpItems = await supabase.from("idea_group_items").select("group_id");
       
       setGroups((grps.data || []) as Group[]);
-      
       const m = new Map<number, number>();
       for (const row of grpItems.data ?? []) { const gid = Number((row as any).group_id); m.set(gid, (m.get(gid) ?? 0) + 1); }
       setGroupCounts(m);
@@ -209,18 +328,31 @@ export default function Dashboard() {
     window.location.reload();
   }
 
+  // Update Game Local State after Edit
+  const updateGameInList = (updatedGame: Game) => {
+     const updateList = (list: DetailRow[]) => list.map(item => item.game_id === updatedGame.id ? { ...item, game: updatedGame } : item);
+     setPinnedIdeas(updateList(pinnedIdeas));
+     setRecentIdeas(updateList(recentIdeas));
+  };
+
+  const allIdeas = [...pinnedIdeas, ...recentIdeas]; // Helper for modal data
+
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
       
-      {/* SCRIPT EDITOR MODAL */}
+      {/* MODALS */}
       <ScriptEditorModal 
         isOpen={showEditor} 
         onClose={() => setShowEditor(false)}
         onSave={handleSaveScript}
-        initialData={{
-           ids: selectedIds,
-           ideas: recentIdeas.filter(i => selectedIds.includes(i.id))
-        }}
+        initialData={{ ids: selectedIds, ideas: allIdeas.filter(i => selectedIds.includes(i.id)) }}
+      />
+      
+      <GameEditorModal 
+        game={editingGame}
+        isOpen={!!editingGame}
+        onClose={() => setEditingGame(null)}
+        onUpdate={updateGameInList}
       />
 
       {/* BOTTOM SELECTION BAR (Sticky) */}
@@ -239,7 +371,7 @@ export default function Dashboard() {
          </div>
       )}
 
-      {/* SIDEBAR (COPY TỪ HOME) */}
+      {/* SIDEBAR */}
       <aside className="fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-slate-200 bg-white hidden md:flex">
          <div className="flex h-20 items-center px-8 text-2xl font-black text-slate-900">GameKB<span className="text-blue-500">.</span></div>
          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
@@ -275,7 +407,15 @@ export default function Dashboard() {
       <main className="flex-1 pl-0 md:pl-72 pb-32">
         <div className="mx-auto max-w-[1900px] px-6 py-8">
            
-           <h1 className="text-3xl font-black text-slate-900 mb-8">Dashboard Overview</h1>
+           <div className="flex items-center justify-between mb-8">
+             <h1 className="text-3xl font-black text-slate-900">Dashboard</h1>
+             <button 
+                onClick={() => { setIsSelectMode(!isSelectMode); setSelectedIds([]); }}
+                className={`h-10 px-4 rounded-xl font-bold border text-sm transition ${isSelectMode ? "bg-blue-50 border-blue-200 text-blue-600" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+              >
+                {isSelectMode ? "Cancel Selection" : "Select Mode"}
+             </button>
+           </div>
 
            {/* STATS ROW */}
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
@@ -285,72 +425,48 @@ export default function Dashboard() {
               <StatCard title="Scripts Drafted" value={stats.scripts} icon={ChartBarIcon} color="bg-purple-500" />
            </div>
 
-           {/* RECENT IDEAS TABLE */}
-           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                 <h3 className="text-lg font-bold text-slate-800">Recent Ideas</h3>
-                 <button 
-                  onClick={() => { setIsSelectMode(!isSelectMode); setSelectedIds([]); }}
-                  className={`px-4 py-2 text-sm font-bold rounded-xl border transition ${isSelectMode ? "bg-blue-100 text-blue-700 border-blue-200" : "bg-white text-slate-600 hover:bg-slate-100"}`}
-                 >
-                    {isSelectMode ? "Cancel Selection" : "Select to Script"}
-                 </button>
-              </div>
-              
-              <div className="overflow-x-auto">
-                 <table className="w-full text-left text-sm text-slate-600">
-                    <thead className="bg-slate-50 text-xs uppercase font-bold text-slate-400">
-                       <tr>
-                          <th className="px-6 py-4 w-10">#</th>
-                          <th className="px-6 py-4">Title</th>
-                          <th className="px-6 py-4">Game</th>
-                          <th className="px-6 py-4">Priority</th>
-                          <th className="px-6 py-4 text-right">Date</th>
-                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                       {recentIdeas.map((row) => {
-                          const priority = PRIORITY_OPTIONS.find(p => p.value === row.priority) || PRIORITY_OPTIONS[1];
-                          const isSelected = selectedIds.includes(row.id);
-                          
-                          return (
-                             <tr 
-                               key={row.id} 
-                               onClick={() => isSelectMode && toggleSelection(row.id)}
-                               className={`group hover:bg-slate-50 transition ${isSelectMode ? "cursor-pointer" : ""} ${isSelected ? "bg-blue-50/50" : ""}`}
-                             >
-                                <td className="px-6 py-4">
-                                   {isSelectMode ? (
-                                      <div className={`w-5 h-5 rounded border flex items-center justify-center ${isSelected ? "bg-blue-500 border-blue-500 text-white" : "border-slate-300"}`}>
-                                         {isSelected && <CheckIcon className="w-3 h-3 stroke-[3]" />}
-                                      </div>
-                                   ) : (
-                                      <span className="text-slate-300 font-mono">#{row.id}</span>
-                                   )}
-                                </td>
-                                <td className="px-6 py-4">
-                                   <div className="font-bold text-slate-900 line-clamp-1">{row.title}</div>
-                                   <div className="text-xs text-slate-400 mt-1 line-clamp-1">{row.description}</div>
-                                </td>
-                                <td className="px-6 py-4">
-                                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-bold bg-slate-100 text-slate-600">
-                                      {row.game?.title || "Unknown"}
-                                   </span>
-                                </td>
-                                <td className="px-6 py-4">
-                                   <span className={`inline-flex items-center px-2 py-1 rounded border text-[10px] font-bold uppercase tracking-wider ${priority.color}`}>
-                                      {priority.label}
-                                   </span>
-                                </td>
-                                <td className="px-6 py-4 text-right font-mono text-xs text-slate-400">
-                                   {new Date(row.created_at).toLocaleDateString()}
-                                </td>
-                             </tr>
-                          );
-                       })}
-                    </tbody>
-                 </table>
-              </div>
+           {/* SECTION: PINNED IDEAS */}
+           {pinnedIdeas.length > 0 && (
+             <div className="mb-10">
+               <h3 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2">
+                 <span className="text-amber-500">★</span> Pinned Ideas
+               </h3>
+               <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                  {pinnedIdeas.map(r => (
+                     <IdeaItem 
+                       key={r.id} r={r} game={r.game} 
+                       isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} 
+                       onToggleSelect={toggleSelection} 
+                       onTogglePin={async (id, current) => {
+                          setPinnedIdeas(prev => prev.filter(i => i.id !== id)); // Remove from pinned list visually
+                          setRecentIdeas(prev => [r, ...prev]); // Move back to recent list visually (optional)
+                          await supabase.from("details").update({ pinned: !current }).eq("id", id);
+                       }}
+                       onEditGame={(g) => setEditingGame(g)}
+                     />
+                  ))}
+               </ul>
+             </div>
+           )}
+
+           {/* SECTION: RECENT IDEAS */}
+           <div>
+             <h3 className="text-lg font-black text-slate-800 mb-4">✨ Recently Added (Top 10)</h3>
+             <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                {recentIdeas.map(r => (
+                   <IdeaItem 
+                     key={r.id} r={r} game={r.game} 
+                     isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} 
+                     onToggleSelect={toggleSelection} 
+                     onTogglePin={async (id, current) => {
+                        setRecentIdeas(prev => prev.filter(i => i.id !== id));
+                        setPinnedIdeas(prev => [r, ...prev]);
+                        await supabase.from("details").update({ pinned: !current }).eq("id", id);
+                     }}
+                     onEditGame={(g) => setEditingGame(g)}
+                   />
+                ))}
+             </ul>
            </div>
 
         </div>
