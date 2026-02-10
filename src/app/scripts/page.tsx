@@ -4,19 +4,18 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import Link from "next/link";
 import { 
-  PlusIcon, 
   TrashIcon, 
   DocumentTextIcon, 
   CalendarIcon,
-  CheckCircleIcon,
   PlayCircleIcon,
   VideoCameraIcon,
   HashtagIcon,
   TagIcon,
   DocumentDuplicateIcon,
   GlobeAltIcon,
-  MagnifyingGlassIcon, // Thêm icon search
-  XMarkIcon
+  MagnifyingGlassIcon,
+  XMarkIcon,
+  ClockIcon
 } from "@heroicons/react/24/outline";
 
 /* ================= TYPES & CONFIG ================= */
@@ -34,17 +33,16 @@ type ScriptProject = {
   created_at: string;
 };
 
-type Group = { id: number; name: string };
-
 const STATUS_CONFIG = {
-  Draft: { color: "bg-slate-100 text-slate-600 border-slate-200", icon: DocumentTextIcon },
-  Filming: { color: "bg-blue-50 text-blue-600 border-blue-200", icon: PlayCircleIcon },
-  Edited: { color: "bg-purple-50 text-purple-600 border-purple-200", icon: CalendarIcon },
-  Published: { color: "bg-emerald-50 text-emerald-600 border-emerald-200", icon: GlobeAltIcon },
+  Draft: { color: "bg-slate-500/10 text-slate-500 border-slate-200", dot: "bg-slate-400" },
+  Filming: { color: "bg-amber-500/10 text-amber-600 border-amber-200", dot: "bg-amber-500" },
+  Edited: { color: "bg-indigo-500/10 text-indigo-600 border-indigo-200", dot: "bg-indigo-500" },
+  Published: { color: "bg-emerald-500/10 text-emerald-600 border-emerald-200", dot: "bg-emerald-500" },
 };
 
 /* ================= COMPONENTS ================= */
 
+// FIX: Đã thêm đầy đủ ScriptEditorModal vào đây
 function ScriptEditorModal({ 
   isOpen, onClose, script, onSave 
 }: { 
@@ -66,65 +64,65 @@ function ScriptEditorModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-       <div className="bg-white w-full max-w-5xl h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+       <div className="bg-white w-full max-w-5xl h-[90vh] rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
           
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+          <div className="flex items-center justify-between px-10 py-6 border-b border-slate-100 bg-slate-50/50">
              <div>
-                <h2 className="text-xl font-black text-slate-900">Video Project Details</h2>
-                <p className="text-xs text-slate-500 font-bold">Manage content, metadata and assets</p>
+                <h2 className="text-2xl font-black text-slate-900">Project Workspace</h2>
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Editing: {formData.title}</p>
              </div>
-             <div className="flex gap-3">
+             <div className="flex gap-4">
                 <select 
-                  className="h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold outline-none focus:border-blue-500 shadow-sm cursor-pointer"
+                  className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-50 shadow-sm cursor-pointer"
                   value={formData.status}
                   onChange={e => setFormData({...formData, status: e.target.value as any})}
                 >
                    {Object.keys(STATUS_CONFIG).map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
-                <button onClick={onClose} className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl">Cancel</button>
-                <button onClick={() => { onSave(formData); onClose(); }} className="px-6 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg">
-                   Save Project
+                <button onClick={onClose} className="px-6 py-2 text-sm font-bold text-slate-400 hover:text-slate-600 transition">Cancel</button>
+                <button onClick={() => { onSave(formData); onClose(); }} className="px-8 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-2xl shadow-xl shadow-indigo-100 transition-all active:scale-95">
+                   Save Changes
                 </button>
              </div>
           </div>
 
-          <div className="flex px-6 border-b border-slate-100 bg-white">
+          <div className="flex px-10 border-b border-slate-100 bg-white">
              {(["script", "details", "assets"] as const).map(tab => (
-               <button key={tab} onClick={() => setActiveTab(tab)} className={`px-6 py-4 text-sm font-black uppercase tracking-widest border-b-2 transition ${activeTab === tab ? "border-blue-600 text-blue-600" : "border-transparent text-slate-400 hover:text-slate-800"}`}>
+               <button key={tab} onClick={() => setActiveTab(tab)} className={`px-8 py-5 text-xs font-black uppercase tracking-[0.2em] border-b-4 transition-all ${activeTab === tab ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-400 hover:text-slate-800"}`}>
                  {tab === "script" ? "📝 Script" : tab === "details" ? "ℹ️ Metadata" : "🔗 Assets"}
                </button>
              ))}
           </div>
 
-          <div className="flex-1 overflow-y-auto p-8 bg-slate-50/30">
+          <div className="flex-1 overflow-y-auto p-10 bg-slate-50/30">
              {activeTab === "script" && (
-                <div className="h-full flex flex-col gap-4">
-                   <input className="w-full text-2xl font-black bg-transparent outline-none placeholder-slate-300" placeholder="Project Title..." value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
-                   <textarea className="flex-1 w-full rounded-2xl border border-slate-200 p-6 text-sm leading-relaxed text-slate-800 outline-none focus:border-blue-500 font-mono shadow-inner bg-white" value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} />
+                <div className="h-full flex flex-col gap-6">
+                   <input className="w-full text-3xl font-black bg-transparent outline-none placeholder-slate-300 border-none p-0 focus:ring-0" placeholder="Project Title..." value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
+                   <textarea className="flex-1 w-full rounded-[2rem] border border-slate-200 p-8 text-base leading-relaxed text-slate-800 outline-none focus:border-indigo-500 font-mono shadow-inner bg-white" value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} />
                 </div>
              )}
 
              {activeTab === "details" && (
-                <div className="space-y-6">
-                   <div>
-                      <label className="text-[10px] font-bold uppercase text-slate-400 mb-2 block tracking-widest">Video Description</label>
-                      <textarea className="w-full h-40 rounded-xl border border-slate-200 p-4 text-xs outline-none focus:border-blue-500 shadow-sm bg-white" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
+                <div className="max-w-4xl mx-auto space-y-8">
+                   <div className="space-y-3">
+                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-2">Video Description (SEO)</label>
+                      <textarea className="w-full h-48 rounded-3xl border border-slate-200 p-6 text-sm outline-none focus:border-indigo-500 shadow-sm bg-white leading-relaxed" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
                    </div>
-                   <div className="grid grid-cols-2 gap-8">
-                      <div className="space-y-3">
-                         <label className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1 tracking-widest"><HashtagIcon className="w-3 h-3"/> Hashtags</label>
+                   <div className="grid grid-cols-2 gap-10">
+                      <div className="space-y-4">
+                         <label className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-2 tracking-widest"><HashtagIcon className="w-4 h-4 text-indigo-500"/> Hashtags</label>
                          <div className="flex flex-wrap gap-2">
                            {formData.hashtags?.map((tag, i) => (
-                             <span key={i} className="px-2 py-1 bg-blue-50 text-blue-600 rounded-lg text-[11px] font-bold border border-blue-100 shadow-sm">{tag}</span>
+                             <span key={i} className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-xl text-[11px] font-black border border-indigo-100 shadow-sm">{tag}</span>
                            ))}
                          </div>
                       </div>
-                      <div className="space-y-3">
-                         <label className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1 tracking-widest"><TagIcon className="w-3 h-3"/> Tags</label>
+                      <div className="space-y-4">
+                         <label className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-2 tracking-widest"><TagIcon className="w-4 h-4 text-slate-400"/> Tags</label>
                          <div className="flex flex-wrap gap-2">
                            {formData.tags?.map((tag, i) => (
-                             <span key={i} className="px-2 py-1 bg-slate-100 text-slate-600 rounded-lg text-[11px] font-bold border border-slate-200 shadow-sm">{tag}</span>
+                             <span key={i} className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-xl text-[11px] font-black border border-slate-200 shadow-sm">{tag}</span>
                            ))}
                          </div>
                       </div>
@@ -133,25 +131,25 @@ function ScriptEditorModal({
              )}
 
              {activeTab === "assets" && (
-                <div className="space-y-4">
-                   <div className="flex justify-between items-center px-1">
-                      <label className="text-[10px] font-bold uppercase text-slate-400 block tracking-widest">Project Footage</label>
-                      <button onClick={() => navigator.clipboard.writeText(formData.assets?.map(a => a.url).join('\n') || "")} className="text-[10px] flex items-center gap-1 font-bold text-blue-600 hover:underline"><DocumentDuplicateIcon className="w-3 h-3"/> Copy All Links</button>
+                <div className="max-w-4xl mx-auto space-y-6">
+                   <div className="flex justify-between items-center px-2">
+                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">Footage Library</label>
+                      <button onClick={() => navigator.clipboard.writeText(formData.assets?.map(a => a.url).join('\n') || "")} className="text-[10px] flex items-center gap-1.5 font-black text-indigo-600 hover:underline uppercase tracking-widest bg-indigo-50 px-3 py-1.5 rounded-lg transition-all"><DocumentDuplicateIcon className="w-3.5 h-3.5"/> Copy All URLS</button>
                    </div>
-                   <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm divide-y divide-slate-50">
+                   <div className="bg-white rounded-[2rem] border border-slate-200 overflow-hidden shadow-xl shadow-slate-100 divide-y divide-slate-50">
                       {(formData.assets || []).length > 0 ? (
                         formData.assets?.map((asset, i) => (
-                          <div key={i} className="p-4 flex items-center gap-4 hover:bg-slate-50 transition group">
-                             <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-500">#{i+1}</div>
+                          <div key={i} className="p-5 flex items-center gap-6 hover:bg-slate-50 transition group">
+                             <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center text-xs font-black text-slate-400 group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-sm">#{i+1}</div>
                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-bold text-slate-700 truncate">{asset.name}</p>
-                                <p className="text-[10px] text-slate-400 truncate font-mono">{asset.url}</p>
+                                <p className="text-base font-black text-slate-800 truncate">{asset.name}</p>
+                                <p className="text-xs text-indigo-500 truncate font-mono opacity-60">{asset.url}</p>
                              </div>
-                             <a href={asset.url} target="_blank" className="p-2 rounded-lg bg-slate-100 text-slate-400 hover:bg-blue-600 hover:text-white transition shadow-sm"><VideoCameraIcon className="w-4 h-4" /></a>
+                             <a href={asset.url} target="_blank" className="p-3 rounded-2xl bg-slate-100 text-slate-400 hover:bg-indigo-600 hover:text-white transition-all shadow-md"><VideoCameraIcon className="w-5 h-5" /></a>
                           </div>
                         ))
                       ) : (
-                        <div className="p-12 text-center text-slate-400 italic text-sm">No assets found.</div>
+                        <div className="p-20 text-center text-slate-400 italic font-medium">No assets linked.</div>
                       )}
                    </div>
                 </div>
@@ -164,47 +162,72 @@ function ScriptEditorModal({
 
 function ScriptCard({ script, onClick, onDelete }: { script: ScriptProject, onClick: () => void, onDelete: () => void }) {
   const status = STATUS_CONFIG[script.status] || STATUS_CONFIG.Draft;
-  const StatusIcon = status.icon;
+  const coverUrl = script.assets && script.assets.length > 0 ? script.assets[0].url : null;
 
   return (
-    <div onClick={onClick} className="group relative bg-white h-64 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer overflow-hidden flex flex-col">
-       <div className={`h-1.5 w-full ${status.color.split(' ')[0].replace('bg-', 'bg-')}`}></div>
-       <div className="p-6 flex flex-col h-full">
+    <div 
+      onClick={onClick} 
+      className="group relative h-80 w-full overflow-hidden rounded-[2.5rem] border border-slate-200 bg-white shadow-sm hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 cursor-pointer flex flex-col"
+    >
+       {coverUrl && (
+         <div className="absolute inset-0 z-0 overflow-hidden">
+            <img src={coverUrl} className="w-full h-full object-cover opacity-[0.08] group-hover:scale-110 transition-transform duration-1000" alt="" />
+            <div className="absolute inset-0 bg-gradient-to-b from-white/90 to-white" />
+         </div>
+       )}
+
+       <div className="relative z-10 p-8 flex flex-col h-full">
           <div className="flex justify-between items-start mb-4">
-             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${status.color}`}>
-                <StatusIcon className="w-3 h-3" /> {script.status}
+             <span className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border shadow-sm ${status.color}`}>
+                <div className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
+                {script.status}
              </span>
-             <span className="text-[10px] text-slate-300 font-mono">{new Date(script.created_at).toLocaleDateString()}</span>
+             <button 
+                onClick={(e) => { e.stopPropagation(); onDelete(); }} 
+                className="p-2.5 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-2xl transition-all"
+              >
+                <TrashIcon className="w-5 h-5" />
+             </button>
           </div>
-          <h3 className="text-lg font-black text-slate-900 mb-2 line-clamp-2 leading-tight">{script.title || "Untitled Project"}</h3>
-          <p className="text-sm text-slate-400 line-clamp-3 mb-4 font-medium leading-relaxed italic">"{script.description?.slice(0, 100)}..."</p>
-          <div className="mt-auto pt-4 border-t border-slate-50 flex items-center justify-between">
-             <div className="flex gap-1.5">
+
+          <div className="mb-3 flex items-center gap-2 text-[10px] font-black text-slate-400 tracking-widest">
+             <ClockIcon className="w-4 h-4" />
+             {new Date(script.created_at).toLocaleDateString('vi-VN')}
+          </div>
+
+          <h3 className="text-xl font-black text-slate-900 mb-3 line-clamp-2 leading-tight group-hover:text-indigo-600 transition-colors">
+             {script.title || "Untitled Project"}
+          </h3>
+
+          <p className="text-sm text-slate-500 line-clamp-3 mb-6 leading-relaxed font-medium italic opacity-70">
+             {script.description || "No project description..."}
+          </p>
+
+          <div className="mt-auto flex items-center justify-between border-t border-slate-100 pt-6">
+             <div className="flex gap-2">
                 {script.hashtags?.slice(0, 2).map((h, i) => (
-                  <span key={i} className="text-[10px] font-bold text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded">{h}</span>
+                  <span key={i} className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100">
+                    {h}
+                  </span>
                 ))}
              </div>
-             <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">{script.assets?.length || 0} Assets</span>
+             <div className="flex items-center gap-1.5 text-[11px] font-black text-slate-300 uppercase tracking-widest">
+                <VideoCameraIcon className="w-4 h-4" />
+                {script.assets?.length || 0}
+             </div>
           </div>
        </div>
-       <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="absolute top-4 right-4 p-2 bg-white rounded-full shadow-md text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all z-10"><TrashIcon className="h-4 w-4" /></button>
     </div>
   );
 }
 
-/* ================= PAGE LOGIC ================= */
+/* ================= MAIN PAGE ================= */
 
 export default function ScriptsPage() {
   const [scripts, setScripts] = useState<ScriptProject[]>([]);
-  const [filteredScripts, setFilteredScripts] = useState<ScriptProject[]>([]); // Danh sách sau khi search
+  const [filteredScripts, setFilteredScripts] = useState<ScriptProject[]>([]);
   const [editingScript, setEditingScript] = useState<ScriptProject | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [groupCounts, setGroupCounts] = useState<Map<number, number>>(new Map());
-  const [showCreateGroup, setShowCreateGroup] = useState(false);
-  const [newGroupName, setNewGroupName] = useState("");
-  
-  // Search state
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
@@ -213,28 +236,18 @@ export default function ScriptsPage() {
       const scriptData = (data || []) as ScriptProject[];
       setScripts(scriptData);
       setFilteredScripts(scriptData);
-
-      const grps = await supabase.from("idea_groups").select("*").order("name");
-      const grpItems = await supabase.from("idea_group_items").select("group_id");
-      setGroups((grps.data || []) as Group[]);
-      const m = new Map<number, number>();
-      for (const row of grpItems.data ?? []) { const gid = Number((row as any).group_id); m.set(gid, (m.get(gid) ?? 0) + 1); }
-      setGroupCounts(m);
     }
     load();
   }, []);
 
-  // Logic Search
   useEffect(() => {
     const timer = setTimeout(() => {
       const filtered = scripts.filter(s => 
         s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.status.toLowerCase().includes(searchQuery.toLowerCase())
+        s.description?.toLowerCase().includes(searchQuery.toLowerCase())
       );
       setFilteredScripts(filtered);
-    }, 300); // Debounce 300ms
-
+    }, 200);
     return () => clearTimeout(timer);
   }, [searchQuery, scripts]);
 
@@ -244,7 +257,6 @@ export default function ScriptsPage() {
     if (!error) {
        setScripts(prev => prev.map(s => s.id === editingScript.id ? { ...s, ...updatedData } : s));
        setIsModalOpen(false);
-       setEditingScript(null);
     }
   };
 
@@ -254,96 +266,82 @@ export default function ScriptsPage() {
     setScripts(prev => prev.filter(s => s.id !== id));
   };
 
-  async function createGroup() {
-    if (!newGroupName.trim()) return;
-    await supabase.from("idea_groups").insert({ name: newGroupName.trim() });
-    window.location.reload(); 
-  }
-  async function deleteGroup(id: number) {
-    if(!confirm("Delete group?")) return;
-    await supabase.from("idea_groups").delete().eq("id", id);
-    window.location.reload();
-  }
-
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
-      <ScriptEditorModal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setEditingScript(null); }} script={editingScript} onSave={handleUpdateScript} />
       
+      {/* SIDEBAR GIẢ ĐỊNH (Cần thiết cho giao diện tổng thể) */}
       <aside className="fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-slate-200 bg-white hidden md:flex">
-         <div className="flex h-20 items-center px-8 text-2xl font-black text-slate-900">GameKB<span className="text-blue-500">.</span></div>
-         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
-            <nav className="space-y-2">
-               <Link href="/" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>🏠</span> All Ideas</Link>
-               <Link href="/dashboard" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>📊</span> Dashboard</Link>
-               <button className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold bg-slate-900 text-white shadow-lg transition"><span>📜</span> Projects</button>
-               <Link href="/games/new" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>🕹️</span> Add Game</Link>
+         <div className="flex h-24 items-center px-10 text-3xl font-black text-slate-900 tracking-tighter">GameKB<span className="text-indigo-600">.</span></div>
+         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+            <nav className="space-y-1.5">
+               <Link href="/" className="flex w-full items-center gap-4 rounded-2xl px-5 py-3.5 text-sm font-black text-slate-500 hover:bg-slate-100 transition-all"><span>🏠</span> All Ideas</Link>
+               <Link href="/dashboard" className="flex w-full items-center gap-4 rounded-2xl px-5 py-3.5 text-sm font-black text-slate-500 hover:bg-slate-100 transition-all"><span>📊</span> Dashboard</Link>
+               <button className="flex w-full items-center gap-4 rounded-2xl px-5 py-3.5 text-sm font-black bg-slate-900 text-white shadow-2xl shadow-slate-200 transition-all"><span>📜</span> Projects</button>
+               <Link href="/games/new" className="flex w-full items-center gap-4 rounded-2xl px-5 py-3.5 text-sm font-black text-slate-500 hover:bg-slate-100 transition-all"><span>🕹️</span> Add Game</Link>
             </nav>
-            <div className="pt-4 border-t border-slate-100">
-               <div className="flex items-center justify-between px-2 mb-2 font-bold text-xs uppercase text-slate-400 tracking-widest"><span>Collections</span><button onClick={()=>setShowCreateGroup(!showCreateGroup)} className="text-lg hover:text-blue-600">+</button></div>
-               {showCreateGroup && <div className="mb-2"><input className="w-full border rounded px-2 py-1 text-xs outline-none focus:border-blue-500" value={newGroupName} onChange={e=>setNewGroupName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&createGroup()} placeholder="Name..." autoFocus/></div>}
-               <div className="space-y-1">
-                  {groups.map(g => (
-                     <div key={g.id} className="group/item relative flex items-center justify-between w-full hover:bg-slate-50 rounded-xl px-2 py-1 transition cursor-pointer">
-                        <div className="flex-1 flex items-center gap-2 overflow-hidden py-2 text-slate-500 font-medium text-sm"><span className="truncate">{g.name}</span></div>
-                        <div className="w-8 flex justify-center shrink-0">
-                           <span className="text-[10px] font-bold opacity-60 group-hover/item:hidden">{groupCounts.get(g.id)||0}</span>
-                           <button onClick={(e) => { e.stopPropagation(); deleteGroup(g.id); }} className="hidden group-hover/item:block text-rose-500 hover:text-rose-700 transition"><TrashIcon className="h-4 w-4"/></button>
-                        </div>
-                     </div>
-                  ))}
-               </div>
-            </div>
          </div>
       </aside>
 
-      <main className="flex-1 pl-0 md:pl-72 pb-32 min-w-0">
-        <div className="mx-auto max-w-[1900px] px-6 py-8">
-           <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-             <div>
-               <h1 className="text-3xl font-black text-slate-900">Video Projects</h1>
-               <p className="text-slate-400 text-sm font-bold mt-1">Archive of your scripts and published content</p>
-             </div>
-             
-             {/* Thanh Search */}
-             <div className="relative w-full md:w-96">
-                <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input 
-                  type="text"
-                  placeholder="Search projects by title, status..."
-                  className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all text-sm"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                {searchQuery && (
-                  <button 
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 hover:bg-slate-100 rounded-full"
-                  >
-                    <XMarkIcon className="w-4 h-4 text-slate-400" />
-                  </button>
-                )}
-             </div>
-           </div>
-
-           {filteredScripts.length === 0 ? (
-              <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-200">
-                 <DocumentTextIcon className="w-16 h-16 text-slate-200 mx-auto mb-4" />
-                 <h3 className="text-lg font-bold text-slate-400 tracking-widest uppercase">
-                    {searchQuery ? "No matching projects" : "No projects found"}
-                 </h3>
+      <main className="flex-1 pl-0 md:pl-72 pb-32">
+        <div className="mx-auto max-w-7xl px-10 py-16">
+           
+           {/* Header Section Center */}
+           <div className="flex flex-col items-center text-center mb-20">
+              <div className="mb-6 inline-flex items-center justify-center w-20 h-20 rounded-[2.5rem] bg-indigo-600 text-white shadow-2xl shadow-indigo-200 animate-in zoom-in-50 duration-500">
+                 <GlobeAltIcon className="w-10 h-10" />
+              </div>
+              <h1 className="text-5xl font-black text-slate-900 tracking-tighter mb-3">Project Archive</h1>
+              <p className="text-slate-400 font-black uppercase text-[10px] tracking-[0.4em] mb-12">Manage and monitor your published content</p>
+              
+              {/* Central Search Bar */}
+              <div className="relative w-full max-w-3xl group scale-100 hover:scale-[1.02] transition-transform duration-300">
+                 <MagnifyingGlassIcon className="absolute left-6 top-1/2 -translate-y-1/2 w-7 h-7 text-slate-300 group-focus-within:text-indigo-500 transition-colors" />
+                 <input 
+                   type="text"
+                   placeholder="Search project title, keywords..."
+                   className="w-full pl-16 pr-16 py-6 bg-white border-none rounded-[2.5rem] shadow-2xl shadow-slate-200 outline-none focus:ring-8 focus:ring-indigo-500/5 transition-all text-lg font-bold placeholder-slate-300"
+                   value={searchQuery}
+                   onChange={(e) => setSearchQuery(e.target.value)}
+                 />
                  {searchQuery && (
-                   <button onClick={() => setSearchQuery("")} className="text-blue-500 text-sm font-bold mt-2 hover:underline">Clear search</button>
+                   <button onClick={() => setSearchQuery("")} className="absolute right-6 top-1/2 -translate-y-1/2 p-1.5 hover:bg-slate-100 rounded-full transition-all">
+                     <XMarkIcon className="w-6 h-6 text-slate-400" />
+                   </button>
                  )}
               </div>
+           </div>
+
+           {/* Grid Layout */}
+           {filteredScripts.length === 0 ? (
+              <div className="text-center py-32 bg-white rounded-[4rem] border border-dashed border-slate-200 shadow-inner animate-in fade-in duration-700">
+                 <div className="w-24 h-24 bg-slate-50 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8">
+                    <DocumentTextIcon className="w-12 h-12 text-slate-200" />
+                 </div>
+                 <h3 className="text-xl font-black text-slate-300 uppercase tracking-[0.3em]">
+                    {searchQuery ? "No matching results" : "Your archive is empty"}
+                 </h3>
+              </div>
            ) : (
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+              <div className="grid gap-12 sm:grid-cols-2 lg:grid-cols-3">
                  {filteredScripts.map(s => (
-                    <ScriptCard key={s.id} script={s} onClick={() => { setEditingScript(s); setIsModalOpen(true); }} onDelete={() => handleDeleteScript(s.id)} />
+                    <ScriptCard 
+                      key={s.id} 
+                      script={s} 
+                      onClick={() => { setEditingScript(s); setIsModalOpen(true); }} 
+                      onDelete={() => handleDeleteScript(s.id)} 
+                    />
                  ))}
               </div>
            )}
         </div>
       </main>
+
+      <ScriptEditorModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        script={editingScript} 
+        onSave={handleUpdateScript} 
+      />
     </div>
   );
 }
