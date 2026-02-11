@@ -10,7 +10,9 @@ import {
   DocumentTextIcon,
   QueueListIcon,
   PuzzlePieceIcon,
-  TrashIcon
+  TrashIcon,
+  DocumentDuplicateIcon,
+  VideoCameraIcon
 } from "@heroicons/react/24/outline";
 
 /* ================= TYPES ================= */
@@ -31,7 +33,7 @@ const btnPrimary = btnBase + " bg-slate-900 text-white shadow-lg shadow-slate-20
 const btnGhost = btnBase + " border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50";
 const cardClass = "rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm";
 
-/* ================= HELPERS ================= */
+/* ================= HELPERS (Giữ nguyên) ================= */
 
 async function fetchYoutubeTitle(url: string): Promise<string | null> {
   try {
@@ -53,7 +55,7 @@ function renderLinkOrText(text: string) {
   return <span className="break-all font-mono text-slate-500">{text}</span>;
 }
 
-/* ================= SUB-COMPONENTS ================= */
+/* ================= SUB-COMPONENTS (Giữ nguyên GameCombobox, GroupPicker) ================= */
 
 function GameCombobox({ games, selectedGameId, onSelect, onCreateGame }: any) {
   const [open, setOpen] = useState(false);
@@ -165,7 +167,6 @@ function GroupPicker({ groups, selectedIds, onToggle, onCreateGroup }: any) {
 export default function AddIdeaPage() {
   const [games, setGames] = useState<Game[]>([]);
   const [groups, setGroups] = useState<IdeaGroup[]>([]);
-  const [groupCounts, setGroupCounts] = useState<Map<number, number>>(new Map());
   const [gameId, setGameId] = useState<number | "">("");
 
   // Core fields
@@ -202,17 +203,9 @@ export default function AddIdeaPage() {
     async function loadData() {
       const { data: gs } = await supabase.from("games").select("*").order("title");
       const { data: grps } = await supabase.from("idea_groups").select("*").order("name");
-      const { data: items } = await supabase.from("idea_group_items").select("group_id");
       
       setGames((gs || []) as Game[]);
       setGroups((grps || []) as IdeaGroup[]);
-      
-      const m = new Map<number, number>();
-      for (const row of items || []) {
-        const gid = Number((row as any).group_id);
-        m.set(gid, (m.get(gid) ?? 0) + 1);
-      }
-      setGroupCounts(m);
     }
     loadData();
   }, []);
@@ -304,7 +297,7 @@ export default function AddIdeaPage() {
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
       
-      {/* SIDEBAR - ĐỒNG BỘ 100% TRANG CHỦ */}
+      {/* SIDEBAR - CLEAN (NO COLLECTIONS) */}
       <aside className="fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-slate-200 bg-white hidden md:flex">
          <div className="flex h-20 items-center px-8 text-2xl font-black text-slate-900 tracking-tighter">GameKB<span className="text-blue-500">.</span></div>
          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
@@ -312,23 +305,12 @@ export default function AddIdeaPage() {
                <Link href="/" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>🏠</span> All Ideas</Link>
                <Link href="/dashboard" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>📊</span> Dashboard</Link>
                <Link href="/scripts" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>📜</span> Scripts</Link>
-               <button className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold bg-slate-900 text-white shadow-lg shadow-slate-200 transition"><span>🕹️</span> Add Idea</button>
+               <button className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold bg-slate-900 text-white shadow-lg shadow-slate-200 transition text-left"><span>🕹️</span> Add Game</button>
             </nav>
-            <div className="pt-4 border-t border-slate-100">
-               <div className="flex items-center justify-between px-2 mb-2 font-bold text-xs uppercase text-slate-400 tracking-widest"><span>Collections</span></div>
-               <div className="space-y-1">
-                  {groups.map(g => (
-                     <div key={g.id} className="group/item relative flex items-center justify-between w-full hover:bg-slate-50 rounded-xl px-2 py-1 transition cursor-pointer">
-                        <div className="flex-1 flex items-center gap-2 overflow-hidden py-2 text-slate-500 font-medium text-sm"><span className="truncate">{g.name}</span></div>
-                        <div className="w-8 flex justify-center shrink-0"><span className="text-[10px] font-bold opacity-60">{groupCounts.get(g.id)||0}</span></div>
-                     </div>
-                  ))}
-               </div>
-            </div>
          </div>
       </aside>
 
-      {/* MAIN CONTENT AREA */}
+      {/* MAIN CONTENT */}
       <main className="flex-1 md:pl-72 pb-32">
         <div className="mx-auto max-w-5xl px-8 py-10">
           

@@ -29,8 +29,6 @@ type ScriptProject = {
   created_at: string;
 };
 
-type Group = { id: number; name: string };
-
 const STATUS_STYLE: Record<string, string> = {
   Draft: "bg-slate-100 text-slate-700 border-slate-200",
   Filming: "bg-amber-100 text-amber-800 border-amber-200",
@@ -38,7 +36,7 @@ const STATUS_STYLE: Record<string, string> = {
   Published: "bg-emerald-100 text-emerald-800 border-emerald-200",
 };
 
-/* ================= MODAL: STUDIO WORKSPACE ================= */
+/* ================= MODAL: STUDIO WORKSPACE (Giữ nguyên) ================= */
 
 function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
   const [formData, setFormData] = useState<Partial<ScriptProject>>({
@@ -91,6 +89,7 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
                    <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Video Project Studio</p>
                 </div>
              </div>
+             
              <div className="flex items-center gap-5">
                 <select className="bg-slate-100 px-5 py-3 rounded-2xl text-sm font-black outline-none border-none cursor-pointer" value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as any})}>
                    {Object.keys(STATUS_STYLE).map(s => <option key={s} value={s}>{s}</option>)}
@@ -120,21 +119,44 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
           <div className="flex-1 overflow-y-auto p-12 bg-white">
              {activeTab === "script" && (
                 <div className="max-w-5xl mx-auto h-full flex flex-col">
-                   <textarea className="flex-1 w-full p-10 rounded-[2rem] bg-slate-50 border border-slate-100 text-xl leading-relaxed text-slate-900 outline-none font-medium resize-none shadow-inner" placeholder="Start writing..." value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} />
+                   <textarea 
+                    className="flex-1 w-full p-10 rounded-[2rem] bg-slate-50 border border-slate-100 text-xl leading-relaxed text-slate-900 outline-none font-medium resize-none shadow-inner placeholder:text-slate-300" 
+                    placeholder="Bắt đầu soạn thảo kịch bản..." 
+                    value={formData.content} 
+                    onChange={e => setFormData({...formData, content: e.target.value})} 
+                   />
                 </div>
              )}
+
              {activeTab === "metadata" && (
                 <div className="max-w-4xl mx-auto space-y-8">
-                   <textarea className="w-full h-64 p-8 rounded-[2rem] bg-slate-50 border border-slate-100 text-base font-bold leading-relaxed text-slate-700 outline-none resize-none" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
-                   <div className="flex flex-wrap gap-2">{formData.hashtags?.map((h, i) => (<span key={i} className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-xs font-black border border-blue-100">#{h}</span>))}</div>
+                   <div className="space-y-4">
+                      <label className="text-xs font-black uppercase text-slate-400 tracking-widest block ml-4">Video Summary Description</label>
+                      <textarea 
+                        className="w-full h-64 p-8 rounded-[2rem] bg-slate-50 border border-slate-100 text-base leading-relaxed text-slate-700 font-bold outline-none resize-none" 
+                        value={formData.description} 
+                        onChange={e => setFormData({...formData, description: e.target.value})} 
+                      />
+                      <div className="flex flex-wrap gap-2 pt-4">
+                         {formData.hashtags?.map((h, i) => (
+                           <span key={i} className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-xs font-black border border-blue-100">#{h}</span>
+                         ))}
+                      </div>
+                   </div>
                 </div>
              )}
+
              {activeTab === "assets" && (
                 <div className="max-w-4xl mx-auto grid gap-4">
                    {formData.assets?.map((asset, i) => (
                      <div key={i} className="flex items-center gap-5 p-5 bg-slate-50 rounded-2xl border border-slate-200 hover:border-blue-500 transition-all group">
-                        <div className="w-12 h-12 rounded-xl bg-white border flex items-center justify-center text-slate-400 font-black shadow-sm group-hover:bg-blue-600 group-hover:text-white transition-all">#{i+1}</div>
-                        <div className="flex-1 min-w-0"><p className="text-base font-black text-slate-900 truncate">{asset.name}</p><p className="text-xs text-slate-500 truncate font-mono font-bold">{asset.url}</p></div>
+                        <div className="w-12 h-12 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm font-black">
+                           #{i+1}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                           <p className="text-base font-black text-slate-900 truncate">{asset.name}</p>
+                           <p className="text-xs text-slate-500 truncate mt-1 font-mono font-bold">{asset.url}</p>
+                        </div>
                         <a href={asset.url} target="_blank" className="p-3 bg-white text-slate-400 hover:text-blue-600 rounded-xl border border-slate-200 shadow-sm"><LinkIcon className="w-5 h-5" /></a>
                      </div>
                    ))}
@@ -146,7 +168,7 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
   );
 }
 
-/* ================= MAIN PAGE ================= */
+/* ================= MAIN PAGE: CLEAN SIDEBAR ================= */
 
 export default function ScriptsPage() {
   const [scripts, setScripts] = useState<ScriptProject[]>([]);
@@ -155,22 +177,11 @@ export default function ScriptsPage() {
   const [editingScript, setEditingScript] = useState<ScriptProject | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Sidebar states
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [groupCounts, setGroupCounts] = useState<Map<number, number>>(new Map());
-
   useEffect(() => {
     async function load() {
       const { data: sData } = await supabase.from("scripts").select("*").order("created_at", { ascending: false });
       setScripts((sData || []) as ScriptProject[]);
       setFilteredScripts((sData || []) as ScriptProject[]);
-
-      const { data: grps } = await supabase.from("idea_groups").select("*").order("name");
-      const { data: items } = await supabase.from("idea_group_items").select("group_id");
-      setGroups((grps || []) as Group[]);
-      const m = new Map<number, number>();
-      for (const row of items || []) { const gid = Number((row as any).group_id); m.set(gid, (m.get(gid) ?? 0) + 1); }
-      setGroupCounts(m);
     }
     load();
   }, []);
@@ -184,46 +195,48 @@ export default function ScriptsPage() {
   }, [searchQuery, scripts]);
 
   const handleUpdate = async (data: any) => {
-    const { error } = await supabase.from("scripts").update(data).eq("id", editingScript?.id);
+    if (!editingScript) return;
+    const { error } = await supabase.from("scripts").update(data).eq("id", editingScript.id);
     if (!error) {
-      setScripts(prev => prev.map(s => s.id === editingScript?.id ? { ...s, ...data } : s));
+      setScripts(prev => prev.map(s => s.id === editingScript.id ? { ...s, ...data } : s));
       setIsModalOpen(false);
     }
+  };
+
+  const handleDelete = async (id: number) => {
+    if(!confirm("Xác nhận xóa dự án video này?")) return;
+    const { error } = await supabase.from("scripts").delete().eq("id", id);
+    if (!error) setScripts(prev => prev.filter(s => s.id !== id));
   };
 
   return (
     <div className="flex min-h-screen bg-white font-sans text-slate-900">
       <ScriptEditorModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} script={editingScript} onSave={handleUpdate} />
       
-      {/* SIDEBAR - CHUẨN TRANG CHỦ 100% */}
+      {/* SIDEBAR - CLEAN (NO COLLECTIONS) */}
       <aside className="fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-slate-200 bg-white hidden md:flex">
          <div className="flex h-20 items-center px-8 text-2xl font-black text-slate-900 tracking-tighter">GameKB<span className="text-blue-500">.</span></div>
          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
             <nav className="space-y-2">
                <Link href="/" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>🏠</span> All Ideas</Link>
                <Link href="/dashboard" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>📊</span> Dashboard</Link>
-               <button className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold bg-slate-900 text-white shadow-lg shadow-slate-200 transition"><span>📜</span> Scripts</button>
+               <button className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold bg-slate-900 text-white shadow-lg shadow-slate-200 transition text-left"><span>📜</span> Video Projects</button>
                <Link href="/games/new" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>🕹️</span> Add Game</Link>
             </nav>
-            <div className="pt-4 border-t border-slate-100">
-               <div className="flex items-center justify-between px-2 mb-2 font-bold text-xs uppercase text-slate-400 tracking-widest"><span>Collections</span></div>
-               <div className="space-y-1">
-                  {groups.map(g => (
-                     <div key={g.id} className="group/item relative flex items-center justify-between w-full hover:bg-slate-50 rounded-xl px-2 py-1 transition cursor-pointer">
-                        <div className="flex-1 flex items-center gap-2 overflow-hidden py-2 text-slate-500 font-medium text-sm"><span className="truncate">{g.name}</span></div>
-                        <div className="w-8 flex justify-center shrink-0"><span className="text-[10px] font-bold opacity-60 group-hover/item:hidden">{groupCounts.get(g.id)||0}</span></div>
-                     </div>
-                  ))}
-               </div>
-            </div>
          </div>
       </aside>
 
-      <main className="flex-1 md:pl-72 min-w-0 bg-white">
-        <div className="mx-auto max-w-[1440px] px-10 py-12">
+      <main className="flex-1 pl-0 md:pl-72 min-w-0">
+        <div className="mx-auto max-w-[1400px] px-10 py-12">
+           
            <div className="mb-12 relative max-w-2xl">
               <MagnifyingGlassIcon className="w-6 h-6 absolute left-6 top-1/2 -translate-y-1/2 text-slate-900 font-black" />
-              <input className="h-16 w-full rounded-[1.5rem] border-2 border-slate-200 pl-16 pr-12 bg-white outline-none focus:border-slate-900 transition-all font-bold text-lg shadow-sm" placeholder="Search kịch bản..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+              <input 
+                className="h-16 w-full rounded-[1.5rem] border-2 border-slate-200 pl-16 pr-12 bg-white outline-none focus:border-slate-900 transition-all font-bold text-lg shadow-sm" 
+                placeholder="Search..." 
+                value={searchQuery} 
+                onChange={e => setSearchQuery(e.target.value)} 
+              />
            </div>
 
            <div className="bg-white rounded-[2.5rem] border-2 border-slate-200 overflow-hidden shadow-2xl shadow-slate-200/40">
@@ -242,15 +255,22 @@ export default function ScriptsPage() {
                           <td className="px-10 py-9">
                              <div className="flex items-center gap-5">
                                 <div className="w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center text-white shrink-0 shadow-lg shadow-slate-200"><PlayCircleIcon className="w-7 h-7" /></div>
-                                <div className="min-w-0"><p className="text-base font-black text-slate-900 uppercase tracking-tight truncate">{s.title}</p><p className="text-[10px] font-bold text-slate-400 mt-1 uppercase">{new Date(s.created_at).toLocaleDateString('vi-VN')}</p></div>
+                                <div className="min-w-0">
+                                   <p className="text-base font-black text-slate-900 uppercase tracking-tight truncate">{s.title}</p>
+                                   <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase">{new Date(s.created_at).toLocaleDateString('vi-VN')}</p>
+                                </div>
                              </div>
                           </td>
-                          <td className="px-6 py-9 text-center"><span className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-transparent shadow-sm ${STATUS_STYLE[s.status]}`}>{s.status}</span></td>
-                          <td className="px-6 py-9 text-sm text-slate-700 font-bold italic leading-relaxed"><p className="line-clamp-2 pr-10">{s.description || "No description..."}</p></td>
+                          <td className="px-6 py-9 text-center">
+                             <span className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border border-transparent shadow-sm ${STATUS_STYLE[s.status]}`}>{s.status}</span>
+                          </td>
+                          <td className="px-6 py-9 text-sm text-slate-700 font-bold italic leading-relaxed">
+                             <p className="line-clamp-2 pr-10">{s.description || "No description..."}</p>
+                          </td>
                           <td className="px-8 py-9 text-right">
                              <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button className="p-3 bg-white rounded-xl border-2 border-slate-100 text-slate-900 hover:bg-slate-900 hover:text-white transition-all shadow-sm"><PencilSquareIcon className="w-5 h-5" /></button>
-                                <button onClick={(e) => { e.stopPropagation(); if(confirm("Xóa dự án?")) supabase.from("scripts").delete().eq("id", s.id).then(()=>window.location.reload()); }} className="p-3 bg-white rounded-xl border-2 border-slate-100 text-slate-400 hover:text-rose-600 transition-all shadow-sm"><TrashIcon className="w-5 h-5" /></button>
+                                <button onClick={(e) => { e.stopPropagation(); handleDelete(s.id); }} className="p-3 bg-white rounded-xl border-2 border-slate-100 text-slate-400 hover:text-rose-600 transition-all shadow-sm"><TrashIcon className="w-5 h-5" /></button>
                              </div>
                           </td>
                        </tr>

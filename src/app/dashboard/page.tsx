@@ -22,7 +22,6 @@ import {
 /* ================= TYPES & CONFIG ================= */
 
 type Game = { id: number; title: string; cover_url?: string | null };
-type Group = { id: number; name: string };
 type FootageItem = { file_path: string; title: string | null };
 type DetailRow = { 
   id: number; title: string; description: string | null; priority: number; 
@@ -47,7 +46,7 @@ const TYPE_CONFIG: Record<string, { label: string; className: string }> = {
   default: { label: "📝 Note", className: "bg-slate-500/20 border-slate-400/30 text-slate-100" }
 };
 
-/* ================= COMPONENTS ================= */
+/* ================= COMPONENTS (Giữ nguyên) ================= */
 
 function TypePill({ typeKey }: { typeKey: string }) {
   const config = TYPE_CONFIG[typeKey] || TYPE_CONFIG.default;
@@ -68,7 +67,6 @@ function StatCard({ title, value, icon: Icon, color }: { title: string, value: n
   );
 }
 
-// ... (QuickViewModal, GameEditorModal, ScriptEditorModal, IdeaItem giữ nguyên như logic bạn đã gửi) ...
 function QuickViewModal({ idea, isOpen, onClose }: { idea: DetailRow | null; isOpen: boolean; onClose: () => void }) {
   if (!isOpen || !idea) return null;
   return (
@@ -270,15 +268,11 @@ export default function Dashboard() {
   const [stats, setStats] = useState({ total: 0, high: 0, scripts: 0, games: 0 });
   const [pinnedIdeas, setPinnedIdeas] = useState<DetailRow[]>([]);
   const [recentIdeas, setRecentIdeas] = useState<DetailRow[]>([]);
-  const [groups, setGroups] = useState<Group[]>([]);
   const [allGames, setAllGames] = useState<Game[]>([]);
-  const [groupCounts, setGroupCounts] = useState<Map<number, number>>(new Map());
   
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showEditor, setShowEditor] = useState(false);
-  const [showCreateGroup, setShowCreateGroup] = useState(false);
-  const [newGroupName, setNewGroupName] = useState("");
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const [previewIdea, setPreviewIdea] = useState<DetailRow | null>(null);
 
@@ -303,13 +297,6 @@ export default function Dashboard() {
 
       const recentRes = await supabase.from("details").select("*, game:games(*), footage(file_path, title)").eq("status", "idea").eq("pinned", false).order("created_at", { ascending: false }).limit(10);
       setRecentIdeas((recentRes.data || []) as DetailRow[]);
-
-      const grps = await supabase.from("idea_groups").select("*").order("name");
-      const grpItems = await supabase.from("idea_group_items").select("group_id");
-      setGroups((grps.data || []) as Group[]);
-      const m = new Map<number, number>();
-      for (const row of grpItems.data ?? []) { const gid = Number((row as any).group_id); m.set(gid, (m.get(gid) ?? 0) + 1); }
-      setGroupCounts(m);
     }
     loadData();
   }, []);
@@ -321,18 +308,6 @@ export default function Dashboard() {
   async function handleSaveScript(data: Partial<ScriptProject>) {
     const { error } = await supabase.from("scripts").insert(data);
     if (!error) { alert("Script saved successfully!"); setIsSelectMode(false); setSelectedIds([]); }
-  }
-
-  async function createGroup() {
-    if (!newGroupName.trim()) return;
-    await supabase.from("idea_groups").insert({ name: newGroupName.trim() });
-    window.location.reload(); 
-  }
-
-  async function deleteGroup(id: number) {
-    if(!confirm("Delete group?")) return;
-    await supabase.from("idea_groups").delete().eq("id", id);
-    window.location.reload();
   }
 
   const updateGameInList = (updatedGame: Game) => {
@@ -362,36 +337,16 @@ export default function Dashboard() {
          </div>
       )}
 
-      {/* SIDEBAR - SAO CHÉP CHÍNH XÁC 100% TỪ CODE TRANG CHỦ CỦA BẠN */}
+      {/* SIDEBAR - CLEAN */}
       <aside className="fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-slate-200 bg-white hidden md:flex">
          <div className="flex h-20 items-center px-8 text-2xl font-black text-slate-900 tracking-tighter">GameKB<span className="text-blue-500">.</span></div>
          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
             <nav className="space-y-2">
                <Link href="/" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>🏠</span> All Ideas</Link>
-               {/* Dashboard được set làm Active ở đây */}
                <button className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold bg-slate-900 text-white shadow-lg shadow-slate-200 transition text-left"><span>📊</span> Dashboard</button>
-               <Link href="/scripts" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>📜</span> Scripts</Link>
+               <Link href="/scripts" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>📜</span> Video Project </Link>
                <Link href="/games/new" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>🕹️</span> Add Game</Link>
             </nav>
-            <div className="pt-4 border-t border-slate-100">
-               <div className="flex items-center justify-between px-2 mb-2 font-bold text-xs uppercase text-slate-400 tracking-widest"><span>Collections</span><button onClick={()=>setShowCreateGroup(!showCreateGroup)} className="text-lg hover:text-blue-600">+</button></div>
-               {showCreateGroup && <div className="mb-2"><input className="w-full border rounded-xl px-2 py-1 text-xs outline-none focus:border-blue-500" value={newGroupName} onChange={e=>setNewGroupName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&createGroup()} placeholder="Name..." autoFocus/></div>}
-               <div className="space-y-1">
-                  {groups.map(g => (
-                     <div key={g.id} className="group/item relative flex items-center justify-between w-full hover:bg-slate-50 rounded-xl px-2 py-1 transition cursor-pointer">
-                        <div className="flex-1 flex items-center gap-2 overflow-hidden py-2 text-slate-500 font-medium text-sm">
-                           <span className="truncate">{g.name}</span>
-                        </div>
-                        <div className="w-8 flex justify-center shrink-0">
-                           <span className="text-[10px] font-bold opacity-60 group-hover/item:hidden">{groupCounts.get(g.id)||0}</span>
-                           <button onClick={(e) => { e.stopPropagation(); deleteGroup(g.id); }} className="hidden group-hover/item:block text-rose-500 hover:text-rose-700 transition">
-                             <TrashIcon className="h-4 w-4"/>
-                           </button>
-                        </div>
-                     </div>
-                  ))}
-               </div>
-            </div>
          </div>
       </aside>
 

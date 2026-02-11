@@ -83,38 +83,6 @@ export default function AddGamePage() {
 
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
-      
-      {/* SIDEBAR (Copy logic từ Home/Dashboard) */}
-      <aside className="fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-slate-200 bg-white hidden md:flex">
-         <div className="flex h-20 items-center px-8 text-2xl font-black text-slate-900">GameKB<span className="text-blue-500">.</span></div>
-         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
-            <nav className="space-y-2">
-               <Link href="/" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>🏠</span> All Ideas</Link>
-               <Link href="/dashboard" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>📊</span> Dashboard</Link>
-               <Link href="/scripts" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>📜</span> Scripts</Link>
-               <button className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold bg-slate-900 text-white shadow-lg transition"><span>🕹️</span> Add Game</button>
-            </nav>
-            <div className="pt-4 border-t border-slate-100">
-               <div className="flex items-center justify-between px-2 mb-2"><h3 className="text-xs font-bold uppercase text-slate-400">Collections</h3><button onClick={()=>setShowCreateGroup(!showCreateGroup)} className="text-lg hover:text-blue-600 cursor-pointer">+</button></div>
-               {showCreateGroup && <div className="mb-2"><input className="w-full border rounded px-2 py-1 text-xs" value={newGroupName} onChange={e=>setNewGroupName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&createGroup()} placeholder="Name..." autoFocus/></div>}
-               <div className="space-y-1">
-                  {groups.map(g => (
-                     <div key={g.id} className="group/item relative flex items-center justify-between w-full hover:bg-slate-50 rounded-xl px-2 py-1 transition cursor-pointer">
-                        <div className="flex-1 flex items-center gap-2 overflow-hidden py-2 text-slate-500">
-                           <span className="truncate">{g.name}</span>
-                        </div>
-                        <div className="w-8 flex justify-center shrink-0">
-                           <span className="text-[10px] font-bold opacity-60 group-hover/item:hidden">{groupCounts.get(g.id)||0}</span>
-                           <button onClick={(e) => { e.stopPropagation(); deleteGroup(g.id); }} className="hidden group-hover/item:block text-rose-500 hover:text-rose-700 transition">
-                             <TrashIcon className="h-4 w-4"/>
-                           </button>
-                        </div>
-                     </div>
-                  ))}
-               </div>
-            </div>
-         </div>
-      </aside>
 
       {/* MAIN CONTENT */}
       <main className="flex-1 pl-0 md:pl-72 pb-32">
