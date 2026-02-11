@@ -13,7 +13,9 @@ import {
   VideoCameraIcon,
   HashtagIcon,
   TagIcon,
-  DocumentDuplicateIcon
+  DocumentDuplicateIcon,
+  SparklesIcon,
+  ArrowPathIcon
 } from "@heroicons/react/24/outline";
 
 /* ================= TYPES ================= */
@@ -24,6 +26,7 @@ type FootageItem = { file_path: string; title: string | null };
 type DetailRow = { 
   id: number; title: string; description: string | null; priority: number; 
   detail_type: string; game_id: number; pinned?: boolean; created_at?: string; 
+  game?: Game; 
   footage?: FootageItem[]; 
 };
 
@@ -77,10 +80,202 @@ function ComboBox({ placeholder, items, selectedId, onChange }: { placeholder: s
   );
 }
 
+// === UPDATED: RANDOM GRID MODAL (CLICK OUTSIDE TO CLOSE) ===
+function RandomGridModal({ 
+  items, games, isOpen, onClose, onReshuffle, 
+  onQuickView, onTogglePin, 
+  selectedIds, onToggleSelect, onCreateScript 
+}: { 
+  items: DetailRow[]; games: Game[]; isOpen: boolean; onClose: () => void; onReshuffle: () => void;
+  onQuickView: (i: DetailRow) => void; onTogglePin: (id: number, current: boolean) => void;
+  selectedIds: number[]; onToggleSelect: (id: number) => void; onCreateScript: () => void;
+}) {
+  if (!isOpen || items.length === 0) return null;
+
+  return (
+    // THÊM: onClick={onClose} ở wrapper ngoài cùng để bắt sự kiện click vào vùng mờ
+    <div 
+      className="fixed inset-0 z-[150] flex flex-col items-center justify-center bg-slate-900/95 backdrop-blur-sm p-6 animate-in fade-in duration-300 cursor-pointer"
+      onClick={onClose}
+    >
+      
+      {/* HEADER: Thêm e.stopPropagation() để click vào đây ko bị đóng modal */}
+      <div 
+        className="flex flex-col items-center mb-8 gap-4 animate-in slide-in-from-top-4 w-full max-w-[1600px] relative cursor-auto"
+        onClick={(e) => e.stopPropagation()} 
+      >
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg shadow-purple-500/30">
+          <SparklesIcon className="w-5 h-5 animate-spin-slow" />
+          <span className="text-sm font-black uppercase tracking-widest">Gacha Picks</span>
+        </div>
+        <div className="flex gap-3">
+           {selectedIds.length > 0 && (
+             <button onClick={onCreateScript} className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-500 transition active:scale-95 shadow-lg shadow-blue-500/30 animate-in zoom-in">
+                <PlayCircleIcon className="w-5 h-5" /> 
+                Create Script ({selectedIds.length})
+             </button>
+           )}
+           <button onClick={onReshuffle} className="flex items-center gap-2 px-6 py-3 bg-white text-slate-900 rounded-xl font-bold hover:bg-slate-200 transition active:scale-95 shadow-lg">
+              <ArrowPathIcon className="w-5 h-5" /> Spin Again
+           </button>
+           {/* Đã xóa nút X */}
+        </div>
+      </div>
+
+      {/* GRID: Thêm e.stopPropagation() để click vào vùng grid ko bị đóng modal */}
+      <div 
+        className="w-full max-w-[1400px] grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-in zoom-in-95 duration-500 cursor-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+         {items.map((r, i) => (
+           <div key={r.id} className="animate-in slide-in-from-bottom-4" style={{ animationDelay: `${i * 100}ms` }}>
+             <IdeaItem 
+               r={r} 
+               game={games.find(g => g.id === r.game_id)} 
+               isSelectMode={true} 
+               isSelected={selectedIds.includes(r.id)} 
+               onToggleSelect={onToggleSelect} 
+               onTogglePin={onTogglePin} 
+               onEditGame={() => {}} 
+               onQuickView={onQuickView} 
+             />
+           </div>
+         ))}
+      </div>
+    </div>
+  );
+}
+
+// === SCRIPT MODAL (LARGE & BIG TEXT) ===
+function ScriptEditorModal({ 
+  isOpen, onClose, initialData, onSave 
+}: { 
+  isOpen: boolean; onClose: () => void; 
+  initialData: { ids: number[], ideas: DetailRow[], games: Game[] };
+  onSave: (data: Partial<ScriptProject>) => void;
+}) {
+  const [formData, setFormData] = useState<Partial<ScriptProject>>({
+    title: "", content: "", description: "", hashtags: [], tags: [], publish_date: null, status: "Draft", assets: []
+  });
+  const [activeTab, setActiveTab] = useState<"details" | "script" | "assets">("script");
+
+  useEffect(() => {
+    if (isOpen && initialData.ideas.length > 0) {
+       const titles = initialData.ideas.map(i => i.title);
+       const gameNames = Array.from(new Set(initialData.ideas.map(i => {
+          const g = initialData.games.find(game => game.id === i.game_id);
+          return g?.title || "";
+       }).filter(Boolean)));
+       const fullDescription = initialData.ideas.map(i => `• ${i.title}: ${i.description || ""}`).join("\n\n");
+       const allAssets = initialData.ideas.flatMap(i => 
+         i.footage?.map(f => ({ url: f.file_path, name: f.title || f.file_path.split('/').pop() || "Video" })) || []
+       );
+
+       setFormData({
+         title: `Video Script: ${titles[0]}${titles.length > 1 ? '...' : ''}`,
+         content: initialData.ideas.map(i => `[${i.title}]\n${i.description || ""}`).join("\n\n"),
+         description: `Video tổng hợp các chi tiết thú vị.\n\n${fullDescription}`,
+         assets: allAssets,
+         tags: [...gameNames, "Shorts", "Gaming", "Game Facts"],
+         hashtags: ["#shorts", "#gaming", ...gameNames.map(g => `#${g.replace(/\s+/g, '').toLowerCase()}`)],
+         status: "Draft",
+         publish_date: null
+       });
+    }
+  }, [isOpen, initialData]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
+       {/* max-w-7xl cho rộng hơn */}
+       <div className="bg-white w-full max-w-7xl h-[92vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95">
+          <div className="flex items-center justify-between px-8 py-5 border-b border-slate-100 bg-slate-50/50">
+             <div>
+                <h2 className="text-2xl font-black text-slate-900">Create Video Script</h2>
+                <p className="text-sm text-slate-500 font-bold mt-1">Drafting from {initialData.ideas.length} ideas</p>
+             </div>
+             <div className="flex gap-3">
+                <button onClick={onClose} className="px-5 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl">Cancel</button>
+                <button onClick={() => { onSave(formData); onClose(); }} className="px-8 py-3 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg">Save Project</button>
+             </div>
+          </div>
+          <div className="flex px-8 border-b border-slate-100 bg-slate-50">
+             {(["script", "details", "assets"] as const).map(tab => (
+               <button key={tab} onClick={() => setActiveTab(tab)} className={`px-6 py-4 text-base font-bold border-b-2 transition ${activeTab === tab ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"}`}>
+                 {tab === "script" ? "📝 Content" : tab === "details" ? "ℹ️ Metadata" : "🔗 Assets"}
+               </button>
+             ))}
+          </div>
+          <div className="flex-1 overflow-y-auto p-10 bg-slate-50/30">
+             {/* Text-lg cho vùng nhập liệu */}
+             {activeTab === "script" && <textarea className="h-full w-full rounded-2xl border border-slate-200 p-8 text-lg leading-relaxed text-slate-800 outline-none focus:border-blue-500 font-mono shadow-inner" value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} />}
+             
+             {activeTab === "details" && <div className="space-y-8 max-w-5xl mx-auto">
+                <div>
+                  <label className="text-xs font-bold uppercase text-slate-400 mb-2 block tracking-widest">Title</label>
+                  <input className="w-full h-14 rounded-2xl border border-slate-200 px-5 text-lg font-bold outline-none focus:border-blue-500 shadow-sm" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold uppercase text-slate-400 mb-2 block tracking-widest">Description</label>
+                  <textarea className="w-full h-64 rounded-2xl border border-slate-200 p-5 text-base outline-none focus:border-blue-500 shadow-sm" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
+                </div>
+                <div className="grid grid-cols-2 gap-10">
+                  <div className="space-y-4">
+                    <label className="text-xs font-bold uppercase text-slate-400 flex items-center gap-2 tracking-widest"><HashtagIcon className="w-4 h-4"/> Hashtags</label>
+                    <div className="flex flex-wrap gap-2">
+                      {formData.hashtags?.map((tag, i) => (
+                        <span key={i} className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold border border-blue-100 shadow-sm">{tag}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <label className="text-xs font-bold uppercase text-slate-400 flex items-center gap-2 tracking-widest"><TagIcon className="w-4 h-4"/> Tags</label>
+                    <div className="flex flex-wrap gap-2">
+                      {formData.tags?.map((tag, i) => (
+                        <span key={i} className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold border border-slate-200 shadow-sm">{tag}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+             </div>}
+
+             {activeTab === "assets" && <div className="space-y-6 max-w-5xl mx-auto">
+                <div className="flex justify-between items-center px-1">
+                  <label className="text-xs font-bold uppercase text-slate-400 block tracking-widest">Selected Footage</label>
+                  <button onClick={() => navigator.clipboard.writeText(formData.assets?.map(a => a.url).join('\n') || "")} className="text-xs flex items-center gap-1 font-bold text-blue-600 hover:underline">
+                    <DocumentDuplicateIcon className="w-4 h-4"/> Copy All Links
+                  </button>
+                </div>
+                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm divide-y divide-slate-50">
+                  {(formData.assets || []).length > 0 ? (
+                    formData.assets?.map((asset, i) => (
+                      <div key={i} className="p-6 flex items-center gap-6 hover:bg-slate-50 transition group">
+                         <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-500">#{i+1}</div>
+                         <div className="flex-1 min-w-0">
+                            <p className="text-base font-bold text-slate-700 truncate">{asset.name}</p>
+                            <p className="text-xs text-slate-400 truncate font-mono mt-1">{asset.url}</p>
+                         </div>
+                         <a href={asset.url} target="_blank" className="p-3 rounded-xl bg-slate-100 text-slate-400 hover:bg-blue-600 hover:text-white transition shadow-sm">
+                            <VideoCameraIcon className="w-5 h-5" />
+                         </a>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-16 text-center text-slate-400 italic text-base">No assets linked to these ideas.</div>
+                  )}
+                </div>
+             </div>}
+          </div>
+       </div>
+    </div>
+  );
+}
+
 function QuickViewModal({ idea, isOpen, onClose }: { idea: DetailRow | null; isOpen: boolean; onClose: () => void }) {
   if (!isOpen || !idea) return null;
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in" onClick={onClose}>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in" onClick={onClose}>
       <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
         <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
           <h3 className="font-bold text-slate-900 truncate pr-4">{idea.title}</h3>
@@ -119,131 +314,6 @@ function GameEditorModal({ game, isOpen, onClose, onUpdate }: { game: Game | nul
           <div className="flex justify-end gap-2 pt-2"><button onClick={onClose} className="px-4 py-2 text-xs font-bold text-gray-400">Cancel</button><button onClick={handleSave} disabled={loading} className="px-5 py-2 text-xs font-bold text-white bg-blue-600 rounded-lg shadow-sm">{loading ? "Saving..." : "Save Changes"}</button></div>
         </div>
       </div>
-    </div>
-  );
-}
-
-// SCRIPT EDITOR MODAL - FIX ASSETS & METADATA
-function ScriptEditorModal({ 
-  isOpen, onClose, initialData, onSave 
-}: { 
-  isOpen: boolean; onClose: () => void; 
-  initialData: { ids: number[], ideas: DetailRow[], games: Game[] };
-  onSave: (data: Partial<ScriptProject>) => void;
-}) {
-  const [formData, setFormData] = useState<Partial<ScriptProject>>({
-    title: "", content: "", description: "", hashtags: [], tags: [], publish_date: null, status: "Draft", assets: []
-  });
-  const [activeTab, setActiveTab] = useState<"details" | "script" | "assets">("script");
-
-  useEffect(() => {
-    if (isOpen && initialData.ideas.length > 0) {
-       const titles = initialData.ideas.map(i => i.title);
-       const gameNames = Array.from(new Set(initialData.ideas.map(i => {
-          const g = initialData.games.find(game => game.id === i.game_id);
-          return g?.title || "";
-       }).filter(Boolean)));
-
-       const fullDescription = initialData.ideas.map(i => `• ${i.title}: ${i.description || ""}`).join("\n\n");
-       
-       // FIX: Lấy cả Name (title) và URL (file_path) của footage
-       const allAssets = initialData.ideas.flatMap(i => 
-         i.footage?.map(f => ({ url: f.file_path, name: f.title || f.file_path.split('/').pop() || "Video" })) || []
-       );
-
-       setFormData({
-         title: `Video Script: ${titles[0]}${titles.length > 1 ? '...' : ''}`,
-         content: initialData.ideas.map(i => `[${i.title}]\n${i.description || ""}`).join("\n\n"),
-         description: `Video tổng hợp các chi tiết thú vị.\n\n${fullDescription}`,
-         assets: allAssets,
-         tags: [...gameNames, "Shorts", "Gaming", "Game Facts"],
-         hashtags: ["#shorts", "#gaming", ...gameNames.map(g => `#${g.replace(/\s+/g, '').toLowerCase()}`)],
-         status: "Draft",
-         publish_date: null
-       });
-    }
-  }, [isOpen, initialData]);
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
-       <div className="bg-white w-full max-w-4xl h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-             <div><h2 className="text-xl font-black text-slate-900">Create Video Script</h2><p className="text-xs text-slate-500 font-bold">Drafting from {initialData.ideas.length} ideas</p></div>
-             <div className="flex gap-2">
-                <button onClick={onClose} className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl">Cancel</button>
-                <button onClick={() => { onSave(formData); onClose(); }} className="px-6 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg">Save Project</button>
-             </div>
-          </div>
-          <div className="flex px-6 border-b border-slate-100 bg-slate-50">
-             {(["script", "details", "assets"] as const).map(tab => (
-               <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-3 text-sm font-bold border-b-2 transition ${activeTab === tab ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"}`}>
-                 {tab === "script" ? "📝 Script Content" : tab === "details" ? "ℹ️ Metadata" : "🔗 Assets"}
-               </button>
-             ))}
-          </div>
-          <div className="flex-1 overflow-y-auto p-8 bg-slate-50/30">
-             {activeTab === "script" && <textarea className="h-full w-full rounded-2xl border border-slate-200 p-6 text-sm leading-relaxed text-slate-800 outline-none focus:border-blue-500 font-mono shadow-inner" value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} />}
-             
-             {activeTab === "details" && <div className="space-y-6">
-                <div>
-                  <label className="text-[10px] font-bold uppercase text-slate-400 mb-2 block">Title</label>
-                  <input className="w-full h-11 rounded-xl border border-slate-200 px-4 text-sm font-bold outline-none focus:border-blue-500 shadow-sm" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold uppercase text-slate-400 mb-2 block">Description</label>
-                  <textarea className="w-full h-40 rounded-xl border border-slate-200 p-4 text-xs outline-none focus:border-blue-500 shadow-sm" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
-                </div>
-                <div className="grid grid-cols-2 gap-8">
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1 tracking-widest"><HashtagIcon className="w-3 h-3"/> Hashtags</label>
-                    <div className="flex flex-wrap gap-2">
-                      {formData.hashtags?.map((tag, i) => (
-                        <span key={i} className="px-2.5 py-1 bg-blue-50 text-blue-600 rounded-lg text-[11px] font-bold border border-blue-100 shadow-sm">{tag}</span>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1 tracking-widest"><TagIcon className="w-3 h-3"/> Tags</label>
-                    <div className="flex flex-wrap gap-2">
-                      {formData.tags?.map((tag, i) => (
-                        <span key={i} className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-[11px] font-bold border border-slate-200 shadow-sm">{tag}</span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-             </div>}
-
-             {activeTab === "assets" && <div className="space-y-4">
-                <div className="flex justify-between items-center px-1">
-                  <label className="text-[10px] font-bold uppercase text-slate-400 block tracking-widest">Selected Footage</label>
-                  <button onClick={() => navigator.clipboard.writeText(formData.assets?.map(a => a.url).join('\n') || "")} className="text-[10px] flex items-center gap-1 font-bold text-blue-600 hover:underline">
-                    <DocumentDuplicateIcon className="w-3 h-3"/> Copy All Links
-                  </button>
-                </div>
-                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm divide-y divide-slate-50">
-                  {(formData.assets || []).length > 0 ? (
-                    formData.assets?.map((asset, i) => (
-                      <div key={i} className="p-4 flex items-center gap-4 hover:bg-slate-50 transition group">
-                         <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-500">#{i+1}</div>
-                         <div className="flex-1 min-w-0">
-                            {/* HIỂN THỊ TÊN VIDEO CHUẨN Ở ĐÂY */}
-                            <p className="text-sm font-bold text-slate-700 truncate">{asset.name}</p>
-                            <p className="text-[10px] text-slate-400 truncate font-mono">{asset.url}</p>
-                         </div>
-                         <a href={asset.url} target="_blank" className="p-2 rounded-lg bg-slate-100 text-slate-400 hover:bg-blue-600 hover:text-white transition shadow-sm">
-                            <VideoCameraIcon className="w-4 h-4" />
-                         </a>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="p-12 text-center text-slate-400 italic text-sm">No assets linked to these ideas.</div>
-                  )}
-                </div>
-             </div>}
-          </div>
-       </div>
     </div>
   );
 }
@@ -288,6 +358,9 @@ export default function Home() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showEditor, setShowEditor] = useState(false);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
+  
+  // STATE RANDOM
+  const [randomIdeas, setRandomIdeas] = useState<DetailRow[]>([]);
   const [previewIdea, setPreviewIdea] = useState<DetailRow | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -321,7 +394,6 @@ export default function Home() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      // QUAN TRỌNG: Load cả title của footage
       let query = supabase.from("details").select("*, footage(file_path, title)").eq("status", "idea");
       if (groupId) {
          const { data: items } = await supabase.from("idea_group_items").select("detail_id").eq("group_id", groupId);
@@ -362,6 +434,18 @@ export default function Home() {
     window.location.reload();
   }
 
+  // RANDOM 3 ITEMS
+  const handleRandom = () => {
+    if (ideas.length === 0) {
+      alert("No ideas available to randomize!");
+      return;
+    }
+    // LẤY 3 ITEM THAY VÌ 4
+    const count = Math.min(3, ideas.length);
+    const shuffled = [...ideas].sort(() => 0.5 - Math.random());
+    setRandomIdeas(shuffled.slice(0, count));
+  };
+
   const totalPages = Math.ceil(ideas.length / ITEMS_PER_PAGE);
   const currentIdeas = ideas.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
   const goToPage = (p: number) => { setCurrentPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); };
@@ -372,6 +456,24 @@ export default function Home() {
       <ScriptEditorModal isOpen={showEditor} onClose={() => setShowEditor(false)} onSave={handleSaveScript} initialData={{ ids: selectedIds, ideas: ideas.filter(i => selectedIds.includes(i.id)), games: games }} />
       <GameEditorModal game={editingGame} isOpen={!!editingGame} onClose={() => setEditingGame(null)} onUpdate={(updatedGame) => { setGames(prev => prev.map(g => g.id === updatedGame.id ? updatedGame : g)); }} />
       <QuickViewModal idea={previewIdea} isOpen={!!previewIdea} onClose={() => setPreviewIdea(null)} />
+      
+      {/* RANDOM GRID MODAL */}
+      <RandomGridModal 
+        items={randomIdeas}
+        games={games}
+        isOpen={randomIdeas.length > 0}
+        onClose={() => setRandomIdeas([])}
+        onReshuffle={handleRandom}
+        onQuickView={setPreviewIdea}
+        onTogglePin={async (id, current) => {
+           setIdeas(prev => prev.map(i => i.id === id ? { ...i, pinned: !current } : i));
+           setRandomIdeas(prev => prev.map(i => i.id === id ? { ...i, pinned: !current } : i));
+           await supabase.from("details").update({ pinned: !current }).eq("id", id);
+        }}
+        selectedIds={selectedIds}
+        onToggleSelect={toggleSelection}
+        onCreateScript={() => { setRandomIdeas([]); setShowEditor(true); }}
+      />
 
       {isSelectMode && (
          <div className="fixed bottom-0 inset-x-0 z-[80] bg-white border-t border-slate-200 p-4 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] animate-in slide-in-from-bottom-10">
@@ -412,26 +514,32 @@ export default function Home() {
       <main className="flex-1 pl-0 md:pl-72 pb-32 min-w-0">
         <div className="mx-auto max-w-[1900px] px-6 py-8">
           <header className="mb-8 space-y-4">
-             <div className="flex gap-4">
-                <div className="flex-1 relative">
-                   <MagnifyingGlassIcon className="w-5 h-5 absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400" />
-                   <input className="h-12 w-full rounded-2xl border border-slate-200 px-12 shadow-sm outline-none focus:ring-2 focus:ring-slate-200 font-medium" placeholder="Search ideas..." value={q} onChange={e=>setQ(e.target.value)} />
-                </div>
-                <button onClick={() => { setIsSelectMode(!isSelectMode); setSelectedIds([]); }} className={`h-12 px-6 rounded-2xl font-bold text-sm border transition ${isSelectMode ? "bg-blue-50 border-blue-200 text-blue-600" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm"}`}>{isSelectMode ? "Exit Select" : "Select Mode"}</button>
-                <Link href="/add" className="h-12 px-6 flex items-center justify-center rounded-2xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-800 transition shadow-md">+ Add Idea</Link>
-             </div>
-             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 lg:w-3/4">
-               <ComboBox placeholder="Game" items={games.map(g=>({id:g.id, name:g.title}))} selectedId={gameId} onChange={setGameId} />
-               <select className={selectClass} value={type} onChange={e=>setType(e.target.value)}>
-                  <option value="">All Types</option>
-                  {Object.entries(TYPE_CONFIG).filter(([k]) => k !== 'default').map(([key, val]) => (<option key={key} value={key}>{val.label}</option>))}
-               </select>
-               <select className={selectClass} value={priority} onChange={e=>setPriority(e.target.value === "" ? "" : Number(e.target.value))}>
-                  <option value="">All Priorities</option>
-                  {PRIORITY_OPTIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-               </select>
-               {(q||gameId||groupId||type||priority) && <button onClick={()=>{setQ("");setGameId("");setGroupId("");setType("");setPriority("")}} className="text-xs font-bold text-rose-500 hover:underline">Clear Filters</button>}
-             </div>
+              <div className="flex gap-4">
+                 <div className="flex-1 relative">
+                    <MagnifyingGlassIcon className="w-5 h-5 absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400" />
+                    <input className="h-12 w-full rounded-2xl border border-slate-200 px-12 shadow-sm outline-none focus:ring-2 focus:ring-slate-200 font-medium" placeholder="Search ideas..." value={q} onChange={e=>setQ(e.target.value)} />
+                 </div>
+                 
+                 <button onClick={handleRandom} className="h-12 px-5 flex items-center justify-center gap-2 rounded-2xl bg-white border border-slate-200 text-slate-700 font-bold text-sm hover:bg-slate-50 transition shadow-sm" title="Random from current list">
+                    <SparklesIcon className="w-5 h-5 text-purple-500" />
+                    <span className="hidden sm:inline">Random</span>
+                 </button>
+
+                 <button onClick={() => { setIsSelectMode(!isSelectMode); setSelectedIds([]); }} className={`h-12 px-6 rounded-2xl font-bold text-sm border transition ${isSelectMode ? "bg-blue-50 border-blue-200 text-blue-600" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm"}`}>{isSelectMode ? "Exit Select" : "Select Mode"}</button>
+                 <Link href="/add" className="h-12 px-6 flex items-center justify-center rounded-2xl bg-slate-900 text-white font-bold text-sm hover:bg-slate-800 transition shadow-md">+ Add Idea</Link>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 lg:w-3/4">
+                <ComboBox placeholder="Game" items={games.map(g=>({id:g.id, name:g.title}))} selectedId={gameId} onChange={setGameId} />
+                <select className={selectClass} value={type} onChange={e=>setType(e.target.value)}>
+                   <option value="">All Types</option>
+                   {Object.entries(TYPE_CONFIG).filter(([k]) => k !== 'default').map(([key, val]) => (<option key={key} value={key}>{val.label}</option>))}
+                </select>
+                <select className={selectClass} value={priority} onChange={e=>setPriority(e.target.value === "" ? "" : Number(e.target.value))}>
+                   <option value="">All Priorities</option>
+                   {PRIORITY_OPTIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                </select>
+                {(q||gameId||groupId||type||priority) && <button onClick={()=>{setQ("");setGameId("");setGroupId("");setType("");setPriority("")}} className="text-xs font-bold text-rose-500 hover:underline">Clear Filters</button>}
+              </div>
           </header>
 
           <div className="mb-6 flex items-center justify-between"><h2 className="text-2xl font-black text-slate-900 tracking-tight">{loading ? "Loading..." : `${ideas.length} Ideas Found`}</h2></div>
