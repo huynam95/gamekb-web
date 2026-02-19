@@ -3,8 +3,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { 
+  HashtagIcon, 
+  TagIcon, 
+  DocumentDuplicateIcon, 
+  VideoCameraIcon,
+  FolderPlusIcon,
+  DocumentPlusIcon
+} from "@heroicons/react/24/outline";
 
-/* ================= TYPES (Giữ nguyên) ================= */
+/* ================= TYPES ================= */
 
 type Detail = {
   id: number;
@@ -26,7 +34,7 @@ type Game = {
   title: string;
   release_year: number | null;
   cover_url?: string | null;
-  genres_text?: string | null; // Cập nhật thêm genres
+  genres_text?: string | null;
 };
 
 type FootageRow = {
@@ -57,12 +65,23 @@ type Group = {
   description: string | null;
 };
 
+type ScriptProject = { 
+  id?: number; 
+  title: string; 
+  content: string; 
+  assets: { url: string; name: string }[];
+  description: string; 
+  hashtags: string[]; 
+  tags: string[];
+  publish_date: string | null; 
+  status: string;
+};
+
 /* ================= STYLES ================= */
 
 const inputClass =
   "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition";
 
-// Input trong suốt cực to cho Hero Header
 const heroInputClass = 
   "w-full bg-transparent text-3xl md:text-4xl font-extrabold text-white placeholder:text-white/50 border-b-2 border-white/20 px-0 py-2 focus:border-white focus:outline-none transition mb-2";
 
@@ -78,7 +97,6 @@ const btnBase =
 const btnGhost =
   btnBase + " border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900";
 
-// Nút kính mờ (Glass Button) cải tiến
 const btnGlass = 
   "inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-white/10 bg-black/30 px-4 text-sm font-semibold text-white backdrop-blur-md hover:bg-black/50 transition shadow-sm";
 
@@ -117,7 +135,6 @@ function renderLinkOrText(text: string | null) {
   return <span className="break-all font-mono text-slate-600">{text}</span>;
 }
 
-// Badge mới đẹp hơn
 function TypeBadge({ t }: { t: string }) {
   const map: Record<string, string> = {
     small_detail: "🔍 Small Detail",
@@ -131,7 +148,6 @@ function TypeBadge({ t }: { t: string }) {
 }
 
 /* ================= COMPONENT: GROUP PICKER ================= */
-// (Giữ nguyên logic cũ, chỉ rút gọn hiển thị code)
 function GroupAddPicker({ groups, onAdd, onCreate }: { groups: Group[]; onAdd: (id: number) => void; onCreate: (n: string) => void; }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -156,6 +172,186 @@ function GroupAddPicker({ groups, onAdd, onCreate }: { groups: Group[]; onAdd: (
   );
 }
 
+/* ================= COMPONENT: ADD TO SCRIPT MODAL ================= */
+function AddToScriptModal({ 
+  isOpen, onClose, detail, game, footage 
+}: { 
+  isOpen: boolean; onClose: () => void; 
+  detail: Detail; game: Game | null; footage: FootageRow[];
+}) {
+  const [activeTab, setActiveTab] = useState<"existing" | "new">("existing");
+  const [scripts, setScripts] = useState<{ id: number; title: string; status: string }[]>([]);
+  const [selectedScriptId, setSelectedScriptId] = useState<number | "">("");
+  const [loading, setLoading] = useState(false);
+
+  // Form data cho phần Tạo mới
+  const [newTitle, setNewTitle] = useState(`Video Script: ${detail?.title || "Draft"}`);
+
+  // Fetch danh sách scripts mỗi khi mở modal
+  useEffect(() => {
+    if (isOpen) {
+      supabase.from("scripts").select("id, title, status").order("id", { ascending: false })
+        .then(({ data }) => {
+          if (data) {
+            setScripts(data);
+            if (data.length > 0) setSelectedScriptId(data[0].id);
+          }
+        });
+    }
+  }, [isOpen]);
+
+  if (!isOpen || !detail) return null;
+
+  // Xử lý Dữ liệu của Idea hiện tại
+  const ideaTitle = detail.title;
+  const ideaDesc = detail.description || "";
+  const gameName = game?.title || "";
+  
+  const newContentPart = `[${ideaTitle}]\n${ideaDesc}`;
+  const newDescPart = `• ${ideaTitle}: ${ideaDesc}`;
+  const newTags = [gameName, "Shorts", "Gaming", "Game Facts"].filter(Boolean);
+  const newHashtags = ["#shorts", "#gaming", gameName ? `#${gameName.replace(/\s+/g, '').toLowerCase()}` : ""].filter(Boolean);
+  const newAssets = footage.map(f => ({ url: f.file_path || "", name: f.title || f.file_path?.split('/').pop() || "Video" }));
+
+  // Xử lý THÊM VÀO SCRIPT CÓ SẴN
+  const handleAddToExisting = async () => {
+    if (!selectedScriptId) return;
+    setLoading(true);
+
+    const { data: currentScript, error: fetchErr } = await supabase.from("scripts").select("*").eq("id", selectedScriptId).single();
+    
+    if (fetchErr || !currentScript) {
+      alert("Error fetching script data.");
+      setLoading(false);
+      return;
+    }
+
+    // Merge logic
+    const mergedContent = currentScript.content ? `${currentScript.content}\n\n${newContentPart}` : newContentPart;
+    const mergedDesc = currentScript.description ? `${currentScript.description}\n\n${newDescPart}` : newDescPart;
+    const mergedTags = Array.from(new Set([...(currentScript.tags || []), ...newTags]));
+    const mergedHashtags = Array.from(new Set([...(currentScript.hashtags || []), ...newHashtags]));
+    const mergedAssets = [...(currentScript.assets || []), ...newAssets];
+
+    const { error: updateErr } = await supabase.from("scripts").update({
+      content: mergedContent,
+      description: mergedDesc,
+      tags: mergedTags,
+      hashtags: mergedHashtags,
+      assets: mergedAssets
+    }).eq("id", selectedScriptId);
+
+    setLoading(false);
+    if (!updateErr) {
+      alert("✅ Added idea to existing script successfully!");
+      onClose();
+    } else {
+      alert("Failed to update script.");
+    }
+  };
+
+  // Xử lý TẠO SCRIPT MỚI
+  const handleCreateNew = async () => {
+    if (!newTitle.trim()) return;
+    setLoading(true);
+
+    const { error } = await supabase.from("scripts").insert({
+      title: newTitle.trim(),
+      content: newContentPart,
+      description: `Video tổng hợp các chi tiết thú vị.\n\n${newDescPart}`,
+      tags: newTags,
+      hashtags: newHashtags,
+      assets: newAssets,
+      status: "Draft"
+    });
+
+    setLoading(false);
+    if (!error) {
+      alert("✅ Created new script with this idea!");
+      onClose();
+    } else {
+      alert("Failed to create script.");
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in cursor-pointer" onClick={onClose}>
+      <div className="bg-white w-full max-w-xl rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 cursor-auto" onClick={e => e.stopPropagation()}>
+        
+        {/* Header */}
+        <div className="px-6 py-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+          <div>
+            <h2 className="text-xl font-black text-slate-900">Add to Script Project</h2>
+            <p className="text-xs font-bold text-slate-500 mt-1 line-clamp-1">{detail.title}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 font-bold p-2">✕</button>
+        </div>
+
+        {/* Tabs Toggle */}
+        <div className="flex p-2 bg-slate-100/50">
+          <button onClick={() => setActiveTab("existing")} className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold rounded-xl transition ${activeTab === "existing" ? "bg-white text-blue-600 shadow-sm border border-slate-200" : "text-slate-500 hover:bg-slate-100"}`}>
+            <FolderPlusIcon className="w-5 h-5"/> Existing Script
+          </button>
+          <button onClick={() => setActiveTab("new")} className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold rounded-xl transition ${activeTab === "new" ? "bg-white text-blue-600 shadow-sm border border-slate-200" : "text-slate-500 hover:bg-slate-100"}`}>
+            <DocumentPlusIcon className="w-5 h-5"/> New Script
+          </button>
+        </div>
+
+        {/* Tab Content */}
+        <div className="p-6 bg-white min-h-[220px]">
+          {activeTab === "existing" ? (
+            <div className="space-y-6 animate-in fade-in slide-in-from-left-2">
+              <div>
+                <label className="text-xs font-bold uppercase text-slate-400 mb-2 block tracking-widest">Select Script</label>
+                {scripts.length === 0 ? (
+                  <div className="p-4 rounded-xl border border-dashed border-slate-300 text-center text-sm text-slate-500 font-medium">No scripts found. Create a new one first!</div>
+                ) : (
+                  <select 
+                    className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-sm cursor-pointer"
+                    value={selectedScriptId}
+                    onChange={e => setSelectedScriptId(Number(e.target.value))}
+                  >
+                    {scripts.map(s => (
+                      <option key={s.id} value={s.id}>{s.title} ({s.status})</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <button 
+                onClick={handleAddToExisting} 
+                disabled={loading || scripts.length === 0} 
+                className="w-full h-12 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 active:scale-[0.98] transition disabled:opacity-50 shadow-lg shadow-blue-500/30"
+              >
+                {loading ? "Adding..." : "Add to Selected Script"}
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-6 animate-in fade-in slide-in-from-right-2">
+              <div>
+                <label className="text-xs font-bold uppercase text-slate-400 mb-2 block tracking-widest">New Script Title</label>
+                <input 
+                  className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-sm"
+                  value={newTitle}
+                  onChange={e => setNewTitle(e.target.value)}
+                  placeholder="Enter script title..."
+                  autoFocus
+                />
+              </div>
+              <button 
+                onClick={handleCreateNew} 
+                disabled={loading || !newTitle.trim()} 
+                className="w-full h-12 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800 active:scale-[0.98] transition disabled:opacity-50 shadow-lg"
+              >
+                {loading ? "Creating..." : "Create & Add Idea"}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ================= MAIN PAGE ================= */
 
 export default function IdeaDetailPage() {
@@ -171,6 +367,9 @@ export default function IdeaDetailPage() {
   const [allGroups, setAllGroups] = useState<Group[]>([]);
   const [ideaGroups, setIdeaGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
+
+  /* Script State */
+  const [showScriptModal, setShowScriptModal] = useState(false);
 
   /* Edit States */
   const [editingCore, setEditingCore] = useState(false);
@@ -224,7 +423,7 @@ export default function IdeaDetailPage() {
   useEffect(() => { loadAll(); }, [id]);
   useEffect(() => { if (detail) document.title = `${detail.title} | GameKB`; }, [detail]);
 
-  // Actions (Giữ nguyên logic cũ)
+  // Actions 
   async function togglePin() { if (!detail) return; const newPinned = !detail.pinned; await supabase.from("details").update({ pinned: newPinned, pinned_at: newPinned ? new Date().toISOString() : null }).eq("id", detail.id); await loadAll(); }
   async function deleteIdea() { if (!detail || !confirm("Delete this idea?")) return; await supabase.from("details").delete().eq("id", detail.id); router.push("/"); }
   async function saveCore() { if (!detail) return; setSavingCore(true); const { error } = await supabase.from("details").update({ title: draftTitle.trim(), description: draftDesc.trim(), detail_type: draftType, priority: draftPriority, spoiler_level: draftSpoiler, confidence: draftConfidence }).eq("id", detail.id); setSavingCore(false); if (!error) { setEditingCore(false); await loadAll(); } }
@@ -242,6 +441,15 @@ export default function IdeaDetailPage() {
 
   return (
     <main className="min-h-screen bg-slate-50 pb-20">
+      
+      {/* ADD TO SCRIPT MODAL */}
+      <AddToScriptModal 
+        isOpen={showScriptModal} 
+        onClose={() => setShowScriptModal(false)} 
+        detail={detail} 
+        game={game} 
+        footage={footage} 
+      />
       
       {/* ================= NEW HERO HEADER (POSTER STYLE) ================= */}
       <div className="relative w-full bg-slate-900 shadow-xl overflow-hidden">
@@ -262,6 +470,10 @@ export default function IdeaDetailPage() {
             <div className="flex gap-2">
               {!editingCore && (
                 <>
+                  <button onClick={() => setShowScriptModal(true)} className={btnGlass}>
+                    🎬 Add to Script
+                  </button>
+
                   <button onClick={togglePin} className={btnGlass}>
                     {detail.pinned ? "⭐ Pinned" : "☆ Pin"}
                   </button>
