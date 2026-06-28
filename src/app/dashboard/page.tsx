@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { PlayCircleIcon, ChartBarIcon, DocumentTextIcon, FireIcon, PuzzlePieceIcon } from "@heroicons/react/24/outline";
+import { PlayCircleIcon, ChartBarIcon, DocumentTextIcon, PuzzlePieceIcon } from "@heroicons/react/24/outline";
 import { AppSidebar } from "@/components/AppSidebar";
 import { GameEditorModal, IdeaItem, QuickViewModal, ScriptEditorModal } from "@/components/IdeaCards";
 import type { DetailRow, Game, ScriptProject } from "@/types/gamekb";
@@ -26,7 +26,7 @@ function StatCard({ title, value, icon: Icon, color }: { title: string, value: n
 /* ================= PAGE LOGIC (DASHBOARD) ================= */
 
 export default function Dashboard() {
-  const [stats, setStats] = useState({ total: 0, high: 0, scripts: 0, games: 0 });
+  const [stats, setStats] = useState({ total: 0, scripts: 0, games: 0 });
   const [pinnedIdeas, setPinnedIdeas] = useState<DetailRow[]>([]);
   const [recentIdeas, setRecentIdeas] = useState<DetailRow[]>([]);
   const [allGames, setAllGames] = useState<Game[]>([]);
@@ -40,7 +40,6 @@ export default function Dashboard() {
   useEffect(() => {
     async function loadData() {
       const ideasRes = await supabase.from("details").select("id", { count: "exact", head: true }).eq("status", "idea");
-      const highRes = await supabase.from("details").select("id", { count: "exact", head: true }).eq("status", "idea").eq("priority", 1);
       const scriptsRes = await supabase.from("scripts").select("id", { count: "exact", head: true });
       const gamesRes = await supabase.from("games").select("*").order("title");
       
@@ -49,7 +48,6 @@ export default function Dashboard() {
 
       setStats({
         total: ideasRes.count || 0,
-        high: highRes.count || 0,
         scripts: scriptsRes.count || 0,
         games: gamesData.length
       });
@@ -108,9 +106,8 @@ export default function Dashboard() {
              <button onClick={() => { setIsSelectMode(!isSelectMode); setSelectedIds([]); }} className={`h-10 px-4 rounded-xl font-bold border text-sm transition ${isSelectMode ? "bg-blue-50 border-blue-200 text-blue-600" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}>{isSelectMode ? "Exit Select" : "Select Mode"}</button>
            </div>
 
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
               <StatCard title="Total Ideas" value={stats.total} icon={DocumentTextIcon} color="bg-blue-500" />
-              <StatCard title="High Priority" value={stats.high} icon={FireIcon} color="bg-red-500" />
               <StatCard title="Total Games" value={stats.games} icon={PuzzlePieceIcon} color="bg-emerald-500" />
               <StatCard title="Scripts Drafted" value={stats.scripts} icon={ChartBarIcon} color="bg-purple-500" />
            </div>

@@ -19,7 +19,6 @@ export type DetailRow = {
   id: number;
   title: string;
   description: string | null;
-  priority: number;
   detail_type: string;
   game_id: number;
   pinned?: boolean;

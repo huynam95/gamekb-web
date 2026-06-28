@@ -21,9 +21,6 @@ type Detail = {
   title: string;
   description: string | null;
   detail_type: string;
-  priority: number;
-  spoiler_level: number | null;
-  confidence: number | null;
   status: string | null;
   game_id: number;
   created_at: string | null;
@@ -367,9 +364,6 @@ export default function IdeaDetailPage() {
   const [draftTitle, setDraftTitle] = useState("");
   const [draftDesc, setDraftDesc] = useState("");
   const [draftType, setDraftType] = useState("small_detail");
-  const [draftPriority, setDraftPriority] = useState(3);
-  const [draftSpoiler, setDraftSpoiler] = useState(0);
-  const [draftConfidence, setDraftConfidence] = useState(3);
 
   /* Forms */
   const [fp, setFp] = useState("");
@@ -392,7 +386,7 @@ export default function IdeaDetailPage() {
     if (error) { setLoading(false); return; }
     setDetail(d as Detail);
 
-    setDraftTitle(d.title); setDraftDesc(d.description ?? ""); setDraftType(d.detail_type); setDraftPriority(d.priority); setDraftSpoiler(d.spoiler_level ?? 0); setDraftConfidence(d.confidence ?? 3);
+    setDraftTitle(d.title); setDraftDesc(d.description ?? ""); setDraftType(d.detail_type);
 
     const { data: g } = await supabase.from("games").select("*").eq("id", d.game_id).single();
     setGame(g as Game);
@@ -420,7 +414,7 @@ export default function IdeaDetailPage() {
   // Actions 
   async function togglePin() { if (!detail) return; const newPinned = !detail.pinned; await supabase.from("details").update({ pinned: newPinned, pinned_at: newPinned ? new Date().toISOString() : null }).eq("id", detail.id); await loadAll(); }
   async function deleteIdea() { if (!detail || !confirm("Delete this idea?")) return; await supabase.from("details").delete().eq("id", detail.id); router.push("/"); }
-  async function saveCore() { if (!detail) return; setSavingCore(true); const { error } = await supabase.from("details").update({ title: draftTitle.trim(), description: draftDesc.trim(), detail_type: draftType, priority: draftPriority, spoiler_level: draftSpoiler, confidence: draftConfidence }).eq("id", detail.id); setSavingCore(false); if (!error) { setEditingCore(false); await loadAll(); } }
+  async function saveCore() { if (!detail) return; setSavingCore(true); const { error } = await supabase.from("details").update({ title: draftTitle.trim(), description: draftDesc.trim(), detail_type: draftType }).eq("id", detail.id); setSavingCore(false); if (!error) { setEditingCore(false); await loadAll(); } }
   async function addFootage() { if (!detail || !fp.trim()) return; setFetchingTitle(true); const link = fp.trim(); const ytTitle = await fetchYoutubeTitle(link); const isLocalFile = !link.startsWith("http"); await supabase.from("footage").insert({ detail_id: detail.id, file_path: link, title: ytTitle || null, downloaded: isLocalFile }); setFp(""); setFetchingTitle(false); await loadAll(); }
   async function toggleDownloaded(fid: number, currentStatus: boolean) { setFootage(prev => prev.map(f => f.id === fid ? { ...f, downloaded: !currentStatus } : f)); await supabase.from("footage").update({ downloaded: !currentStatus }).eq("id", fid); }
   async function deleteFootage(fid: number) { if (!confirm("Remove this footage?")) return; await supabase.from("footage").delete().eq("id", fid); await loadAll(); }
@@ -520,43 +514,16 @@ export default function IdeaDetailPage() {
                   {editingCore ? (
                      <div className="space-y-4 rounded-xl bg-black/40 p-4 border border-white/10 backdrop-blur-md">
                         <input className={heroInputClass} value={draftTitle} onChange={e => setDraftTitle(e.target.value)} autoFocus />
-                        <div className="grid grid-cols-2 gap-4">
-                           <div>
-                              <label className="text-xs text-slate-400 uppercase font-bold">Priority</label>
-                              <select className="w-full bg-slate-800 text-white rounded p-2 mt-1 border border-slate-600" value={draftPriority} onChange={e => setDraftPriority(Number(e.target.value))}>
-                                 <option value={1}>🔥 High</option>
-                                 <option value={3}>Normal</option>
-                                 <option value={5}>Low</option>
-                              </select>
-                           </div>
-                           <div>
-                              <label className="text-xs text-slate-400 uppercase font-bold">Type</label>
-                              <select className="w-full bg-slate-800 text-white rounded p-2 mt-1 border border-slate-600" value={draftType} onChange={e => setDraftType(e.target.value)}>
-                                 <option value="small_detail">Small Detail</option>
-                                 <option value="easter_egg">Easter Egg</option>
-                                 <option value="npc_reaction">NPC Reaction</option>
-                                 <option value="physics">Physics</option>
-                                 <option value="troll">Troll</option>
-                                 <option value="punish">Punish</option>
-                              </select>
-                           </div>
-                           <div>
-                              <label className="text-xs text-slate-400 uppercase font-bold">Confidence</label>
-                              <select className="w-full bg-slate-800 text-white rounded p-2 mt-1 border border-slate-600" value={draftConfidence} onChange={e => setDraftConfidence(Number(e.target.value))}>
-                                 <option value={1}>Low</option>
-                                 <option value={3}>Medium</option>
-                                 <option value={5}>Verified</option>
-                              </select>
-                           </div>
-                           <div>
-                              <label className="text-xs text-slate-400 uppercase font-bold">Spoiler</label>
-                              <select className="w-full bg-slate-800 text-white rounded p-2 mt-1 border border-slate-600" value={draftSpoiler} onChange={e => setDraftSpoiler(Number(e.target.value))}>
-                                 <option value={0}>None</option>
-                                 <option value={1}>Mild</option>
-                                 <option value={2}>Story</option>
-                                 <option value={3}>Ending</option>
-                              </select>
-                           </div>
+                        <div>
+                           <label className="text-xs text-slate-400 uppercase font-bold">Type</label>
+                           <select className="w-full bg-slate-800 text-white rounded p-2 mt-1 border border-slate-600" value={draftType} onChange={e => setDraftType(e.target.value)}>
+                              <option value="small_detail">Small Detail</option>
+                              <option value="easter_egg">Easter Egg</option>
+                              <option value="npc_reaction">NPC Reaction</option>
+                              <option value="physics">Physics</option>
+                              <option value="troll">Troll</option>
+                              <option value="punish">Punish</option>
+                           </select>
                         </div>
                      </div>
                   ) : (
@@ -565,35 +532,8 @@ export default function IdeaDetailPage() {
                            {detail.title}
                         </h1>
 
-                        {/* STATS BAR */}
                         <div className="flex flex-wrap items-center gap-4">
                            <TypeBadge t={detail.detail_type} />
-                           
-                           <div className="h-6 w-px bg-white/20"></div>
-
-                           <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold uppercase text-slate-400">Priority</span>
-                              <span className={`text-xs font-bold px-2 py-0.5 rounded ${detail.priority === 1 ? 'bg-rose-500 text-white' : 'bg-slate-700 text-white'}`}>
-                                 {detail.priority === 1 ? "HIGH" : detail.priority === 5 ? "LOW" : "NORMAL"}
-                              </span>
-                           </div>
-
-                           <div className="h-6 w-px bg-white/20"></div>
-
-                           <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold uppercase text-slate-400">Confidence</span>
-                              <div className="flex gap-0.5">
-                                 {[1, 2, 3, 4, 5].map(star => (
-                                    <div key={star} className={`h-1.5 w-1.5 rounded-full ${star <= (detail.confidence||0) ? 'bg-emerald-400' : 'bg-slate-700'}`} />
-                                 ))}
-                              </div>
-                           </div>
-                           
-                           {detail.spoiler_level && detail.spoiler_level > 0 && (
-                              <span className="ml-auto text-xs font-bold text-amber-500 border border-amber-500/30 px-2 py-0.5 rounded bg-amber-500/10 uppercase tracking-wider">
-                                 ⚠️ Spoiler Lv.{detail.spoiler_level}
-                              </span>
-                           )}
                         </div>
                      </>
                   )}
