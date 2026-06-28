@@ -273,11 +273,22 @@ export function IdeaItem({
       )}
       <div className={`absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/60 to-transparent ${isSelected ? "opacity-90 bg-blue-900/20" : ""}`} />
       {isSelectMode && (
-        <div className="absolute top-3 right-3 z-30">
-          <div className={`h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? "bg-blue-500 border-blue-500 text-white" : "border-white/50 bg-black/20"}`}>
-            {isSelected && <CheckIcon className="h-4 w-4 stroke-[3]" />}
+        <>
+          <button
+            onClick={(event) => { event.stopPropagation(); onQuickView(r); }}
+            className="absolute left-3 top-3 z-30 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur-md transition hover:bg-emerald-500 hover:border-emerald-400 active:scale-95"
+            title="Preview idea"
+            aria-label={`Preview idea: ${r.title}`}
+            type="button"
+          >
+            <EyeIcon className="h-4 w-4" />
+          </button>
+          <div className="absolute top-3 right-3 z-30">
+            <div className={`flex h-7 w-7 items-center justify-center rounded-full border-2 transition-all ${isSelected ? "border-blue-500 bg-blue-500 text-white shadow-lg shadow-blue-500/30" : "border-white/60 bg-black/25 backdrop-blur-md"}`}>
+              {isSelected && <CheckIcon className="h-4 w-4 stroke-[3]" />}
+            </div>
           </div>
-        </div>
+        </>
       )}
       <div className="absolute inset-0 flex flex-col justify-end p-5">
         <div className="z-10">
