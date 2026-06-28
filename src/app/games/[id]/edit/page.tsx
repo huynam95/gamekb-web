@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { useNotifications } from "@/components/NotificationCenter";
 
 /* ================= STYLES ================= */
 
@@ -25,6 +26,7 @@ const cardClass = "rounded-2xl border border-slate-200 bg-white p-6 shadow-sm";
 export default function EditGamePage() {
   const params = useParams();
   const router = useRouter();
+  const { success, error: notifyError, confirm } = useNotifications();
   
   const id = Number(params?.id);
 
@@ -94,10 +96,10 @@ export default function EditGamePage() {
       .eq("id", id);
 
     if (error) {
-      setErr(error.message);
+      notifyError(error.message, "Could not update game");
       setSaving(false);
     } else {
-      setOkMsg("Updated successfully!");
+      success("Updated successfully!", "Game updated");
       setSaving(false);
       router.refresh();
       // Delay chút rồi về trang chủ
@@ -107,16 +109,24 @@ export default function EditGamePage() {
 
   // Hành động Xóa (DELETE)
   async function deleteGame() {
-    const confirmMsg = `Delete "${title}"?\n\nWarning: This will delete ALL ideas attached to this game!`;
-    if (!confirm(confirmMsg)) return;
+    const shouldDelete = await confirm({
+      kind: "warning",
+      title: "Delete game?",
+      message: `Delete "${title}"?
+
+Warning: This will delete ALL ideas attached to this game!`,
+      confirmText: "Delete",
+    });
+    if (!shouldDelete) return;
 
     setSaving(true);
     const { error } = await supabase.from("games").delete().eq("id", id);
 
     if (error) {
-      setErr(error.message);
+      notifyError(error.message, "Could not delete game");
       setSaving(false);
     } else {
+      success("Game deleted.", "Deleted");
       router.push("/");
       router.refresh();
     }

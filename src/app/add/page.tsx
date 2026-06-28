@@ -15,6 +15,7 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import { fetchYoutubeTitle } from "@/lib/youtube";
 import { AppSidebar } from "@/components/AppSidebar";
+import { useNotifications } from "@/components/NotificationCenter";
 
 /* ================= TYPES ================= */
 
@@ -428,6 +429,7 @@ function GroupPicker({ groups, selectedIds, onToggle, onCreateGroup }: any) {
 /* ================= MAIN COMPONENT ================= */
 
 export default function AddIdeaPage() {
+  const { success, error: notifyError } = useNotifications();
   const [games, setGames] = useState<Game[]>([]);
   const [groups, setGroups] = useState<IdeaGroup[]>([]);
   const [gameId, setGameId] = useState<number | "">("");
@@ -457,10 +459,6 @@ export default function AddIdeaPage() {
   const [stagedSources, setStagedSources] = useState<StagedSource[]>([]);
 
   const [savingIdea, setSavingIdea] = useState(false);
-  const [message, setMessage] = useState<{
-    kind: "ok" | "err";
-    text: string;
-  } | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -552,10 +550,7 @@ export default function AddIdeaPage() {
   async function saveIdea(e: React.FormEvent) {
     e.preventDefault();
     if (!gameId || !title.trim() || !description.trim()) {
-      setMessage({
-        kind: "err",
-        text: "Please fill in Game, Title, and Description.",
-      });
+      notifyError("Please fill in Game, Title, and Description.", "Missing fields");
       return;
     }
     setSavingIdea(true);
@@ -574,7 +569,7 @@ export default function AddIdeaPage() {
       .single();
 
     if (error || !idea) {
-      setMessage({ kind: "err", text: error?.message || "Error saving." });
+      notifyError(error?.message || "Error saving.", "Could not save idea");
       setSavingIdea(false);
       return;
     }
@@ -629,17 +624,16 @@ export default function AddIdeaPage() {
     if (failedChildSave) {
       await supabase.from("details").delete().eq("id", detailId);
       setSavingIdea(false);
-      setMessage({
-        kind: "err",
-        text:
-          failedChildSave.error?.message ||
+      notifyError(
+        failedChildSave.error?.message ||
           "Idea was not saved because related data failed.",
-      });
+        "Could not save idea",
+      );
       return;
     }
 
     setSavingIdea(false);
-    setMessage({ kind: "ok", text: "Idea saved successfully!" });
+    success("Idea saved successfully!", "Idea saved");
     setTitle("");
     setDescription("");
     setStagedFootage([]);
@@ -664,13 +658,6 @@ export default function AddIdeaPage() {
             </p>
           </div>
 
-          {message && (
-            <div
-              className={`mb-8 rounded-2xl border-2 px-6 py-4 text-sm font-bold animate-in slide-in-from-top-4 ${message.kind === "ok" ? "border-emerald-100 bg-emerald-50 text-emerald-700" : "border-rose-100 bg-rose-50 text-rose-700"}`}
-            >
-              {message.kind === "ok" ? "✓ " : "✕ "} {message.text}
-            </div>
-          )}
 
           <form
             onSubmit={saveIdea}

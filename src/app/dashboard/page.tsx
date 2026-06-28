@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { PlayCircleIcon, ChartBarIcon, DocumentTextIcon, PuzzlePieceIcon } from "@heroicons/react/24/outline";
 import { AppSidebar } from "@/components/AppSidebar";
 import { GameEditorModal, IdeaItem, QuickViewModal, ScriptEditorModal } from "@/components/IdeaCards";
+import { useNotifications } from "@/components/NotificationCenter";
 import type { DetailRow, Game, ScriptProject } from "@/types/gamekb";
 
 /* ================= COMPONENTS ================= */
@@ -26,6 +27,7 @@ function StatCard({ title, value, icon: Icon, color }: { title: string, value: n
 /* ================= PAGE LOGIC (DASHBOARD) ================= */
 
 export default function Dashboard() {
+  const { success, error: notifyError } = useNotifications();
   const [stats, setStats] = useState({ total: 0, scripts: 0, games: 0 });
   const [pinnedIdeas, setPinnedIdeas] = useState<DetailRow[]>([]);
   const [recentIdeas, setRecentIdeas] = useState<DetailRow[]>([]);
@@ -67,7 +69,13 @@ export default function Dashboard() {
 
   async function handleSaveScript(data: Partial<ScriptProject>) {
     const { error } = await supabase.from("scripts").insert(data);
-    if (!error) { alert("Script saved successfully!"); setIsSelectMode(false); setSelectedIds([]); }
+    if (error) {
+      notifyError(error.message, "Could not save script");
+      return;
+    }
+    success("Script saved successfully!", "Script saved");
+    setIsSelectMode(false);
+    setSelectedIds([]);
   }
 
   const updateGameInList = (updatedGame: Game) => {

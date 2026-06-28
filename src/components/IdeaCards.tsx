@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CheckIcon, DocumentDuplicateIcon, EyeIcon, HashtagIcon, PencilSquareIcon, TagIcon, VideoCameraIcon } from "@heroicons/react/24/outline";
+import { Bars3Icon, CheckIcon, DocumentDuplicateIcon, EyeIcon, HashtagIcon, PencilSquareIcon, TagIcon, VideoCameraIcon } from "@heroicons/react/24/outline";
 import { supabase } from "@/lib/supabaseClient";
 import type { DetailRow, Game, ScriptProject } from "@/types/gamekb";
 import type { VideoTheme } from "@/lib/videoThemes";
@@ -105,45 +105,110 @@ export function ScriptEditorModal({
     assets: [],
   });
   const [activeTab, setActiveTab] = useState<"details" | "script" | "assets">("script");
+  const [orderedIdeas, setOrderedIdeas] = useState<DetailRow[]>([]);
+  const [draggedIdeaId, setDraggedIdeaId] = useState<number | null>(null);
+  const [dragOverIdeaId, setDragOverIdeaId] = useState<number | null>(null);
+
+  const findGameTitle = (idea: DetailRow) => {
+    return initialData.games.find((candidate) => candidate.id === idea.game_id)?.title || idea.game?.title || "this game";
+  };
+
+  const ensurePeriod = (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return trimmed;
+    return /[.!?…]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+  };
+
+  const smoothScriptDetail = (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return trimmed;
+    return /^(If|When|During|After|Before|At|Right|There|You|Most|But|And)\b/.test(trimmed)
+      ? trimmed.charAt(0).toLowerCase() + trimmed.slice(1)
+      : trimmed;
+  };
+
+  const buildScriptLine = (idea: DetailRow) => {
+    const gameTitle = findGameTitle(idea);
+    const rawDetail = (idea.description || idea.title || "").replace(/\s+/g, " ").replace(/^\[[^\]]+\]\s*/, "").trim();
+
+    if (!rawDetail) return `In ${gameTitle}, ${smoothScriptDetail(idea.title)}`;
+    if (/^in\s+/i.test(rawDetail)) return ensurePeriod(rawDetail);
+
+    return ensurePeriod(`In ${gameTitle}, ${smoothScriptDetail(rawDetail)}`);
+  };
+
+  const buildDraftFromIdeas = (ideas: DetailRow[]) => {
+    const titles = ideas.map((idea) => idea.title);
+    const gameNames = Array.from(
+      new Set(
+        ideas
+          .map((idea) => findGameTitle(idea))
+          .filter(Boolean)
+      )
+    );
+    const fullDescription = ideas.map((idea) => `• ${findGameTitle(idea)}: ${idea.title}\n${idea.description || ""}`).join("\n\n");
+    const allAssets = ideas.flatMap(
+      (idea) => idea.footage?.map((footage) => ({ url: footage.file_path, name: footage.title || footage.file_path.split("/").pop() || "Video" })) || []
+    );
+
+    const theme = initialData.theme ?? null;
+    const themePrefix = theme ? `${theme.title}: ` : "Video Script: ";
+    const themeDescription = theme ? `Topic: ${theme.title}${theme.hook ? `\nHook: ${theme.hook}` : ""}\n\n` : "";
+    const themeTags = theme ? [theme.title] : [];
+    const themeHashtag = theme ? [themeToHashtag(theme)] : [];
+    const ideaBlocks = ideas.map(buildScriptLine).join("\n\n");
+    const openingHook = theme?.hook?.trim() || "";
+
+    return {
+      title: `${themePrefix}${titles[0] || "Untitled"}${titles.length > 1 ? "..." : ""}`,
+      content: openingHook ? `${openingHook}\n\n${ideaBlocks}` : ideaBlocks,
+      description: `${themeDescription}Video tổng hợp các chi tiết thú vị.\n\n${fullDescription}`,
+      assets: allAssets,
+      tags: Array.from(new Set([...themeTags, ...gameNames, "Shorts", "Gaming", "Game Facts"])),
+      hashtags: Array.from(new Set(["#shorts", "#gaming", ...themeHashtag, ...gameNames.map((gameName) => `#${gameName.replace(/\s+/g, "").toLowerCase()}`)])),
+    };
+  };
 
   useEffect(() => {
     if (isOpen && initialData.ideas.length > 0) {
-      const titles = initialData.ideas.map((idea) => idea.title);
-      const gameNames = Array.from(
-        new Set(
-          initialData.ideas
-            .map((idea) => {
-              const game = initialData.games.find((candidate) => candidate.id === idea.game_id);
-              return game?.title || "";
-            })
-            .filter(Boolean)
-        )
-      );
-      const fullDescription = initialData.ideas.map((idea) => `• ${idea.title}: ${idea.description || ""}`).join("\n\n");
-      const allAssets = initialData.ideas.flatMap(
-        (idea) => idea.footage?.map((footage) => ({ url: footage.file_path, name: footage.title || footage.file_path.split("/").pop() || "Video" })) || []
-      );
-
-      const theme = initialData.theme ?? null;
-      const themePrefix = theme ? `${theme.title}: ` : "Video Script: ";
-      const themeDescription = theme ? `Topic: ${theme.title}${theme.hook ? `\nHook: ${theme.hook}` : ""}\n\n` : "";
-      const themeTags = theme ? [theme.title] : [];
-      const themeHashtag = theme ? [themeToHashtag(theme)] : [];
-      const ideaBlocks = initialData.ideas.map((idea) => `[${idea.title}]\n${idea.description || ""}`).join("\n\n");
-      const openingHook = theme?.hook?.trim() || "";
-
+      setOrderedIdeas(initialData.ideas);
       setFormData({
-        title: `${themePrefix}${titles[0]}${titles.length > 1 ? "..." : ""}`,
-        content: openingHook ? `${openingHook}\n\n${ideaBlocks}` : ideaBlocks,
-        description: `${themeDescription}Video tổng hợp các chi tiết thú vị.\n\n${fullDescription}`,
-        assets: allAssets,
-        tags: Array.from(new Set([...themeTags, ...gameNames, "Shorts", "Gaming", "Game Facts"])),
-        hashtags: Array.from(new Set(["#shorts", "#gaming", ...themeHashtag, ...gameNames.map((gameName) => `#${gameName.replace(/\s+/g, "").toLowerCase()}`)])),
+        ...buildDraftFromIdeas(initialData.ideas),
         status: "Draft",
         publish_date: null,
       });
+      setActiveTab("script");
+      setDraggedIdeaId(null);
+      setDragOverIdeaId(null);
     }
   }, [isOpen, initialData.ideas, initialData.games, initialData.theme]);
+
+  const applyIdeaOrder = (nextIdeas: DetailRow[]) => {
+    setOrderedIdeas(nextIdeas);
+    const draft = buildDraftFromIdeas(nextIdeas);
+    setFormData((current) => ({
+      ...current,
+      title: draft.title,
+      content: draft.content,
+      description: draft.description,
+      assets: draft.assets,
+      tags: draft.tags,
+      hashtags: draft.hashtags,
+    }));
+  };
+
+  const moveIdea = (sourceId: number, targetId: number) => {
+    if (sourceId === targetId) return;
+
+    const sourceIndex = orderedIdeas.findIndex((idea) => idea.id === sourceId);
+    const targetIndex = orderedIdeas.findIndex((idea) => idea.id === targetId);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+
+    const nextIdeas = [...orderedIdeas];
+    const [movedIdea] = nextIdeas.splice(sourceIndex, 1);
+    nextIdeas.splice(targetIndex, 0, movedIdea);
+    applyIdeaOrder(nextIdeas);
+  };
 
   if (!isOpen) return null;
 
@@ -153,7 +218,7 @@ export function ScriptEditorModal({
         <div className="flex items-center justify-between border-b border-slate-100 bg-white px-8 py-5 dark:border-slate-800 dark:bg-slate-950">
           <div>
             <h2 className="text-2xl font-black text-slate-900 dark:text-slate-50">Create Video Script</h2>
-            <p className="text-sm text-slate-500 font-bold mt-1">Drafting from {initialData.ideas.length} ideas</p>
+            <p className="mt-1 text-sm font-bold text-slate-500">Drafting from {orderedIdeas.length || initialData.ideas.length} ideas</p>
           </div>
           <div className="flex gap-3">
             <button onClick={onClose} className="cursor-pointer rounded-xl px-5 py-3 text-sm font-bold text-slate-500 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800" type="button">Cancel</button>
@@ -169,39 +234,95 @@ export function ScriptEditorModal({
           ))}
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-slate-50/40 p-10 dark:bg-slate-950">
+        <div className="flex-1 overflow-y-auto bg-slate-50/40 p-6 dark:bg-slate-950 lg:p-8">
           {activeTab === "script" && (
-            <textarea
-              className="h-full w-full resize-none rounded-3xl border border-slate-200 bg-white p-8 font-sans text-[17px] leading-8 text-slate-800 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-600"
-              value={formData.content}
-              onChange={(event) => setFormData({ ...formData, content: event.target.value })}
-            />
+            <div className="grid h-full min-h-[560px] gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
+              <aside className="flex min-h-0 flex-col rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-500 dark:text-blue-300">Idea Order</p>
+                    <p className="mt-1 text-xs font-bold text-slate-400 dark:text-slate-500">Drag details to arrange the script.</p>
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-500 dark:bg-slate-800 dark:text-slate-300">{orderedIdeas.length}</span>
+                </div>
+
+                <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+                  {orderedIdeas.map((idea, index) => {
+                    const isDragOver = dragOverIdeaId === idea.id && draggedIdeaId !== idea.id;
+                    return (
+                      <div
+                        key={idea.id}
+                        draggable
+                        onDragStart={(event) => {
+                          setDraggedIdeaId(idea.id);
+                          event.dataTransfer.effectAllowed = "move";
+                          event.dataTransfer.setData("text/plain", String(idea.id));
+                        }}
+                        onDragOver={(event) => {
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = "move";
+                          setDragOverIdeaId(idea.id);
+                        }}
+                        onDragLeave={() => setDragOverIdeaId((current) => current === idea.id ? null : current)}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          const sourceId = Number(event.dataTransfer.getData("text/plain") || draggedIdeaId);
+                          if (Number.isFinite(sourceId)) moveIdea(sourceId, idea.id);
+                          setDraggedIdeaId(null);
+                          setDragOverIdeaId(null);
+                        }}
+                        onDragEnd={() => {
+                          setDraggedIdeaId(null);
+                          setDragOverIdeaId(null);
+                        }}
+                        className={`group flex cursor-grab items-start gap-3 rounded-2xl border p-3 text-left shadow-sm transition active:cursor-grabbing ${isDragOver ? "border-blue-400 bg-blue-50 ring-2 ring-blue-100 dark:border-blue-500 dark:bg-blue-500/10 dark:ring-blue-500/20" : "border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700 dark:hover:bg-slate-900"}`}
+                      >
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-xs font-black text-slate-400 shadow-sm dark:bg-slate-800 dark:text-slate-300">{index + 1}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <p className="truncate text-sm font-black text-slate-800 dark:text-slate-100">{findGameTitle(idea)}</p>
+                            <Bars3Icon className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:text-slate-500 dark:text-slate-600 dark:group-hover:text-slate-300" />
+                          </div>
+                          <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">{idea.title}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </aside>
+
+              <textarea
+                className="h-full min-h-[560px] w-full resize-none rounded-3xl border border-slate-200 bg-white p-8 font-sans text-[17px] leading-8 text-slate-800 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-600"
+                value={formData.content}
+                onChange={(event) => setFormData({ ...formData, content: event.target.value })}
+              />
+            </div>
           )}
 
           {activeTab === "details" && (
-            <div className="space-y-8 max-w-5xl mx-auto">
+            <div className="mx-auto max-w-5xl space-y-8">
               <div>
-                <label className="text-xs font-bold uppercase text-slate-400 mb-2 block tracking-widest">Title</label>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-slate-400">Title</label>
                 <input className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-5 text-lg font-bold outline-none shadow-sm focus:border-blue-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100" value={formData.title} onChange={(event) => setFormData({ ...formData, title: event.target.value })} />
               </div>
               <div>
-                <label className="text-xs font-bold uppercase text-slate-400 mb-2 block tracking-widest">Description</label>
+                <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-slate-400">Description</label>
                 <textarea className="h-64 w-full rounded-2xl border border-slate-200 bg-white p-5 text-base leading-7 outline-none shadow-sm focus:border-blue-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100" value={formData.description} onChange={(event) => setFormData({ ...formData, description: event.target.value })} />
               </div>
               <div className="grid grid-cols-2 gap-10">
                 <div className="space-y-4">
-                  <label className="text-xs font-bold uppercase text-slate-400 flex items-center gap-2 tracking-widest"><HashtagIcon className="w-4 h-4" /> Hashtags</label>
+                  <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400"><HashtagIcon className="h-4 w-4" /> Hashtags</label>
                   <div className="flex flex-wrap gap-2">
                     {formData.hashtags?.map((tag, index) => (
-                      <span key={index} className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold border border-blue-100 shadow-sm">{tag}</span>
+                      <span key={index} className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-600 shadow-sm dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">{tag}</span>
                     ))}
                   </div>
                 </div>
                 <div className="space-y-4">
-                  <label className="text-xs font-bold uppercase text-slate-400 flex items-center gap-2 tracking-widest"><TagIcon className="w-4 h-4" /> Tags</label>
+                  <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400"><TagIcon className="h-4 w-4" /> Tags</label>
                   <div className="flex flex-wrap gap-2">
                     {formData.tags?.map((tag, index) => (
-                      <span key={index} className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold border border-slate-200 shadow-sm">{tag}</span>
+                      <span key={index} className="rounded-lg border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">{tag}</span>
                     ))}
                   </div>
                 </div>
@@ -210,11 +331,11 @@ export function ScriptEditorModal({
           )}
 
           {activeTab === "assets" && (
-            <div className="space-y-6 max-w-5xl mx-auto">
-              <div className="flex justify-between items-center px-1">
-                <label className="text-xs font-bold uppercase text-slate-400 block tracking-widest">Selected Footage</label>
+            <div className="mx-auto max-w-5xl space-y-6">
+              <div className="flex items-center justify-between px-1">
+                <label className="block text-xs font-bold uppercase tracking-widest text-slate-400">Selected Footage</label>
                 <button onClick={() => navigator.clipboard.writeText(formData.assets?.map((asset) => asset.url).join("\n") || "")} className="flex cursor-pointer items-center gap-1 text-xs font-bold text-blue-600 hover:underline" type="button">
-                  <DocumentDuplicateIcon className="w-4 h-4" /> Copy All Links
+                  <DocumentDuplicateIcon className="h-4 w-4" /> Copy All Links
                 </button>
               </div>
               <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm divide-y divide-slate-50 dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900">
@@ -222,17 +343,17 @@ export function ScriptEditorModal({
                   formData.assets?.map((asset, index) => (
                     <div key={index} className="group flex items-center gap-6 p-6 transition hover:bg-slate-50 dark:hover:bg-slate-800/60">
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-500 dark:bg-slate-800 dark:text-slate-500 dark:group-hover:bg-blue-500/15 dark:group-hover:text-blue-300">#{index + 1}</div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-base font-bold text-slate-700 truncate">{asset.name}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-base font-bold text-slate-700 dark:text-slate-100">{asset.name}</p>
                         <p className="mt-1 truncate font-sans text-xs text-slate-400">{asset.url}</p>
                       </div>
                       <a href={asset.url} target="_blank" rel="noopener noreferrer" className="cursor-pointer rounded-xl bg-slate-100 p-3 text-slate-400 shadow-sm transition hover:bg-blue-600 hover:text-white dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-blue-600 dark:hover:text-white">
-                        <VideoCameraIcon className="w-5 h-5" />
+                        <VideoCameraIcon className="h-5 w-5" />
                       </a>
                     </div>
                   ))
                 ) : (
-                  <div className="p-16 text-center text-slate-400 italic text-base">No assets linked to these ideas.</div>
+                  <div className="p-16 text-center text-base italic text-slate-400">No assets linked to these ideas.</div>
                 )}
               </div>
             </div>

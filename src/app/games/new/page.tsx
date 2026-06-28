@@ -6,6 +6,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PhotoIcon, PuzzlePieceIcon, ArrowLeftIcon } from "@heroicons/react/24/outline";
+import { useNotifications } from "@/components/NotificationCenter";
 
 /* ================= TYPES ================= */
 
@@ -15,6 +16,7 @@ type Group = { id: number; name: string };
 
 export default function AddGamePage() {
   const router = useRouter();
+  const { success, error: notifyError, warning, confirm } = useNotifications();
   
   // Form State
   const [title, setTitle] = useState("");
@@ -46,7 +48,7 @@ export default function AddGamePage() {
 
   const handleAddGame = async () => {
     if (!title.trim()) {
-      alert("Please enter a game title!");
+      warning("Please enter a game title.", "Missing title");
       return;
     }
 
@@ -58,10 +60,10 @@ export default function AddGamePage() {
     setLoading(false);
 
     if (!error) {
-      alert("Game added successfully!");
+      success("Game added successfully!", "Game saved");
       router.push("/"); // Quay về trang chủ
     } else {
-      alert("Error adding game: " + error.message);
+      notifyError(error.message, "Error adding game");
     }
   };
 
@@ -72,7 +74,13 @@ export default function AddGamePage() {
     window.location.reload(); 
   }
   async function deleteGroup(id: number) {
-    if(!confirm("Delete group?")) return;
+    const shouldDelete = await confirm({
+      kind: "warning",
+      title: "Delete collection?",
+      message: "Delete this collection? Ideas will stay in your database.",
+      confirmText: "Delete",
+    });
+    if (!shouldDelete) return;
     await supabase.from("idea_groups").delete().eq("id", id);
     window.location.reload();
   }

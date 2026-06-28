@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchYoutubeTitle } from "@/lib/youtube";
+import { useNotifications } from "@/components/NotificationCenter";
 import { 
   HashtagIcon, 
   TagIcon, 
@@ -166,6 +167,7 @@ function AddToScriptModal({
   isOpen: boolean; onClose: () => void; 
   detail: Detail; game: Game | null; footage: FootageRow[];
 }) {
+  const { success, error: notifyError } = useNotifications();
   const [activeTab, setActiveTab] = useState<"existing" | "new">("existing");
   const [scripts, setScripts] = useState<{ id: number; title: string; status: string }[]>([]);
   const [selectedScriptId, setSelectedScriptId] = useState<number | "">("");
@@ -208,7 +210,7 @@ function AddToScriptModal({
     const { data: currentScript, error: fetchErr } = await supabase.from("scripts").select("*").eq("id", selectedScriptId).single();
     
     if (fetchErr || !currentScript) {
-      alert("Error fetching script data.");
+      notifyError("Error fetching script data.", "Could not load script");
       setLoading(false);
       return;
     }
@@ -230,10 +232,10 @@ function AddToScriptModal({
 
     setLoading(false);
     if (!updateErr) {
-      alert("✅ Added idea to existing script successfully!");
+      success("Added idea to existing script successfully!", "Script updated");
       onClose();
     } else {
-      alert("Failed to update script.");
+      notifyError("Failed to update script.", "Could not update script");
     }
   };
 
@@ -254,10 +256,10 @@ function AddToScriptModal({
 
     setLoading(false);
     if (!error) {
-      alert("✅ Created new script with this idea!");
+      success("Created new script with this idea!", "Script created");
       onClose();
     } else {
-      alert("Failed to create script.");
+      notifyError("Failed to create script.", "Could not create script");
     }
   };
 
@@ -344,6 +346,7 @@ function AddToScriptModal({
 export default function IdeaDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { success, error: notifyError, confirm } = useNotifications();
   const rawId = params?.id;
   const id = useMemo(() => Number(rawId), [rawId]);
 
@@ -413,13 +416,38 @@ export default function IdeaDetailPage() {
 
   // Actions 
   async function togglePin() { if (!detail) return; const newPinned = !detail.pinned; await supabase.from("details").update({ pinned: newPinned, pinned_at: newPinned ? new Date().toISOString() : null }).eq("id", detail.id); await loadAll(); }
-  async function deleteIdea() { if (!detail || !confirm("Delete this idea?")) return; await supabase.from("details").delete().eq("id", detail.id); router.push("/"); }
+  async function deleteIdea() {
+    if (!detail) return;
+    const shouldDelete = await confirm({ kind: "warning", title: "Delete idea?", message: "Delete this idea?", confirmText: "Delete" });
+    if (!shouldDelete) return;
+    const { error } = await supabase.from("details").delete().eq("id", detail.id);
+    if (error) {
+      notifyError(error.message, "Could not delete idea");
+      return;
+    }
+    success("Idea deleted.", "Deleted");
+    router.push("/");
+  }
   async function saveCore() { if (!detail) return; setSavingCore(true); const { error } = await supabase.from("details").update({ title: draftTitle.trim(), description: draftDesc.trim(), detail_type: draftType }).eq("id", detail.id); setSavingCore(false); if (!error) { setEditingCore(false); await loadAll(); } }
   async function addFootage() { if (!detail || !fp.trim()) return; setFetchingTitle(true); const link = fp.trim(); const ytTitle = await fetchYoutubeTitle(link); const isLocalFile = !link.startsWith("http"); await supabase.from("footage").insert({ detail_id: detail.id, file_path: link, title: ytTitle || null, downloaded: isLocalFile }); setFp(""); setFetchingTitle(false); await loadAll(); }
   async function toggleDownloaded(fid: number, currentStatus: boolean) { setFootage(prev => prev.map(f => f.id === fid ? { ...f, downloaded: !currentStatus } : f)); await supabase.from("footage").update({ downloaded: !currentStatus }).eq("id", fid); }
-  async function deleteFootage(fid: number) { if (!confirm("Remove this footage?")) return; await supabase.from("footage").delete().eq("id", fid); await loadAll(); }
+  async function deleteFootage(fid: number) {
+    const shouldDelete = await confirm({ kind: "warning", title: "Remove footage?", message: "Remove this footage?", confirmText: "Remove" });
+    if (!shouldDelete) return;
+    const { error } = await supabase.from("footage").delete().eq("id", fid);
+    if (error) notifyError(error.message, "Could not remove footage");
+    else success("Footage removed.", "Removed");
+    await loadAll();
+  }
   async function addSource() { if (!detail || !srcUrl.trim()) return; setSavingItem(true); await supabase.from("sources").insert({ detail_id: detail.id, url: srcUrl.trim(), reliability: 3 }); setSrcUrl(""); setSavingItem(false); await loadAll(); }
-  async function deleteSource(sid: number) { if (!confirm("Remove this source?")) return; await supabase.from("sources").delete().eq("id", sid); await loadAll(); }
+  async function deleteSource(sid: number) {
+    const shouldDelete = await confirm({ kind: "warning", title: "Remove source?", message: "Remove this source?", confirmText: "Remove" });
+    if (!shouldDelete) return;
+    const { error } = await supabase.from("sources").delete().eq("id", sid);
+    if (error) notifyError(error.message, "Could not remove source");
+    else success("Source removed.", "Removed");
+    await loadAll();
+  }
   async function addToGroup(gid: number) { if (!detail) return; await supabase.from("idea_group_items").insert({ group_id: gid, detail_id: detail.id, position: 0 }); loadAll(); }
   async function removeFromGroup(gid: number) { if (!detail) return; await supabase.from("idea_group_items").delete().eq("group_id", gid).eq("detail_id", detail.id); loadAll(); }
   async function createGroup(name: string) { const { data } = await supabase.from("idea_groups").insert({ name }).select().single(); if (data) { await addToGroup(data.id); } }

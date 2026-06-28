@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { AppSidebar } from "@/components/AppSidebar";
+import { useNotifications } from "@/components/NotificationCenter";
 import {
   TrashIcon,
   MagnifyingGlassIcon,
@@ -240,6 +241,7 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
 /* ================= MAIN PAGE ================= */
 
 export default function ScriptsPage() {
+  const { success, error: notifyError, confirm } = useNotifications();
   const [scripts, setScripts] = useState<ScriptProject[]>([]);
   const [filteredScripts, setFilteredScripts] = useState<ScriptProject[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -287,31 +289,52 @@ export default function ScriptsPage() {
   const handleUpdate = async (data: any) => {
     if (!editingScript) return;
     const { error } = await supabase.from("scripts").update(data).eq("id", editingScript.id);
-    if (!error) {
-      setScripts((prev) => prev.map((script) => (script.id === editingScript.id ? { ...script, ...data } : script)));
-      setIsModalOpen(false);
+    if (error) {
+      notifyError(error.message, "Could not update project");
+      return;
     }
+    setScripts((prev) => prev.map((script) => (script.id === editingScript.id ? { ...script, ...data } : script)));
+    setIsModalOpen(false);
+    success("Project updated successfully.", "Project updated");
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Xác nhận xóa dự án video này?")) return;
+    const shouldDelete = await confirm({
+      kind: "warning",
+      title: "Delete project?",
+      message: "Delete this video project?",
+      confirmText: "Delete",
+    });
+    if (!shouldDelete) return;
     const { error } = await supabase.from("scripts").delete().eq("id", id);
-    if (!error) {
-      setScripts((prev) => prev.filter((script) => script.id !== id));
-      setSelectedIds((prev) => prev.filter((selectedId) => selectedId !== id));
+    if (error) {
+      notifyError(error.message, "Could not delete project");
+      return;
     }
+    setScripts((prev) => prev.filter((script) => script.id !== id));
+    setSelectedIds((prev) => prev.filter((selectedId) => selectedId !== id));
+    success("Project deleted.", "Deleted");
   };
 
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
-    if (!confirm(`Xóa ${selectedIds.length} video project đã chọn?`)) return;
+    const shouldDelete = await confirm({
+      kind: "warning",
+      title: "Delete selected projects?",
+      message: `Delete ${selectedIds.length} selected video project${selectedIds.length > 1 ? "s" : ""}?`,
+      confirmText: "Delete selected",
+    });
+    if (!shouldDelete) return;
 
     const idsToDelete = [...selectedIds];
     const { error } = await supabase.from("scripts").delete().in("id", idsToDelete);
-    if (!error) {
-      setScripts((prev) => prev.filter((script) => !idsToDelete.includes(script.id)));
-      setSelectedIds([]);
+    if (error) {
+      notifyError(error.message, "Could not delete projects");
+      return;
     }
+    setScripts((prev) => prev.filter((script) => !idsToDelete.includes(script.id)));
+    setSelectedIds([]);
+    success("Selected projects deleted.", "Deleted");
   };
 
   return (

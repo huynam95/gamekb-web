@@ -11,6 +11,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { GameEditorModal, IdeaItem, QuickViewModal, ScriptEditorModal } from "@/components/IdeaCards";
 import { RandomIdeaModal } from "@/components/RandomIdeaModal";
+import { useNotifications } from "@/components/NotificationCenter";
 import type { DetailRow, Game, Group, ScriptProject } from "@/types/gamekb";
 
 /* ================= CONFIG ================= */
@@ -168,6 +169,7 @@ function VideoThemeBoard({
   onReorder: (themes: VideoTheme[]) => void;
 }) {
   const selectedTheme = getVideoThemeById(themes, value);
+  const { confirm } = useNotifications();
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState<TopicDraft>(EMPTY_TOPIC_DRAFT);
   const [draggedTopicId, setDraggedTopicId] = useState<string | null>(null);
@@ -207,8 +209,14 @@ function VideoThemeBoard({
     closeEditor();
   };
 
-  const removeTopic = (theme: VideoTheme) => {
-    if (!confirm(`Delete topic "${theme.title}"?`)) return;
+  const removeTopic = async (theme: VideoTheme) => {
+    const shouldDelete = await confirm({
+      kind: "warning",
+      title: "Delete topic?",
+      message: `Delete topic "${theme.title}"?`,
+      confirmText: "Delete",
+    });
+    if (!shouldDelete) return;
     onDelete(theme.id);
   };
 
@@ -469,6 +477,7 @@ function SortToggle({ value, onChange }: { value: "newest" | "oldest"; onChange:
 /* ================= PAGE LOGIC (MAIN) ================= */
 
 export default function Home() {
+  const { success, error: notifyError, warning, confirm: confirmNotice } = useNotifications();
   const [games, setGames] = useState<Game[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupCounts, setGroupCounts] = useState<Map<number, number>>(new Map());
@@ -499,7 +508,6 @@ export default function Home() {
   const [themesLoaded, setThemesLoaded] = useState(false);
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const [loading, setLoading] = useState(true);
-  const [saveToast, setSaveToast] = useState(false);
 
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
@@ -644,7 +652,7 @@ export default function Home() {
           .in("id", missingIds);
 
         if (error) {
-          alert(error.message);
+          notifyError(error.message);
           return;
         }
 
@@ -662,12 +670,11 @@ export default function Home() {
   const handleSaveScript = async (data: Partial<ScriptProject>) => {
     const { error } = await supabase.from("scripts").insert(data);
     if (error) {
-      alert(error.message);
+      notifyError(error.message);
       return;
     }
 
-    setSaveToast(true);
-    window.setTimeout(() => setSaveToast(false), 2600);
+    success("Added to Video Project.", "Project saved");
     setIsSelectMode(Boolean(selectedThemeId));
     setSelectedIds([]);
     setSelectedIdeas([]);
@@ -682,7 +689,13 @@ export default function Home() {
   }
 
   async function deleteGroup(id: number) {
-    if(!confirm("Delete?")) return;
+    const shouldDelete = await confirmNotice({
+      kind: "warning",
+      title: "Delete collection?",
+      message: "Delete this collection? Ideas will stay in your database.",
+      confirmText: "Delete",
+    });
+    if (!shouldDelete) return;
     await supabase.from("idea_groups").delete().eq("id", id);
     window.location.reload();
   }
@@ -732,7 +745,7 @@ export default function Home() {
       const poolCount = groupDetailIds?.length === 0 ? 0 : totalCount;
 
       if (poolCount === 0) {
-        alert("No ideas available to randomize!");
+        warning("No ideas available to randomize.", "Nothing to spin");
         return;
       }
 
@@ -756,8 +769,8 @@ export default function Home() {
 
       const picks = uniqueRows.slice(0, count);
       setRandomIdeas(picks);
-    } catch (error) {
-      alert(error instanceof Error ? error.message : "Could not randomize ideas.");
+    } catch (err) {
+      notifyError(err instanceof Error ? err.message : "Could not randomize ideas.", "Random failed");
     } finally {
       setRandomLoading(false);
     }
@@ -778,16 +791,6 @@ export default function Home() {
       <GameEditorModal game={editingGame} isOpen={!!editingGame} onClose={() => setEditingGame(null)} onUpdate={(updatedGame) => { setGames(prev => prev.map(g => g.id === updatedGame.id ? updatedGame : g)); }} />
       <QuickViewModal idea={previewIdea} isOpen={!!previewIdea} onClose={() => setPreviewIdea(null)} />
 
-      {saveToast && (
-        <div className="fixed right-6 top-6 z-[220] flex items-center gap-4 rounded-3xl border border-emerald-200 bg-white/95 px-5 py-4 shadow-2xl shadow-emerald-900/10 backdrop-blur dark:border-emerald-900/60 dark:bg-slate-950/95 dark:shadow-black/30">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 text-lg font-black text-white shadow-lg shadow-emerald-500/20">✓</div>
-          <div>
-            <p className="text-sm font-black text-slate-900 dark:text-slate-50">Project saved</p>
-            <p className="mt-0.5 text-xs font-bold text-slate-500 dark:text-slate-400">Added to Video Project.</p>
-          </div>
-        </div>
-      )}
-      
       <RandomIdeaModal
         items={randomIdeas}
         games={games}
