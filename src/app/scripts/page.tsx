@@ -2,20 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import Link from "next/link";
+import { AppSidebar } from "@/components/AppSidebar";
 import { 
   TrashIcon, 
-  VideoCameraIcon,
   MagnifyingGlassIcon,
-  XMarkIcon,
   DocumentTextIcon,
   PlayCircleIcon,
-  ClockIcon,
   PencilSquareIcon,
   InformationCircleIcon,
   Squares2X2Icon,
   LinkIcon,
-  DocumentDuplicateIcon,
   CheckIcon
 } from "@heroicons/react/24/outline";
 
@@ -139,7 +135,7 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
                       />
                       <div className="flex flex-wrap gap-2 pt-4">
                          {formData.hashtags?.map((h, i) => (
-                           <span key={i} className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-xs font-black border border-blue-100">#{h}</span>
+                           <span key={i} className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-xs font-black border border-blue-100">{h.startsWith("#") ? h : `#${h}`}</span>
                          ))}
                       </div>
                    </div>
@@ -157,7 +153,7 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
                            <p className="text-base font-black text-slate-900 truncate">{asset.name}</p>
                            <p className="text-xs text-slate-500 truncate mt-1 font-mono font-bold">{asset.url}</p>
                         </div>
-                        <a href={asset.url} target="_blank" className="p-3 bg-white text-slate-400 hover:text-blue-600 rounded-xl border border-slate-200 shadow-sm"><LinkIcon className="w-5 h-5" /></a>
+                        <a href={asset.url} target="_blank" rel="noopener noreferrer" className="p-3 bg-white text-slate-400 hover:text-blue-600 rounded-xl border border-slate-200 shadow-sm"><LinkIcon className="w-5 h-5" /></a>
                      </div>
                    ))}
                 </div>
@@ -213,18 +209,7 @@ export default function ScriptsPage() {
     <div className="flex min-h-screen bg-white font-sans text-slate-900">
       <ScriptEditorModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} script={editingScript} onSave={handleUpdate} />
       
-      {/* SIDEBAR - CLEAN (NO COLLECTIONS) */}
-      <aside className="fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-slate-200 bg-white hidden md:flex">
-         <div className="flex h-20 items-center px-8 text-2xl font-black text-slate-900 tracking-tighter">GameKB<span className="text-blue-500">.</span></div>
-         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
-            <nav className="space-y-2">
-               <Link href="/" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>🏠</span> All Ideas</Link>
-               <Link href="/dashboard" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>📊</span> Dashboard</Link>
-               <button className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold bg-slate-900 text-white shadow-lg shadow-slate-200 transition text-left"><span>📜</span> Video Projects</button>
-               <Link href="/games/new" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>🕹️</span> Add Game</Link>
-            </nav>
-         </div>
-      </aside>
+      <AppSidebar activePage="scripts" />
 
       <main className="flex-1 pl-0 md:pl-72 min-w-0">
         <div className="mx-auto max-w-[1400px] px-10 py-12">

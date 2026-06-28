@@ -1,8 +1,16 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  color-scheme: light;
+}
+
+.dark {
+  --background: #020617;
+  --foreground: #e2e8f0;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -12,15 +20,166 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--background);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+* {
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.dark * {
+  scrollbar-color: #334155 transparent;
+}
+
+::selection {
+  background: rgba(37, 99, 235, 0.18);
+}
+
+.dark ::selection {
+  background: rgba(96, 165, 250, 0.22);
+}
+
+/* Dark mode base skin for the existing Tailwind-heavy UI.
+   This keeps the current class names working without repainting every page by hand. */
+.dark .bg-white {
+  background-color: #0f172a !important;
+}
+
+.dark .bg-slate-50,
+.dark .bg-slate-50\/50,
+.dark .bg-slate-50\/80 {
+  background-color: #111827 !important;
+}
+
+.dark .bg-slate-100,
+.dark .bg-slate-100\/50 {
+  background-color: #1e293b !important;
+}
+
+.dark .bg-slate-200 {
+  background-color: #334155 !important;
+}
+
+.dark .bg-blue-50 {
+  background-color: rgba(37, 99, 235, 0.16) !important;
+}
+
+.dark .bg-rose-50 {
+  background-color: rgba(225, 29, 72, 0.16) !important;
+}
+
+.dark .text-slate-950,
+.dark .text-slate-900,
+.dark .text-slate-800 {
+  color: #f8fafc !important;
+}
+
+.dark .text-slate-700,
+.dark .text-slate-600 {
+  color: #cbd5e1 !important;
+}
+
+.dark .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+.dark .text-slate-400 {
+  color: #64748b !important;
+}
+
+.dark .text-blue-600,
+.dark .text-blue-700 {
+  color: #60a5fa !important;
+}
+
+.dark .border-slate-100,
+.dark .border-slate-200,
+.dark .border-slate-300 {
+  border-color: #334155 !important;
+}
+
+.dark .border-blue-200 {
+  border-color: rgba(96, 165, 250, 0.35) !important;
+}
+
+.dark .shadow-slate-200,
+.dark .shadow-slate-200\/40 {
+  --tw-shadow-color: rgba(0, 0, 0, 0.25) !important;
+}
+
+.dark .placeholder\:text-slate-300::placeholder,
+.dark .placeholder\:text-slate-400::placeholder,
+.dark .placeholder\:text-slate-500::placeholder {
+  color: #64748b !important;
+}
+
+.dark .hover\:bg-slate-50:hover,
+.dark .hover\:bg-slate-50\/80:hover,
+.dark .hover\:bg-slate-100:hover {
+  background-color: #1e293b !important;
+}
+
+.dark .hover\:bg-blue-50:hover {
+  background-color: rgba(37, 99, 235, 0.18) !important;
+}
+
+.dark .hover\:bg-white:hover {
+  background-color: #1e293b !important;
+}
+
+.dark input,
+.dark textarea,
+.dark select {
+  color-scheme: dark;
+}
+
+.dark .dark\:bg-white {
+  background-color: #ffffff !important;
+}
+
+.dark .dark\:bg-slate-800 {
+  background-color: #1e293b !important;
+}
+
+.dark .dark\:bg-slate-900 {
+  background-color: #0f172a !important;
+}
+
+.dark .dark\:bg-slate-950 {
+  background-color: #020617 !important;
+}
+
+.dark .dark\:text-slate-950 {
+  color: #020617 !important;
+}
+
+.dark .dark\:text-slate-100 {
+  color: #f1f5f9 !important;
+}
+
+.dark .dark\:text-slate-300 {
+  color: #cbd5e1 !important;
+}
+
+.dark .dark\:text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+/* Keep navigation feeling instant. Expensive entrance animations made page switches feel laggy. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
 }

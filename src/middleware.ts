@@ -1,31 +1,22 @@
-// middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { AUTH_COOKIE_NAME, verifyAuthToken } from "@/lib/authSession";
 
-export function middleware(request: NextRequest) {
-  // Lấy cookie
-  const authToken = request.cookies.get("auth_token");
+export async function middleware(request: NextRequest) {
+  const authToken = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+  const isValidSession = await verifyAuthToken(authToken);
 
-  // Nếu đã có token, cho đi qua
-  if (authToken) {
+  if (isValidSession) {
     return NextResponse.next();
   }
 
-  // Nếu chưa có token, chuyển hướng về trang login
-  return NextResponse.redirect(new URL("/login", request.url));
+  const loginUrl = new URL("/login", request.url);
+  loginUrl.searchParams.set("next", request.nextUrl.pathname);
+  return NextResponse.redirect(loginUrl);
 }
 
-// Cấu hình: Chặn tất cả, TRỪ trang login và các file tĩnh (ảnh, api login)
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - login (trang đăng nhập)
-     * - api/auth (api xử lý đăng nhập)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
     "/((?!login|api/auth|_next/static|_next/image|favicon.ico).*)",
   ],
 };

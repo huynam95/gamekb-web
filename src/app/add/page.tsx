@@ -2,18 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import Link from "next/link";
-import { 
-  PlusIcon,
-  HomeIcon,
-  ChartBarIcon,
-  DocumentTextIcon,
-  QueueListIcon,
-  PuzzlePieceIcon,
-  TrashIcon,
-  DocumentDuplicateIcon,
-  VideoCameraIcon
-} from "@heroicons/react/24/outline";
+import { fetchYoutubeTitle } from "@/lib/youtube";
+import { AppSidebar } from "@/components/AppSidebar";
 
 /* ================= TYPES ================= */
 
@@ -34,16 +24,6 @@ const btnGhost = btnBase + " border border-slate-200 bg-white text-slate-600 sha
 const cardClass = "rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm";
 
 /* ================= HELPERS (Giữ nguyên) ================= */
-
-async function fetchYoutubeTitle(url: string): Promise<string | null> {
-  try {
-    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$/;
-    if (!youtubeRegex.test(url)) return null;
-    const res = await fetch(`https://noembed.com/embed?url=${url}`);
-    const data = await res.json();
-    return data.title || null;
-  } catch (e) { return null; }
-}
 
 function renderLinkOrText(text: string) {
   const isUrl = text.startsWith("http://") || text.startsWith("https://");
@@ -288,7 +268,16 @@ export default function AddIdeaPage() {
       promises.push(supabase.from("sources").insert(stagedSources.map((s) => ({ detail_id: detailId, url: s.url, reliability: s.reliability }))));
     }
 
-    await Promise.all(promises);
+    const childResults = await Promise.all(promises);
+    const failedChildSave = childResults.find((result) => result.error);
+
+    if (failedChildSave) {
+      await supabase.from("details").delete().eq("id", detailId);
+      setSavingIdea(false);
+      setMessage({ kind: "err", text: failedChildSave.error?.message || "Idea was not saved because related data failed." });
+      return;
+    }
+
     setSavingIdea(false);
     setMessage({ kind: "ok", text: "Idea saved successfully!" });
     setTitle(""); setDescription(""); setStagedFootage([]); setStagedSources([]); setSimilar([]); setPinned(false);
@@ -297,18 +286,7 @@ export default function AddIdeaPage() {
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
       
-      {/* SIDEBAR - CLEAN (NO COLLECTIONS) */}
-      <aside className="fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-slate-200 bg-white hidden md:flex">
-         <div className="flex h-20 items-center px-8 text-2xl font-black text-slate-900 tracking-tighter">GameKB<span className="text-blue-500">.</span></div>
-         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
-            <nav className="space-y-2">
-               <Link href="/" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>🏠</span> All Ideas</Link>
-               <Link href="/dashboard" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>📊</span> Dashboard</Link>
-               <Link href="/scripts" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>📜</span> Scripts</Link>
-               <button className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold bg-slate-900 text-white shadow-lg shadow-slate-200 transition text-left"><span>🕹️</span> Add Game</button>
-            </nav>
-         </div>
-      </aside>
+      <AppSidebar activePage="addIdea" />
 
       {/* MAIN CONTENT */}
       <main className="flex-1 md:pl-72 pb-32">

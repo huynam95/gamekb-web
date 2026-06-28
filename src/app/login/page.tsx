@@ -17,11 +17,13 @@ export default function LoginPage() {
 
     const res = await fetch("/api/auth", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ password: pass }),
     });
 
     if (res.ok) {
-      router.push("/"); // Chuyển về trang chủ
+      const nextUrl = new URLSearchParams(window.location.search).get("next") || "/";
+      router.push(nextUrl.startsWith("/") ? nextUrl : "/");
       router.refresh();
     } else {
       setErr("Incorrect password access denied.");

@@ -34,3 +34,30 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Security notes
+
+This project now signs the `auth_token` cookie with an HMAC session token instead of storing `auth_token=true`.
+
+Required production env vars:
+
+```bash
+ADMIN_PASSWORD="your-login-password"
+ADMIN_SESSION_SECRET="a-long-random-secret"
+```
+
+Generate a strong session secret with:
+
+```bash
+openssl rand -base64 32
+```
+
+Do not commit or share `.env.local`. Supabase Row Level Security should still be enabled for every table that can be modified from the client.
+
+## Update: Random to Project
+
+- Random now pulls from the full filtered idea pool instead of only the visible page.
+- Random results open in a full-screen picker.
+- Clicking a random card opens `/idea/[id]` for full detail.
+- Random ideas are selected for project creation by default.
+- Use `Save to Project` to open the project editor with the selected random ideas.

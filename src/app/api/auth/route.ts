@@ -1,31 +1,33 @@
 import { NextResponse } from "next/server";
+import { AUTH_COOKIE_NAME, SESSION_MAX_AGE_SECONDS, createAuthToken } from "@/lib/authSession";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { password } = body;
-
-    // Lấy pass từ .env, nếu chưa cấu hình thì dùng tạm chuỗi fix cứng để test
     const adminPassword = process.env.ADMIN_PASSWORD;
 
-    if (password === adminPassword) {
-      // 1. Tạo response thành công trước
-      const response = NextResponse.json({ success: true });
+    if (!adminPassword) {
+      return NextResponse.json({ success: false, error: "Server auth is not configured" }, { status: 500 });
+    }
 
-      // 2. Set cookie trực tiếp vào response này
-      response.cookies.set("auth_token", "true", {
+    if (password === adminPassword) {
+      const response = NextResponse.json({ success: true });
+      const authToken = await createAuthToken();
+
+      response.cookies.set(AUTH_COOKIE_NAME, authToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        maxAge: 60 * 60 * 24 * 30, // 30 ngày
+        sameSite: "lax",
+        maxAge: SESSION_MAX_AGE_SECONDS,
         path: "/",
       });
 
-      // 3. Trả về response đã có cookie
       return response;
     }
 
     return NextResponse.json({ success: false }, { status: 401 });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ success: false, error: "Invalid request" }, { status: 400 });
   }
 }

@@ -2,14 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { AppSidebar } from "@/components/AppSidebar";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { 
-  TrashIcon, 
-  PhotoIcon, 
-  PuzzlePieceIcon,
-  ArrowLeftIcon
-} from "@heroicons/react/24/outline";
+import { PhotoIcon, PuzzlePieceIcon, ArrowLeftIcon } from "@heroicons/react/24/outline";
 
 /* ================= TYPES ================= */
 
@@ -83,6 +79,19 @@ export default function AddGamePage() {
 
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
+      <AppSidebar
+        activePage="addGame"
+        groups={groups}
+        groupCounts={groupCounts}
+        showCollections
+        showCreateGroup={showCreateGroup}
+        newGroupName={newGroupName}
+        onToggleCreateGroup={() => setShowCreateGroup(!showCreateGroup)}
+        onNewGroupNameChange={setNewGroupName}
+        onCreateGroup={createGroup}
+        onDeleteGroup={deleteGroup}
+        onSelectGroup={() => router.push("/")}
+      />
 
       {/* MAIN CONTENT */}
       <main className="flex-1 pl-0 md:pl-72 pb-32">

@@ -2,20 +2,7 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-
-// 1. Hàm lấy title (dùng lại logic cũ)
-async function fetchYoutubeTitle(url: string): Promise<string | null> {
-  try {
-    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$/;
-    if (!youtubeRegex.test(url)) return null;
-
-    const res = await fetch(`https://noembed.com/embed?url=${url}`);
-    const data = await res.json();
-    return data.title || null;
-  } catch (e) {
-    return null;
-  }
-}
+import { fetchYoutubeTitle } from "@/lib/youtube";
 
 export default function MigratePage() {
   const [logs, setLogs] = useState<string[]>([]);

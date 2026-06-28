@@ -2,56 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import Link from "next/link";
-import { 
-  PlayCircleIcon, 
-  TrashIcon, 
-  ChartBarIcon, 
-  DocumentTextIcon, 
-  FireIcon, 
-  PuzzlePieceIcon,
-  CheckIcon,
-  PencilSquareIcon,
-  EyeIcon,
-  VideoCameraIcon,
-  HashtagIcon,
-  TagIcon,
-  DocumentDuplicateIcon
-} from "@heroicons/react/24/outline";
+import { PlayCircleIcon, ChartBarIcon, DocumentTextIcon, FireIcon, PuzzlePieceIcon } from "@heroicons/react/24/outline";
+import { AppSidebar } from "@/components/AppSidebar";
+import { GameEditorModal, IdeaItem, QuickViewModal, ScriptEditorModal } from "@/components/IdeaCards";
+import type { DetailRow, Game, ScriptProject } from "@/types/gamekb";
 
-/* ================= TYPES & CONFIG ================= */
-
-type Game = { id: number; title: string; cover_url?: string | null };
-type FootageItem = { file_path: string; title: string | null };
-type DetailRow = { 
-  id: number; title: string; description: string | null; priority: number; 
-  detail_type: string; game_id: number; pinned?: boolean; created_at?: string; 
-  game?: Game; 
-  footage?: FootageItem[];
-};
-
-type ScriptProject = { 
-  id: number; title: string; content: string; assets: { url: string; name: string }[];
-  description: string; hashtags: string[]; tags: string[];
-  publish_date: string | null; status: string;
-};
-
-const TYPE_CONFIG: Record<string, { label: string; className: string }> = {
-  small_detail: { label: "🔍 Small Detail", className: "bg-blue-500/20 border-blue-400/30 text-blue-100" },
-  easter_egg: { label: "🥚 Easter Egg", className: "bg-purple-500/20 border-purple-400/30 text-purple-100" },
-  npc_reaction: { label: "🗣️ NPC Reaction", className: "bg-emerald-500/20 border-emerald-400/30 text-emerald-100" },
-  physics: { label: "🍎 Physics", className: "bg-orange-500/20 border-orange-400/30 text-orange-100" },
-  troll: { label: "🤡 Troll", className: "bg-pink-500/20 border-pink-400/30 text-pink-100" },
-  punish: { label: "💀 Punish", className: "bg-red-500/20 border-red-400/30 text-red-100" },
-  default: { label: "📝 Note", className: "bg-slate-500/20 border-slate-400/30 text-slate-100" }
-};
-
-/* ================= COMPONENTS (Giữ nguyên) ================= */
-
-function TypePill({ typeKey }: { typeKey: string }) {
-  const config = TYPE_CONFIG[typeKey] || TYPE_CONFIG.default;
-  return <span className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider backdrop-blur-md ${config.className}`}>{config.label}</span>;
-}
+/* ================= COMPONENTS ================= */
 
 function StatCard({ title, value, icon: Icon, color }: { title: string, value: number, icon: any, color: string }) {
   return (
@@ -64,201 +20,6 @@ function StatCard({ title, value, icon: Icon, color }: { title: string, value: n
         <h4 className="text-3xl font-black text-slate-900">{value}</h4>
       </div>
     </div>
-  );
-}
-
-function QuickViewModal({ idea, isOpen, onClose }: { idea: DetailRow | null; isOpen: boolean; onClose: () => void }) {
-  if (!isOpen || !idea) return null;
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in" onClick={onClose}>
-      <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
-        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-          <h3 className="font-bold text-slate-900 truncate pr-4">{idea.title}</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">✕</button>
-        </div>
-        <div className="p-6 space-y-4 text-sm leading-relaxed text-slate-600 whitespace-pre-wrap max-h-[60vh] overflow-y-auto">
-          {idea.description || "No description available."}
-        </div>
-        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
-          <button onClick={onClose} className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-lg hover:bg-slate-800 transition">Close</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function GameEditorModal({ game, isOpen, onClose, onUpdate }: { game: Game | null; isOpen: boolean; onClose: () => void; onUpdate: (g: Game) => void }) {
-  const [title, setTitle] = useState("");
-  const [cover, setCover] = useState("");
-  const [loading, setLoading] = useState(false);
-  useEffect(() => { if (game) { setTitle(game.title); setCover(game.cover_url || ""); } }, [game]);
-  async function handleSave() {
-    if (!game) return; setLoading(true);
-    const { error } = await supabase.from("games").update({ title, cover_url: cover }).eq("id", game.id);
-    setLoading(false);
-    if (!error) { onUpdate({ ...game, title, cover_url: cover }); onClose(); }
-  }
-  if (!isOpen || !game) return null;
-  return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95">
-        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center"><h3 className="font-bold text-gray-900 text-sm">Edit Game Info</h3><button onClick={onClose} className="text-gray-400">✕</button></div>
-        <div className="p-5 space-y-4">
-          <div><label className="text-[10px] font-bold uppercase text-gray-400 mb-1 block tracking-wider">Title</label><input className="w-full h-10 border rounded-lg px-3 text-sm outline-none focus:border-blue-500 shadow-sm" value={title} onChange={e=>setTitle(e.target.value)} /></div>
-          <div><label className="text-[10px] font-bold uppercase text-gray-400 mb-1 block tracking-wider">Cover URL</label><input className="w-full h-10 border rounded-lg px-3 text-sm outline-none focus:border-blue-500 shadow-sm" value={cover} onChange={e=>setCover(e.target.value)} /></div>
-          <div className="flex justify-end gap-2 pt-2"><button onClick={onClose} className="px-4 py-2 text-xs font-bold text-gray-400">Cancel</button><button onClick={handleSave} disabled={loading} className="px-5 py-2 text-xs font-bold text-white bg-blue-600 rounded-lg shadow-sm">{loading ? "Saving..." : "Save Changes"}</button></div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ScriptEditorModal({ 
-  isOpen, onClose, initialData, onSave 
-}: { 
-  isOpen: boolean; onClose: () => void; 
-  initialData: { ids: number[], ideas: DetailRow[], games: Game[] };
-  onSave: (data: Partial<ScriptProject>) => void;
-}) {
-  const [formData, setFormData] = useState<Partial<ScriptProject>>({
-    title: "", content: "", description: "", hashtags: [], tags: [], publish_date: null, status: "Draft", assets: []
-  });
-  const [activeTab, setActiveTab] = useState<"details" | "script" | "assets">("script");
-
-  useEffect(() => {
-    if (isOpen && initialData.ideas.length > 0) {
-       const titles = initialData.ideas.map(i => i.title);
-       const gameNames = Array.from(new Set(initialData.ideas.map(i => {
-          const g = initialData.games.find(game => game.id === i.game_id);
-          return g?.title || "";
-       }).filter(Boolean)));
-
-       const fullDescription = initialData.ideas.map(i => `• ${i.title}: ${i.description || ""}`).join("\n\n");
-       const allAssets = initialData.ideas.flatMap(i => 
-         i.footage?.map(f => ({ url: f.file_path, name: f.title || f.file_path.split('/').pop() || "Video" })) || []
-       );
-
-       setFormData({
-         title: `Shorts Script: ${titles[0]}${titles.length > 1 ? '...' : ''}`,
-         content: initialData.ideas.map(i => `[${i.title}]\n${i.description || ""}`).join("\n\n"),
-         description: `Video tổng hợp các chi tiết thú vị.\n\n${fullDescription}`,
-         assets: allAssets,
-         tags: [...gameNames, "Shorts", "Gaming", "Game Facts"],
-         hashtags: ["#shorts", "#gaming", ...gameNames.map(g => `#${g.replace(/\s+/g, '').toLowerCase()}`)],
-         status: "Draft",
-         publish_date: null
-       });
-    }
-  }, [isOpen, initialData]);
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in">
-       <div className="bg-white w-full max-w-4xl h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-             <div><h2 className="text-xl font-black text-slate-900">Create Video Script</h2><p className="text-xs text-slate-500 font-bold">Drafting from {initialData.ideas.length} ideas</p></div>
-             <div className="flex gap-2">
-                <button onClick={onClose} className="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl">Cancel</button>
-                <button onClick={() => { onSave(formData); onClose(); }} className="px-6 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-lg">Save Project</button>
-             </div>
-          </div>
-          <div className="flex px-6 border-b border-slate-100 bg-slate-50">
-             {(["script", "details", "assets"] as const).map(tab => (
-               <button key={tab} onClick={() => setActiveTab(tab)} className={`px-4 py-3 text-sm font-bold border-b-2 transition ${activeTab === tab ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-800"}`}>
-                 {tab === "script" ? "📝 Content" : tab === "details" ? "ℹ️ Metadata" : "🔗 Assets"}
-               </button>
-             ))}
-          </div>
-          <div className="flex-1 overflow-y-auto p-8 bg-slate-50/30">
-             {activeTab === "script" && <textarea className="h-full w-full rounded-2xl border border-slate-200 p-6 text-sm leading-relaxed text-slate-800 outline-none focus:border-blue-500 font-mono shadow-inner" value={formData.content} onChange={e => setFormData({...formData, content: e.target.value})} />}
-             
-             {activeTab === "details" && <div className="space-y-6">
-                <div>
-                  <label className="text-[10px] font-bold uppercase text-slate-400 mb-2 block">Title</label>
-                  <input className="w-full h-11 rounded-xl border border-slate-200 px-4 text-sm font-bold outline-none focus:border-blue-500 shadow-sm" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold uppercase text-slate-400 mb-2 block">Description</label>
-                  <textarea className="w-full h-40 rounded-xl border border-slate-200 p-4 text-xs outline-none focus:border-blue-500 shadow-sm" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
-                </div>
-                <div className="grid grid-cols-2 gap-8">
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1 tracking-widest"><HashtagIcon className="w-3 h-3"/> Hashtags</label>
-                    <div className="flex flex-wrap gap-2">
-                      {formData.hashtags?.map((tag, i) => (
-                        <span key={i} className="px-2.5 py-1 bg-blue-50 text-blue-600 rounded-lg text-[11px] font-bold border border-blue-100 shadow-sm">{tag}</span>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1 tracking-widest"><TagIcon className="w-3 h-3"/> Tags</label>
-                    <div className="flex flex-wrap gap-2">
-                      {formData.tags?.map((tag, i) => (
-                        <span key={i} className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-lg text-[11px] font-bold border border-slate-200 shadow-sm">{tag}</span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-             </div>}
-
-             {activeTab === "assets" && <div className="space-y-4">
-                <div className="flex justify-between items-center px-1">
-                  <label className="text-[10px] font-bold uppercase text-slate-400 block tracking-widest">Selected Footage</label>
-                  <button onClick={() => navigator.clipboard.writeText(formData.assets?.map(a => a.url).join('\n') || "")} className="text-[10px] flex items-center gap-1 font-bold text-blue-600 hover:underline">
-                    <DocumentDuplicateIcon className="w-3 h-3"/> Copy All Links
-                  </button>
-                </div>
-                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm divide-y divide-slate-50">
-                  {(formData.assets || []).length > 0 ? (
-                    formData.assets?.map((asset, i) => (
-                      <div key={i} className="p-4 flex items-center gap-4 hover:bg-slate-50 transition group">
-                         <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-500">#{i+1}</div>
-                         <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold text-slate-700 truncate">{asset.name}</p>
-                            <p className="text-[10px] text-slate-400 truncate font-mono">{asset.url}</p>
-                         </div>
-                         <a href={asset.url} target="_blank" className="p-2 rounded-lg bg-slate-100 text-slate-400 hover:bg-blue-600 hover:text-white transition shadow-sm">
-                            <VideoCameraIcon className="w-4 h-4" />
-                         </a>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="p-12 text-center text-slate-400 italic text-sm">No assets linked to these ideas.</div>
-                  )}
-                </div>
-             </div>}
-          </div>
-       </div>
-    </div>
-  );
-}
-
-function IdeaItem({ r, game, isSelectMode, isSelected, onToggleSelect, onTogglePin, onEditGame, onQuickView }: { 
-  r: DetailRow; game?: Game; isSelectMode: boolean; isSelected: boolean; 
-  onToggleSelect: (id: number) => void; onTogglePin: (id: number, current: boolean) => void; 
-  onEditGame: (game: Game) => void; onQuickView: (idea: DetailRow) => void;
-}) {
-  const hasCover = !!game?.cover_url;
-  return (
-    <li onClick={() => isSelectMode && onToggleSelect(r.id)} className={`group relative h-64 w-full overflow-hidden rounded-2xl border shadow-sm transition-all duration-300 ${isSelectMode ? "cursor-pointer active:scale-95" : "hover:shadow-2xl hover:-translate-y-1"} ${isSelected ? "border-blue-500 ring-2 ring-blue-500 ring-offset-2 ring-offset-slate-50" : "border-slate-200 bg-slate-900"}`}>
-        {hasCover ? <div className={`absolute inset-0 bg-cover bg-center transition-transform duration-700 ease-out opacity-60 ${isSelectMode ? '' : 'group-hover:scale-110 group-hover:opacity-40'}`} style={{ backgroundImage: `url(${game.cover_url})` }} /> : <div className="absolute inset-0 bg-slate-800 opacity-50" />}
-        <div className={`absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/60 to-transparent ${isSelected ? 'opacity-90 bg-blue-900/20' : ''}`} />
-        {isSelectMode && <div className="absolute top-3 right-3 z-30"><div className={`h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all ${isSelected ? "bg-blue-500 border-blue-500 text-white" : "border-white/50 bg-black/20"}`}>{isSelected && <CheckIcon className="h-4 w-4 stroke-[3]" />}</div></div>}
-        <div className="absolute inset-0 flex flex-col justify-end p-5"><div className="z-10">
-          <div className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 z-20 relative">
-            <span className="truncate max-w-[80%]">{game?.title}</span>
-            {!isSelectMode && game && <button onClick={(e)=>{e.stopPropagation(); onEditGame(game)}} className="p-1 rounded hover:bg-white/20 text-slate-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"><PencilSquareIcon className="h-3 w-3"/></button>}
-          </div>
-          <h3 className="line-clamp-2 text-base font-bold leading-snug text-white mb-2">{r.title}</h3>
-          <div className="flex items-center gap-2"><TypePill typeKey={r.detail_type} />{r.pinned && <span className="text-[10px] font-bold text-amber-400">★ Pinned</span>}</div>
-        </div></div>
-        {!isSelectMode && <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex flex-col gap-2">
-           <button onClick={(e)=>{e.stopPropagation(); onTogglePin(r.id, !!r.pinned)}} className={`flex h-8 w-8 items-center justify-center rounded-full backdrop-blur-md shadow-lg transition hover:scale-110 ${r.pinned ? 'bg-amber-400 text-white' : 'bg-white/10 text-white hover:bg-white/20'}`}>{r.pinned ? "★" : "☆"}</button>
-           <button onClick={(e)=>{e.stopPropagation(); onQuickView(r)}} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-md shadow-lg hover:bg-emerald-500 hover:scale-110 transition" title="Quick Preview"><EyeIcon className="h-4 w-4"/></button>
-        </div>}
-        <a href={`/idea/${r.id}`} className={`absolute inset-0 z-0 ${isSelectMode ? 'hidden' : ''}`} />
-    </li>
   );
 }
 
@@ -278,8 +39,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function loadData() {
-      const ideasRes = await supabase.from("details").select("id, priority, status", { count: 'exact' });
-      const scriptsRes = await supabase.from("scripts").select("id", { count: 'exact' });
+      const ideasRes = await supabase.from("details").select("id", { count: "exact", head: true }).eq("status", "idea");
+      const highRes = await supabase.from("details").select("id", { count: "exact", head: true }).eq("status", "idea").eq("priority", 1);
+      const scriptsRes = await supabase.from("scripts").select("id", { count: "exact", head: true });
       const gamesRes = await supabase.from("games").select("*").order("title");
       
       const gamesData = (gamesRes.data || []) as Game[];
@@ -287,7 +49,7 @@ export default function Dashboard() {
 
       setStats({
         total: ideasRes.count || 0,
-        high: ideasRes.data?.filter(i => i.priority === 1).length || 0,
+        high: highRes.count || 0,
         scripts: scriptsRes.count || 0,
         games: gamesData.length
       });
@@ -337,18 +99,7 @@ export default function Dashboard() {
          </div>
       )}
 
-      {/* SIDEBAR - CLEAN */}
-      <aside className="fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-slate-200 bg-white hidden md:flex">
-         <div className="flex h-20 items-center px-8 text-2xl font-black text-slate-900 tracking-tighter">GameKB<span className="text-blue-500">.</span></div>
-         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
-            <nav className="space-y-2">
-               <Link href="/" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>🏠</span> All Ideas</Link>
-               <button className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold bg-slate-900 text-white shadow-lg shadow-slate-200 transition text-left"><span>📊</span> Dashboard</button>
-               <Link href="/scripts" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>📜</span> Video Project </Link>
-               <Link href="/games/new" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-slate-500 hover:bg-slate-100 transition"><span>🕹️</span> Add Game</Link>
-            </nav>
-         </div>
-      </aside>
+      <AppSidebar activePage="dashboard" />
 
       <main className="flex-1 pl-0 md:pl-72 pb-32">
         <div className="mx-auto max-w-[1900px] px-6 py-8">

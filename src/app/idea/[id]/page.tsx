@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
+import { fetchYoutubeTitle } from "@/lib/youtube";
 import { 
   HashtagIcon, 
   TagIcon, 
@@ -103,18 +105,6 @@ const btnGlass =
 const cardClass = "rounded-2xl border border-slate-200 bg-white p-6 shadow-sm";
 
 /* ================= HELPERS ================= */
-
-async function fetchYoutubeTitle(url: string): Promise<string | null> {
-  try {
-    const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$/;
-    if (!youtubeRegex.test(url)) return null;
-    const res = await fetch(`https://noembed.com/embed?url=${url}`);
-    const data = await res.json();
-    return data.title || null;
-  } catch (e) {
-    return null;
-  }
-}
 
 function renderLinkOrText(text: string | null) {
   if (!text) return null;
@@ -300,7 +290,7 @@ function AddToScriptModal({
         {/* Tab Content */}
         <div className="p-6 bg-white min-h-[220px]">
           {activeTab === "existing" ? (
-            <div className="space-y-6 animate-in fade-in slide-in-from-left-2">
+            <div className="space-y-6">
               <div>
                 <label className="text-xs font-bold uppercase text-slate-400 mb-2 block tracking-widest">Select Script</label>
                 {scripts.length === 0 ? (
@@ -326,7 +316,7 @@ function AddToScriptModal({
               </button>
             </div>
           ) : (
-            <div className="space-y-6 animate-in fade-in slide-in-from-right-2">
+            <div className="space-y-6">
               <div>
                 <label className="text-xs font-bold uppercase text-slate-400 mb-2 block tracking-widest">New Script Title</label>
                 <input 
@@ -390,7 +380,11 @@ export default function IdeaDetailPage() {
   // Load Data
   async function loadAll() {
     setLoading(true);
-    if (!Number.isFinite(id)) return;
+    if (!Number.isFinite(id)) {
+      setDetail(null);
+      setLoading(false);
+      return;
+    }
     const { data: gs } = await supabase.from("idea_groups").select("*").order("name");
     setAllGroups((gs ?? []) as Group[]);
 
@@ -465,7 +459,7 @@ export default function IdeaDetailPage() {
 
          {/* Navigation Top */}
          <div className="absolute top-0 left-0 w-full p-6 flex justify-between items-start z-30">
-            <a href="/" className={btnGlass}>← Home</a>
+            <Link href="/" className={btnGlass}>← Home</Link>
             
             <div className="flex gap-2">
               {!editingCore && (
