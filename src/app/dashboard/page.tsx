@@ -61,8 +61,8 @@ export default function Dashboard() {
     loadData();
   }, []);
 
-  const toggleSelection = (id: number) => {
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const toggleSelection = (idea: DetailRow) => {
+    setSelectedIds(prev => prev.includes(idea.id) ? prev.filter(x => x !== idea.id) : [...prev, idea.id]);
   };
 
   async function handleSaveScript(data: Partial<ScriptProject>) {

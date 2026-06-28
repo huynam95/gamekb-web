@@ -257,7 +257,7 @@ export function IdeaItem({
   game?: Game;
   isSelectMode: boolean;
   isSelected: boolean;
-  onToggleSelect: (id: number) => void;
+  onToggleSelect: (idea: DetailRow) => void;
   onTogglePin: (id: number, current: boolean) => void;
   onEditGame: (game: Game) => void;
   onQuickView: (idea: DetailRow) => void;
@@ -265,7 +265,7 @@ export function IdeaItem({
   const hasCover = !!game?.cover_url;
 
   return (
-    <li onClick={() => isSelectMode && onToggleSelect(r.id)} className={`group relative h-64 w-full overflow-hidden rounded-2xl border shadow-sm transition-shadow duration-150 ${isSelectMode ? "cursor-pointer active:scale-[0.99]" : "hover:shadow-xl"} ${isSelected ? "border-blue-500 ring-2 ring-blue-500 ring-offset-2 ring-offset-slate-50" : "border-slate-200 bg-slate-900"}`}>
+    <li onClick={() => isSelectMode && onToggleSelect(r)} className={`group relative h-64 w-full overflow-hidden rounded-2xl border shadow-sm transition-shadow duration-150 ${isSelectMode ? "cursor-pointer active:scale-[0.99]" : "hover:shadow-xl"} ${isSelected ? "border-blue-500 ring-2 ring-blue-500 ring-offset-2 ring-offset-slate-50" : "border-slate-200 bg-slate-900"}`}>
       {hasCover ? (
         <div className={`absolute inset-0 bg-cover bg-center opacity-60 transition-opacity duration-150 ${isSelectMode ? "" : "group-hover:opacity-45"}`} style={{ backgroundImage: `url(${game.cover_url})` }} />
       ) : (

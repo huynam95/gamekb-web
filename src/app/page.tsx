@@ -477,6 +477,7 @@ export default function Home() {
   
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [selectedIdeas, setSelectedIdeas] = useState<DetailRow[]>([]);
   const [showEditor, setShowEditor] = useState(false);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const [projectIdeas, setProjectIdeas] = useState<DetailRow[]>([]);
@@ -581,14 +582,22 @@ export default function Home() {
     load();
   }, [debouncedQ, gameId, groupId, type, sortOrder, currentPage]);
 
-  const toggleSelection = (id: number) => {
-    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  const toggleSelection = (idea: DetailRow) => {
+    setSelectedIds(prev =>
+      prev.includes(idea.id) ? prev.filter((id) => id !== idea.id) : [...prev, idea.id]
+    );
+    setSelectedIdeas(prev =>
+      prev.some((item) => item.id === idea.id)
+        ? prev.filter((item) => item.id !== idea.id)
+        : [...prev, idea]
+    );
   };
 
 
   const handleThemeChange = (themeId: string | "") => {
     setSelectedThemeId(themeId);
     setSelectedIds([]);
+    setSelectedIdeas([]);
     setIsSelectMode(Boolean(themeId));
   };
 
@@ -619,8 +628,32 @@ export default function Home() {
     );
   };
 
-  const openScriptEditor = (sourceIdeas?: DetailRow[]) => {
-    const nextIdeas = sourceIdeas ?? ideas.filter((idea) => selectedIds.includes(idea.id));
+  const openScriptEditor = async (sourceIdeas?: DetailRow[]) => {
+    let nextIdeas = sourceIdeas ?? selectedIdeas;
+
+    // Safety net: if selection ids exist but some selected idea data is not in memory,
+    // fetch the missing rows before opening the script editor.
+    if (!sourceIdeas && selectedIds.length > nextIdeas.length) {
+      const loadedById = new Map(nextIdeas.map((idea) => [idea.id, idea]));
+      const missingIds = selectedIds.filter((id) => !loadedById.has(id));
+
+      if (missingIds.length > 0) {
+        const { data, error } = await supabase
+          .from("details")
+          .select("*, footage(file_path, title)")
+          .in("id", missingIds);
+
+        if (error) {
+          alert(error.message);
+          return;
+        }
+
+        for (const idea of (data ?? []) as DetailRow[]) loadedById.set(idea.id, idea);
+        nextIdeas = selectedIds.map((id) => loadedById.get(id)).filter(Boolean) as DetailRow[];
+        setSelectedIdeas(nextIdeas);
+      }
+    }
+
     if (nextIdeas.length === 0) return;
     setProjectIdeas(nextIdeas);
     setShowEditor(true);
@@ -637,6 +670,7 @@ export default function Home() {
     window.setTimeout(() => setSaveToast(false), 2600);
     setIsSelectMode(Boolean(selectedThemeId));
     setSelectedIds([]);
+    setSelectedIdeas([]);
     setRandomPickedIdeas([]);
     setProjectIdeas([]);
   };
@@ -767,7 +801,7 @@ export default function Home() {
         onClearSelection={() => setRandomPickedIdeas([])}
         onSaveProject={() => {
           setRandomIdeas([]);
-          openScriptEditor(randomPickedIdeas);
+          void openScriptEditor(randomPickedIdeas);
         }}
       />
 
@@ -789,7 +823,7 @@ export default function Home() {
                  >
                    Cancel
                  </button>
-                 <button disabled={selectedIds.length === 0} onClick={() => openScriptEditor()} className="flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-bold text-white shadow-lg transition hover:bg-blue-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"><PlayCircleIcon className="h-5 w-5" /> Create Script</button>
+                 <button disabled={selectedIds.length === 0} onClick={() => void openScriptEditor()} className="flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-bold text-white shadow-lg transition hover:bg-blue-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"><PlayCircleIcon className="h-5 w-5" /> Create Script</button>
                </div>
             </div>
          </div>
