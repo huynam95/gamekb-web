@@ -5,6 +5,8 @@ import Link from "next/link";
 import { CheckIcon, DocumentDuplicateIcon, EyeIcon, HashtagIcon, PencilSquareIcon, TagIcon, VideoCameraIcon } from "@heroicons/react/24/outline";
 import { supabase } from "@/lib/supabaseClient";
 import type { DetailRow, Game, ScriptProject } from "@/types/gamekb";
+import type { VideoTheme } from "@/lib/videoThemes";
+import { themeToHashtag } from "@/lib/videoThemes";
 import { TypePill } from "@/components/TypePill";
 
 export function QuickViewModal({ idea, isOpen, onClose }: { idea: DetailRow | null; isOpen: boolean; onClose: () => void }) {
@@ -89,7 +91,7 @@ export function ScriptEditorModal({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  initialData: { ids: number[]; ideas: DetailRow[]; games: Game[] };
+  initialData: { ids: number[]; ideas: DetailRow[]; games: Game[]; theme?: VideoTheme | null };
   onSave: (data: Partial<ScriptProject>) => void;
 }) {
   const [formData, setFormData] = useState<Partial<ScriptProject>>({
@@ -122,18 +124,26 @@ export function ScriptEditorModal({
         (idea) => idea.footage?.map((footage) => ({ url: footage.file_path, name: footage.title || footage.file_path.split("/").pop() || "Video" })) || []
       );
 
+      const theme = initialData.theme ?? null;
+      const themePrefix = theme ? `${theme.title}: ` : "Video Script: ";
+      const themeDescription = theme ? `Topic: ${theme.title}${theme.hook ? `\nHook: ${theme.hook}` : ""}\n\n` : "";
+      const themeTags = theme ? [theme.title] : [];
+      const themeHashtag = theme ? [themeToHashtag(theme)] : [];
+      const ideaBlocks = initialData.ideas.map((idea) => `[${idea.title}]\n${idea.description || ""}`).join("\n\n");
+      const openingHook = theme?.hook?.trim() || "";
+
       setFormData({
-        title: `Video Script: ${titles[0]}${titles.length > 1 ? "..." : ""}`,
-        content: initialData.ideas.map((idea) => `[${idea.title}]\n${idea.description || ""}`).join("\n\n"),
-        description: `Video tổng hợp các chi tiết thú vị.\n\n${fullDescription}`,
+        title: `${themePrefix}${titles[0]}${titles.length > 1 ? "..." : ""}`,
+        content: openingHook ? `${openingHook}\n\n${ideaBlocks}` : ideaBlocks,
+        description: `${themeDescription}Video tổng hợp các chi tiết thú vị.\n\n${fullDescription}`,
         assets: allAssets,
-        tags: [...gameNames, "Shorts", "Gaming", "Game Facts"],
-        hashtags: ["#shorts", "#gaming", ...gameNames.map((gameName) => `#${gameName.replace(/\s+/g, "").toLowerCase()}`)],
+        tags: Array.from(new Set([...themeTags, ...gameNames, "Shorts", "Gaming", "Game Facts"])),
+        hashtags: Array.from(new Set(["#shorts", "#gaming", ...themeHashtag, ...gameNames.map((gameName) => `#${gameName.replace(/\s+/g, "").toLowerCase()}`)])),
         status: "Draft",
         publish_date: null,
       });
     }
-  }, [isOpen, initialData]);
+  }, [isOpen, initialData.ideas, initialData.games, initialData.theme]);
 
   if (!isOpen) return null;
 
@@ -142,7 +152,7 @@ export function ScriptEditorModal({
       <div className="flex h-[92vh] w-full max-w-7xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl animate-in zoom-in-95 dark:border-slate-800 dark:bg-slate-950" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-slate-100 bg-white px-8 py-5 dark:border-slate-800 dark:bg-slate-950">
           <div>
-            <h2 className="text-2xl font-black text-slate-900">Create Video Script</h2>
+            <h2 className="text-2xl font-black text-slate-900 dark:text-slate-50">Create Video Script</h2>
             <p className="text-sm text-slate-500 font-bold mt-1">Drafting from {initialData.ideas.length} ideas</p>
           </div>
           <div className="flex gap-3">

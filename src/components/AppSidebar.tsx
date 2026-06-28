@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { TrashIcon } from "@heroicons/react/24/outline";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import type { Group } from "@/types/gamekb";
@@ -27,8 +28,9 @@ type AppSidebarProps = {
 const navItems: Array<{ key: ActivePage; href: string; icon: string; label: string }> = [
   { key: "ideas", href: "/", icon: "🏠", label: "All Ideas" },
   { key: "dashboard", href: "/dashboard", icon: "📊", label: "Dashboard" },
-  { key: "scripts", href: "/scripts", icon: "📜", label: "Video Project" },
+  { key: "addIdea", href: "/add", icon: "✦", label: "Add Idea" },
   { key: "addGame", href: "/games/new", icon: "🕹️", label: "Add Game" },
+  { key: "scripts", href: "/scripts", icon: "📜", label: "Video Project" },
 ];
 
 function navClass(active: boolean) {
@@ -37,6 +39,10 @@ function navClass(active: boolean) {
       ? "bg-slate-900 text-white shadow-lg shadow-slate-200 dark:bg-white dark:text-slate-950 dark:shadow-none"
       : "text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-900"
   }`;
+}
+
+function NavIcon({ children }: { children: ReactNode }) {
+  return <span className="flex h-5 w-5 shrink-0 items-center justify-center text-base leading-none">{children}</span>;
 }
 
 export function AppSidebar({
@@ -68,14 +74,16 @@ export function AppSidebar({
             if (item.key === "ideas" && onSelectAllIdeas) {
               return (
                 <button key={item.key} onClick={onSelectAllIdeas} className={navClass(active && !selectedGroupId)} type="button">
-                  <span>{item.icon}</span> {item.label}
+                  <NavIcon>{item.icon}</NavIcon>
+                  <span className="leading-none">{item.label}</span>
                 </button>
               );
             }
 
             return (
               <Link key={item.key} href={item.href} className={navClass(active)}>
-                <span>{item.icon}</span> {item.label}
+                <NavIcon>{item.icon}</NavIcon>
+                  <span className="leading-none">{item.label}</span>
               </Link>
             );
           })}
@@ -84,8 +92,13 @@ export function AppSidebar({
         {showCollections && (
           <div className="border-t border-slate-100 pt-4 dark:border-slate-800">
             <div className="mb-2 flex items-center justify-between px-2 text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
-              <span>Collections</span>
-              <button onClick={onToggleCreateGroup} className="cursor-pointer text-lg hover:text-blue-600 dark:hover:text-blue-400" type="button" aria-label="Create collection">
+              <span className="leading-none">Collections</span>
+              <button
+                onClick={onToggleCreateGroup}
+                className="flex h-7 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-base leading-none transition hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-900 dark:hover:text-blue-400"
+                type="button"
+                aria-label="Create collection"
+              >
                 +
               </button>
             </div>
@@ -119,8 +132,8 @@ export function AppSidebar({
                     <span className="truncate">{group.name}</span>
                   </button>
 
-                  <div className="flex w-8 shrink-0 justify-center">
-                    <span className={`text-[10px] font-bold opacity-60 group-hover/item:hidden ${selectedGroupId === group.id ? "text-blue-700 dark:text-blue-400" : ""}`}>
+                  <div className="flex w-8 shrink-0 items-center justify-center">
+                    <span className={`tabular-nums text-[10px] font-bold leading-none opacity-60 group-hover/item:hidden ${selectedGroupId === group.id ? "text-blue-700 dark:text-blue-400" : ""}`}>
                       {groupCounts.get(group.id) || 0}
                     </span>
                     <button
@@ -128,7 +141,7 @@ export function AppSidebar({
                         event.stopPropagation();
                         onDeleteGroup?.(group.id);
                       }}
-                      className="hidden cursor-pointer text-rose-500 transition hover:text-rose-700 group-hover/item:block"
+                      className="hidden h-7 w-8 cursor-pointer items-center justify-center rounded-lg text-rose-500 transition hover:bg-rose-50 hover:text-rose-700 group-hover/item:flex dark:hover:bg-rose-950/30"
                       type="button"
                       aria-label={`Delete ${group.name}`}
                     >
