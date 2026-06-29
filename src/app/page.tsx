@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabaseClient";
-import { ACTIVE_VIDEO_THEME_STORAGE_KEY, DEFAULT_VIDEO_THEMES, VIDEO_THEMES_STORAGE_KEY, getVideoThemeById, makeVideoThemeId, normalizeVideoTheme, parseVideoThemes } from "@/lib/videoThemes";
+import { ACTIVE_VIDEO_THEME_STORAGE_KEY, DEFAULT_VIDEO_THEMES, VIDEO_THEMES_STORAGE_KEY, VIDEO_TOPICS_TABLE, getVideoThemeById, makeVideoThemeId, normalizeVideoTheme, parseVideoThemes, rowToVideoTheme, videoThemeToRow } from "@/lib/videoThemes";
 import type { VideoTheme } from "@/lib/videoThemes";
 import { PlayCircleIcon } from "@heroicons/react/24/solid";
 import { ChevronDoubleLeftIcon, ChevronDoubleRightIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, CubeTransparentIcon, ExclamationTriangleIcon, FaceSmileIcon, MagnifyingGlassIcon, Bars3Icon, PencilSquareIcon, PlusIcon, SparklesIcon, Squares2X2Icon, TrashIcon, UserGroupIcon, XMarkIcon } from "@heroicons/react/24/outline";
@@ -18,6 +18,7 @@ import type { DetailRow, Game, Group, ScriptProject } from "@/types/gamekb";
 
 const ITEMS_PER_PAGE = 24;
 const RANDOM_PICK_COUNT = 3;
+const TOPIC_DB_MIGRATION_STORAGE_KEY = "gamekb-video-themes-db-migrated";
 
 /* ================= COMPONENTS ================= */
 
@@ -163,10 +164,10 @@ function VideoThemeBoard({
   value: string | "";
   themes: VideoTheme[];
   onChange: (value: string | "") => void;
-  onCreate: (theme: VideoTheme) => void;
-  onUpdate: (theme: VideoTheme) => void;
-  onDelete: (id: string) => void;
-  onReorder: (themes: VideoTheme[]) => void;
+  onCreate: (theme: VideoTheme) => void | Promise<void>;
+  onUpdate: (theme: VideoTheme) => void | Promise<void>;
+  onDelete: (id: string) => void | Promise<void>;
+  onReorder: (themes: VideoTheme[]) => void | Promise<void>;
 }) {
   const selectedTheme = getVideoThemeById(themes, value);
   const { confirm } = useNotifications();
@@ -527,18 +528,78 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    const storedThemes = parseVideoThemes(window.localStorage.getItem(VIDEO_THEMES_STORAGE_KEY));
-    setVideoThemes(storedThemes);
+    let alive = true;
 
-    const savedTheme = window.localStorage.getItem(ACTIVE_VIDEO_THEME_STORAGE_KEY);
-    if (savedTheme && getVideoThemeById(storedThemes, savedTheme)) {
-      setSelectedThemeId(savedTheme);
-      setIsSelectMode(true);
-    } else {
-      window.localStorage.removeItem(ACTIVE_VIDEO_THEME_STORAGE_KEY);
+    async function loadVideoThemes() {
+      const rawLocalThemes = window.localStorage.getItem(VIDEO_THEMES_STORAGE_KEY);
+      const localThemes = rawLocalThemes ? parseVideoThemes(rawLocalThemes) : [];
+
+      const { data, error } = await supabase
+        .from(VIDEO_TOPICS_TABLE)
+        .select("id,title,hook,sort_order,created_at")
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true });
+
+      if (!alive) return;
+
+      if (error) {
+        const fallbackThemes = localThemes.length > 0 ? localThemes : DEFAULT_VIDEO_THEMES;
+        setVideoThemes(fallbackThemes);
+
+        const savedTheme = window.localStorage.getItem(ACTIVE_VIDEO_THEME_STORAGE_KEY);
+        if (savedTheme && getVideoThemeById(fallbackThemes, savedTheme)) {
+          setSelectedThemeId(savedTheme);
+          setIsSelectMode(true);
+        } else {
+          window.localStorage.removeItem(ACTIVE_VIDEO_THEME_STORAGE_KEY);
+        }
+
+        warning("Run the video_topics database migration so topic titles and hooks stay saved after deploys.", "Topic database not ready");
+        setThemesLoaded(true);
+        return;
+      }
+
+      let loadedThemes = (data ?? []).map(rowToVideoTheme);
+      const hasMigratedLocalTopics = window.localStorage.getItem(TOPIC_DB_MIGRATION_STORAGE_KEY);
+
+      // One-time safety bridge: if you already edited topics in localStorage before this DB version,
+      // copy them into Supabase once. After that, database is the source of truth.
+      if (loadedThemes.length === 0 && rawLocalThemes && !hasMigratedLocalTopics && localThemes.length > 0) {
+        const { error: migrateError } = await supabase
+          .from(VIDEO_TOPICS_TABLE)
+          .upsert(localThemes.map(videoThemeToRow), { onConflict: "id" });
+
+        if (!alive) return;
+
+        if (migrateError) {
+          warning(migrateError.message, "Could not sync local topics");
+          loadedThemes = localThemes;
+        } else {
+          loadedThemes = localThemes;
+          window.localStorage.setItem(TOPIC_DB_MIGRATION_STORAGE_KEY, "1");
+        }
+      } else {
+        window.localStorage.setItem(TOPIC_DB_MIGRATION_STORAGE_KEY, "1");
+      }
+
+      setVideoThemes(loadedThemes);
+
+      const savedTheme = window.localStorage.getItem(ACTIVE_VIDEO_THEME_STORAGE_KEY);
+      if (savedTheme && getVideoThemeById(loadedThemes, savedTheme)) {
+        setSelectedThemeId(savedTheme);
+        setIsSelectMode(true);
+      } else {
+        window.localStorage.removeItem(ACTIVE_VIDEO_THEME_STORAGE_KEY);
+      }
+
+      setThemesLoaded(true);
     }
 
-    setThemesLoaded(true);
+    loadVideoThemes();
+
+    return () => {
+      alive = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -609,22 +670,62 @@ export default function Home() {
     setIsSelectMode(Boolean(themeId));
   };
 
-  const handleCreateTheme = (theme: VideoTheme) => {
-    setVideoThemes((current) => [...current, theme]);
+  const handleCreateTheme = async (theme: VideoTheme) => {
+    const nextThemes = [...videoThemes, theme];
+    const { error } = await supabase
+      .from(VIDEO_TOPICS_TABLE)
+      .insert(videoThemeToRow(theme, nextThemes.length - 1));
+
+    if (error) {
+      notifyError(error.message, "Topic not saved");
+      return;
+    }
+
+    setVideoThemes(nextThemes);
     handleThemeChange(theme.id);
   };
 
-  const handleUpdateTheme = (theme: VideoTheme) => {
+  const handleUpdateTheme = async (theme: VideoTheme) => {
+    const { error } = await supabase
+      .from(VIDEO_TOPICS_TABLE)
+      .update({ title: theme.title, hook: theme.hook })
+      .eq("id", theme.id);
+
+    if (error) {
+      notifyError(error.message, "Topic not updated");
+      return;
+    }
+
     setVideoThemes((current) => current.map((item) => (item.id === theme.id ? theme : item)));
   };
 
-  const handleDeleteTheme = (id: string) => {
+  const handleDeleteTheme = async (id: string) => {
+    const { error } = await supabase
+      .from(VIDEO_TOPICS_TABLE)
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      notifyError(error.message, "Topic not deleted");
+      return;
+    }
+
     setVideoThemes((current) => current.filter((theme) => theme.id !== id));
     if (selectedThemeId === id) handleThemeChange("");
   };
 
-  const handleReorderThemes = (nextThemes: VideoTheme[]) => {
+  const handleReorderThemes = async (nextThemes: VideoTheme[]) => {
+    const previousThemes = videoThemes;
     setVideoThemes(nextThemes);
+
+    const { error } = await supabase
+      .from(VIDEO_TOPICS_TABLE)
+      .upsert(nextThemes.map(videoThemeToRow), { onConflict: "id" });
+
+    if (error) {
+      setVideoThemes(previousThemes);
+      notifyError(error.message, "Topic order not saved");
+    }
   };
 
 

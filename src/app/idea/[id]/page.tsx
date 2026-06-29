@@ -195,9 +195,36 @@ function AddToScriptModal({
   const ideaTitle = detail.title;
   const ideaDesc = detail.description || "";
   const gameName = game?.title || "";
+
+  const ensurePeriod = (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return trimmed;
+    return /[.!?…]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+  };
+
+  const smoothScriptDetail = (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return trimmed;
+    return /^(If|When|During|After|Before|At|Right|There|You|Most|But|And)\b/.test(trimmed)
+      ? trimmed.charAt(0).toLowerCase() + trimmed.slice(1)
+      : trimmed;
+  };
+
+  const buildScriptLine = () => {
+    const rawDetail = (ideaDesc || ideaTitle || "")
+      .replace(/\s+/g, " ")
+      .replace(/^\[[^\]]+\]\s*/, "")
+      .trim();
+    const safeGameName = gameName || "this game";
+
+    if (!rawDetail) return `In ${safeGameName}, ${smoothScriptDetail(ideaTitle)}`;
+    if (/^in\s+/i.test(rawDetail)) return ensurePeriod(rawDetail);
+
+    return ensurePeriod(`In ${safeGameName}, ${smoothScriptDetail(rawDetail)}`);
+  };
   
-  const newContentPart = `[${ideaTitle}]\n${ideaDesc}`;
-  const newDescPart = `• ${ideaTitle}: ${ideaDesc}`;
+  const newContentPart = buildScriptLine();
+  const newDescPart = `• ${gameName || "Unknown Game"}: ${ideaTitle}${ideaDesc ? `\n${ideaDesc}` : ""}`;
   const newTags = [gameName, "Shorts", "Gaming", "Game Facts"].filter(Boolean);
   const newHashtags = ["#shorts", "#gaming", gameName ? `#${gameName.replace(/\s+/g, '').toLowerCase()}` : ""].filter(Boolean);
   const newAssets = footage.map(f => ({ url: f.file_path || "", name: f.title || f.file_path?.split('/').pop() || "Video" }));

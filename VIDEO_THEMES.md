@@ -1,30 +1,19 @@
 # Video Topics
 
-The home page uses a lightweight **Today's Topic** flow for planning Shorts.
+Video topics are now stored in Supabase instead of only in browser localStorage.
 
-Each topic only has two editable fields:
-
-- **Title**: the video direction, for example `Games That Remember You`
-- **Opening Hook**: the first line that should appear at the top of the generated script
-
-Selecting a topic automatically turns on pick mode. The topic does **not** filter ideas by itself. You still browse, search, filter, randomize, and manually pick ideas that fit the selected direction.
-
-Topics are stored in `localStorage` under:
+Run this migration once in Supabase SQL Editor:
 
 ```text
-gamekb-video-themes
+database/migrations/20260629_create_video_topics.sql
 ```
 
-The active topic is stored under:
+Each topic has only:
 
-```text
-gamekb-active-video-theme
-```
+- `title`
+- `hook`
+- `sort_order`
 
-The default topics live in:
+The app still keeps the active topic ID in localStorage so reopening the same browser can restore the current planning session, but topic titles/hooks/order are now loaded from the database.
 
-```text
-src/lib/videoThemes.ts
-```
-
-When you create a video script, the selected topic hook is inserted at the top of the script content automatically.
+If you had edited topics before this database version, the app will try to copy your existing localStorage topics into Supabase one time, but the safest approach is to run the migration first.

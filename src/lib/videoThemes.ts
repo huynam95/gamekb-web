@@ -4,6 +4,15 @@ export type VideoTheme = {
   hook: string;
 };
 
+export type VideoThemeRow = {
+  id: string;
+  title: string;
+  hook: string | null;
+  sort_order?: number | null;
+};
+
+export const VIDEO_TOPICS_TABLE = "video_topics";
+
 export const VIDEO_THEMES_STORAGE_KEY = "gamekb-video-themes";
 export const ACTIVE_VIDEO_THEME_STORAGE_KEY = "gamekb-active-video-theme";
 
@@ -75,6 +84,23 @@ export function normalizeVideoTheme(theme: Partial<VideoTheme> & { description?:
     title,
     hook,
   };
+}
+
+export function videoThemeToRow(theme: VideoTheme, sortOrder: number) {
+  return {
+    id: theme.id,
+    title: theme.title,
+    hook: theme.hook ?? "",
+    sort_order: sortOrder,
+  };
+}
+
+export function rowToVideoTheme(row: VideoThemeRow): VideoTheme {
+  return normalizeVideoTheme({
+    id: row.id,
+    title: row.title,
+    hook: row.hook ?? "",
+  });
 }
 
 export function parseVideoThemes(value: string | null): VideoTheme[] {

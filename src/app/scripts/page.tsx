@@ -390,10 +390,10 @@ export default function ScriptsPage() {
                       className="h-5 w-5 cursor-pointer rounded border-slate-300 accent-blue-600"
                     />
                   </th>
-                  <th className="w-[31%] px-4 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Project</th>
-                  <th className="w-[25%] px-4 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Topic</th>
-                  <th className="w-[11%] px-4 py-7 text-center text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Status</th>
-                  <th className="w-[21%] px-4 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Summary</th>
+                  <th className="w-[32%] px-4 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Project</th>
+                  <th className="w-[32%] px-4 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Topic</th>
+                  <th className="w-[10%] px-4 py-7 text-center text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Status</th>
+                  <th className="w-[14%] px-4 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Summary</th>
                   <th className="w-[8%] px-6 py-7 text-right text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Action</th>
                 </tr>
               </thead>
@@ -436,9 +436,18 @@ export default function ScriptsPage() {
                         </div>
                       </td>
                       <td className="px-4 py-9">
-                        <div className={`inline-flex max-w-full items-start gap-3 rounded-2xl border px-4 py-3 ${topic === "No topic" ? "border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500" : "border-violet-100 bg-violet-50 text-violet-800 dark:border-violet-900/70 dark:bg-violet-950/40 dark:text-violet-200"}`}>
-                          <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-sm ${topicVisual.className}`} aria-hidden="true">{topicVisual.emoji}</span>
-                          <span className="min-w-0 whitespace-normal text-sm font-black leading-snug">{topic}</span>
+                        <div
+                          title={topic}
+                          className={`flex h-20 w-full items-center gap-4 rounded-[1.65rem] border px-5 shadow-sm transition-colors ${
+                            topic === "No topic"
+                              ? "border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500"
+                              : "border-violet-100 bg-violet-50 text-violet-800 dark:border-violet-900/70 dark:bg-violet-950/40 dark:text-violet-100"
+                          }`}
+                        >
+                          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-lg shadow-sm ${topicVisual.className}`} aria-hidden="true">
+                            {topicVisual.emoji}
+                          </span>
+                          <span className="line-clamp-2 min-w-0 flex-1 text-left text-base font-black leading-snug tracking-tight">{topic}</span>
                         </div>
                       </td>
                       <td className="px-4 py-9 text-center">
