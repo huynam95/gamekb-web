@@ -101,15 +101,15 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
 
   return (
     <div
-      className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/70 p-6 backdrop-blur-md"
+      className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/70 p-2 sm:p-4 lg:p-6 backdrop-blur-md"
       onClick={onClose}
     >
       <div
-        className="flex h-[90vh] w-full max-w-[1300px] flex-col overflow-hidden rounded-[2.5rem] border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950"
+        className="flex h-[94vh] w-full max-w-[min(1300px,calc(100vw-1rem))] flex-col overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-2xl sm:rounded-[2rem] lg:h-[90vh] lg:rounded-[2.5rem] dark:border-slate-800 dark:bg-slate-950"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-100 px-10 py-7 dark:border-slate-800">
-          <div className="flex flex-1 items-center gap-5">
+        <div className="flex flex-col gap-4 border-b border-slate-100 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-10 lg:py-7 dark:border-slate-800">
+          <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-5">
             <div className="rounded-2xl bg-blue-600 p-3 text-white shadow-lg shadow-blue-100 dark:shadow-blue-950/40">
               <DocumentTextIcon className="h-7 w-7" />
             </div>
@@ -124,7 +124,7 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
                     onBlur={() => setIsEditingTitle(false)}
                   />
                 ) : (
-                  <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-slate-50">{formData.title}</h2>
+                  <h2 className="line-clamp-2 text-xl font-black tracking-tight text-slate-900 sm:text-2xl dark:text-slate-50">{formData.title}</h2>
                 )}
                 <button
                   onClick={() => setIsEditingTitle(!isEditingTitle)}
@@ -138,9 +138,9 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
             </div>
           </div>
 
-          <div className="flex items-center gap-5">
+          <div className="flex flex-wrap items-center gap-3 lg:gap-5">
             <select
-              className="cursor-pointer rounded-2xl bg-slate-100 px-5 py-3 text-sm font-black outline-none dark:bg-slate-900 dark:text-slate-100"
+              className="h-11 cursor-pointer rounded-2xl bg-slate-100 px-4 text-sm font-black outline-none dark:bg-slate-900 dark:text-slate-100"
               value={formData.status || "Draft"}
               onChange={(event) => setFormData({ ...formData, status: event.target.value as any })}
             >
@@ -155,7 +155,7 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
                 onSave(formData);
                 onClose();
               }}
-              className="cursor-pointer rounded-2xl bg-slate-900 px-10 py-4 text-sm font-black text-white shadow-xl transition-all hover:bg-black active:scale-95 dark:bg-blue-600 dark:hover:bg-blue-700"
+              className="h-11 cursor-pointer rounded-2xl bg-slate-900 px-5 text-sm font-black text-white shadow-xl transition-all hover:bg-black active:scale-95 sm:px-8 lg:px-10 dark:bg-blue-600 dark:hover:bg-blue-700"
               type="button"
             >
               Save Changes
@@ -163,7 +163,7 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
           </div>
         </div>
 
-        <div className="flex border-b border-slate-100 bg-slate-50/50 px-10 dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="flex overflow-x-auto border-b border-slate-100 bg-slate-50/50 px-2 sm:px-4 lg:px-10 dark:border-slate-800 dark:bg-slate-900/60">
           {[
             { id: "script", label: "Script", icon: DocumentTextIcon },
             { id: "metadata", label: "Metadata", icon: InformationCircleIcon },
@@ -172,7 +172,7 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex cursor-pointer items-center gap-3 border-b-4 px-8 py-5 text-xs font-black uppercase tracking-[0.2em] transition-all ${
+              className={`flex shrink-0 cursor-pointer items-center gap-2 border-b-4 px-4 py-4 text-xs font-black uppercase tracking-[0.16em] transition-all sm:gap-3 sm:px-6 lg:px-8 lg:py-5 lg:tracking-[0.2em] ${
                 activeTab === tab.id ? "border-blue-600 text-blue-600 dark:text-blue-400" : "border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-slate-100"
               }`}
               type="button"
@@ -182,11 +182,11 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
           ))}
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-white p-12 dark:bg-slate-950">
+        <div className="flex-1 overflow-y-auto bg-white p-4 sm:p-6 lg:p-12 dark:bg-slate-950">
           {activeTab === "script" && (
             <div className="mx-auto flex h-full max-w-5xl flex-col">
               <textarea
-                className="h-full w-full resize-none rounded-[2rem] border border-slate-100 bg-slate-50 p-10 font-sans text-xl font-medium leading-relaxed text-slate-900 shadow-inner outline-none placeholder:text-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                className="h-full min-h-[420px] w-full resize-none rounded-[1.5rem] border border-slate-100 bg-slate-50 p-5 font-sans text-base font-medium leading-relaxed text-slate-900 shadow-inner outline-none placeholder:text-slate-300 sm:p-7 sm:text-lg lg:rounded-[2rem] lg:p-10 lg:text-xl dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
                 placeholder="Bắt đầu soạn thảo kịch bản..."
                 value={formData.content || ""}
                 onChange={(event) => setFormData({ ...formData, content: event.target.value })}
@@ -199,7 +199,7 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
               <div className="space-y-4">
                 <label className="ml-4 block text-xs font-black uppercase tracking-widest text-slate-400">Video Summary Description</label>
                 <textarea
-                  className="h-64 w-full resize-none rounded-[2rem] border border-slate-100 bg-slate-50 p-8 text-base font-bold leading-relaxed text-slate-700 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                  className="h-64 w-full resize-none rounded-[1.5rem] border border-slate-100 bg-slate-50 p-5 text-base font-bold leading-relaxed text-slate-700 outline-none sm:p-8 lg:rounded-[2rem] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
                   value={formData.description || ""}
                   onChange={(event) => setFormData({ ...formData, description: event.target.value })}
                 />
@@ -338,18 +338,18 @@ export default function ScriptsPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-white font-sans text-slate-900 dark:bg-slate-950 dark:text-slate-50">
+    <div className="min-h-screen bg-white font-sans text-slate-900 xl:flex dark:bg-slate-950 dark:text-slate-50">
       <ScriptEditorModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} script={editingScript} onSave={handleUpdate} />
 
       <AppSidebar activePage="scripts" />
 
-      <main className="min-w-0 flex-1 pl-0 md:pl-72">
-        <div className="mx-auto max-w-[1500px] px-10 py-12">
+      <main className="min-w-0 flex-1 pl-0 xl:pl-72">
+        <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 lg:px-10 lg:py-12">
           <div className="mb-8 flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
             <div className="relative w-full max-w-2xl">
-              <MagnifyingGlassIcon className="absolute left-6 top-1/2 h-6 w-6 -translate-y-1/2 text-slate-900 dark:text-slate-200" />
+              <MagnifyingGlassIcon className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-900 sm:left-6 sm:h-6 sm:w-6 dark:text-slate-200" />
               <input
-                className="h-16 w-full rounded-[1.5rem] border-2 border-slate-200 bg-white pl-16 pr-12 text-lg font-bold shadow-sm outline-none transition-all focus:border-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-50 dark:focus:border-blue-500"
+                className="h-12 w-full rounded-[1.25rem] border-2 border-slate-200 bg-white pl-12 pr-4 text-base font-bold shadow-sm outline-none transition-all focus:border-slate-900 sm:h-16 sm:rounded-[1.5rem] sm:pl-16 sm:pr-12 sm:text-lg dark:border-slate-800 dark:bg-slate-900 dark:text-slate-50 dark:focus:border-blue-500"
                 placeholder="Search projects, topic, summary..."
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
@@ -377,8 +377,8 @@ export default function ScriptsPage() {
             )}
           </div>
 
-          <div className="overflow-hidden rounded-[2.5rem] border-2 border-slate-200 bg-white shadow-2xl shadow-slate-200/40 dark:border-slate-800 dark:bg-slate-950 dark:shadow-black/20">
-            <table className="w-full table-fixed border-collapse text-left">
+          <div className="overflow-x-auto rounded-[1.5rem] border-2 border-slate-200 bg-white shadow-2xl shadow-slate-200/40 sm:rounded-[2rem] lg:rounded-[2.5rem] dark:border-slate-800 dark:bg-slate-950 dark:shadow-black/20">
+            <table className="min-w-[1120px] table-fixed border-collapse text-left xl:w-full">
               <thead className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/70">
                 <tr>
                   <th className="w-[4%] px-6 py-7 text-center">
@@ -425,7 +425,7 @@ export default function ScriptsPage() {
                         />
                       </td>
                       <td className="px-4 py-9">
-                        <div className="flex items-center gap-5">
+                        <div className="flex flex-wrap items-center gap-3 lg:gap-5">
                           <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-2xl shadow-lg shadow-slate-200 transition-transform group-hover:scale-[1.03] dark:shadow-black/30 ${topicVisual.className}`}>
                             <span aria-hidden="true">{topicVisual.emoji}</span>
                           </div>

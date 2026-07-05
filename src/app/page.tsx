@@ -887,7 +887,7 @@ export default function Home() {
   const btnPage = "inline-flex h-10 min-w-[40px] cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800";
 
   return (
-    <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 xl:flex">
       <ScriptEditorModal isOpen={showEditor} onClose={() => { setShowEditor(false); setProjectIdeas([]); }} onSave={handleSaveScript} initialData={{ ids: projectIdeas.map((idea) => idea.id), ideas: projectIdeas, games: games, theme: selectedTheme }} />
       <GameEditorModal game={editingGame} isOpen={!!editingGame} onClose={() => setEditingGame(null)} onUpdate={(updatedGame) => { setGames(prev => prev.map(g => g.id === updatedGame.id ? updatedGame : g)); }} />
       <QuickViewModal idea={previewIdea} isOpen={!!previewIdea} onClose={() => setPreviewIdea(null)} />
@@ -950,8 +950,8 @@ export default function Home() {
         showThemeToggle={false}
       />
 
-      <main className="flex-1 pl-0 md:pl-72 pb-32 min-w-0">
-        <div className="mx-auto max-w-[1900px] px-6 py-8">
+      <main className="flex-1 pl-0 xl:pl-72 pb-32 min-w-0">
+        <div className="mx-auto max-w-[1900px] px-4 py-5 sm:px-6 sm:py-8">
           <header className="relative z-40 mb-8 space-y-4">
               <VideoThemeBoard
                 value={selectedThemeId}

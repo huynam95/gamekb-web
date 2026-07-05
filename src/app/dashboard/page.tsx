@@ -88,7 +88,7 @@ export default function Dashboard() {
   const combinedIdeas = [...pinnedIdeas, ...recentIdeas];
 
   return (
-    <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 xl:flex">
       
       {/* MODALS */}
       <ScriptEditorModal isOpen={showEditor} onClose={() => setShowEditor(false)} onSave={handleSaveScript} initialData={{ ids: selectedIds, ideas: combinedIdeas.filter(i => selectedIds.includes(i.id)), games: allGames }} />
@@ -97,7 +97,7 @@ export default function Dashboard() {
 
       {/* SELECTION BAR */}
       {isSelectMode && (
-         <div className="fixed bottom-0 inset-x-0 z-[80] bg-white border-t border-slate-200 p-4 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] animate-in slide-in-from-bottom-10 md:pl-72">
+         <div className="fixed bottom-0 inset-x-0 z-[80] bg-white border-t border-slate-200 p-4 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] animate-in slide-in-from-bottom-10 xl:pl-72">
             <div className="mx-auto max-w-4xl flex items-center justify-between">
                <div className="flex items-center gap-4"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-white font-bold text-sm">{selectedIds.length}</span><span className="text-sm font-bold text-slate-600 uppercase tracking-widest">Ideas Selected</span></div>
                <button disabled={selectedIds.length === 0} onClick={() => setShowEditor(true)} className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-white font-bold shadow-lg hover:bg-blue-700 active:scale-95 transition disabled:opacity-50"><PlayCircleIcon className="h-5 w-5" /> Create Script</button>
@@ -107,8 +107,8 @@ export default function Dashboard() {
 
       <AppSidebar activePage="dashboard" />
 
-      <main className="flex-1 pl-0 md:pl-72 pb-32">
-        <div className="mx-auto max-w-[1900px] px-6 py-8">
+      <main className="flex-1 pl-0 xl:pl-72 pb-32">
+        <div className="mx-auto max-w-[1900px] px-4 py-5 sm:px-6 sm:py-8">
            <div className="flex items-center justify-between mb-8">
              <h1 className="text-3xl font-black text-slate-900">Dashboard</h1>
              <button onClick={() => { setIsSelectMode(!isSelectMode); setSelectedIds([]); }} className={`h-10 px-4 rounded-xl font-bold border text-sm transition ${isSelectMode ? "bg-blue-50 border-blue-200 text-blue-600" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"}`}>{isSelectMode ? "Exit Select" : "Select Mode"}</button>

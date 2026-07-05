@@ -86,7 +86,7 @@ export default function AddGamePage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 xl:flex">
       <AppSidebar
         activePage="addGame"
         groups={groups}
@@ -102,7 +102,7 @@ export default function AddGamePage() {
       />
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 pl-0 md:pl-72 pb-32">
+      <main className="flex-1 pl-0 xl:pl-72 pb-32">
         <div className="mx-auto max-w-2xl px-6 py-12">
            
            <div className="mb-8">

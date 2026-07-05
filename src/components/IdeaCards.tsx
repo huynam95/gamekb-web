@@ -213,31 +213,31 @@ export function ScriptEditorModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm animate-in fade-in" onClick={onClose}>
-      <div className="flex h-[92vh] w-full max-w-7xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl animate-in zoom-in-95 dark:border-slate-800 dark:bg-slate-950" onClick={(event) => event.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-slate-100 bg-white px-8 py-5 dark:border-slate-800 dark:bg-slate-950">
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/70 p-2 sm:p-4 backdrop-blur-sm animate-in fade-in" onClick={onClose}>
+      <div className="flex h-[94vh] w-full max-w-[min(80rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-2xl animate-in zoom-in-95 sm:rounded-3xl lg:h-[92vh] dark:border-slate-800 dark:bg-slate-950" onClick={(event) => event.stopPropagation()}>
+        <div className="flex flex-col gap-3 border-b border-slate-100 bg-white px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8 lg:py-5 dark:border-slate-800 dark:bg-slate-950">
           <div>
-            <h2 className="text-2xl font-black text-slate-900 dark:text-slate-50">Create Video Script</h2>
+            <h2 className="text-xl font-black text-slate-900 sm:text-2xl dark:text-slate-50">Create Video Script</h2>
             <p className="mt-1 text-sm font-bold text-slate-500">Drafting from {orderedIdeas.length || initialData.ideas.length} ideas</p>
           </div>
-          <div className="flex gap-3">
-            <button onClick={onClose} className="cursor-pointer rounded-xl px-5 py-3 text-sm font-bold text-slate-500 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800" type="button">Cancel</button>
-            <button onClick={() => { onSave(formData); onClose(); }} className="cursor-pointer rounded-xl bg-blue-600 px-8 py-3 text-sm font-bold text-white shadow-lg transition hover:bg-blue-700 active:scale-[0.98]" type="button">Save Project</button>
+          <div className="flex flex-wrap gap-2 sm:gap-3">
+            <button onClick={onClose} className="cursor-pointer rounded-xl px-4 py-2.5 text-sm font-bold text-slate-500 transition hover:bg-slate-100 sm:px-5 sm:py-3 dark:text-slate-300 dark:hover:bg-slate-800" type="button">Cancel</button>
+            <button onClick={() => { onSave(formData); onClose(); }} className="cursor-pointer rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg transition hover:bg-blue-700 active:scale-[0.98] sm:px-8 sm:py-3" type="button">Save Project</button>
           </div>
         </div>
 
-        <div className="flex border-b border-slate-100 bg-slate-50 px-8 dark:border-slate-800 dark:bg-slate-900/60">
+        <div className="flex overflow-x-auto border-b border-slate-100 bg-slate-50 px-2 sm:px-6 lg:px-8 dark:border-slate-800 dark:bg-slate-900/60">
           {(["script", "details", "assets"] as const).map((tab) => (
-            <button key={tab} onClick={() => setActiveTab(tab)} className={`cursor-pointer border-b-2 px-6 py-4 text-sm font-black uppercase tracking-[0.12em] transition ${activeTab === tab ? "border-blue-600 text-blue-600 dark:text-blue-400" : "border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"}`} type="button">
+            <button key={tab} onClick={() => setActiveTab(tab)} className={`shrink-0 cursor-pointer border-b-2 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] transition sm:px-6 sm:py-4 sm:text-sm ${activeTab === tab ? "border-blue-600 text-blue-600 dark:text-blue-400" : "border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"}`} type="button">
               {tab === "script" ? "Content" : tab === "details" ? "Metadata" : "Assets"}
             </button>
           ))}
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-slate-50/40 p-6 dark:bg-slate-950 lg:p-8">
+        <div className="flex-1 overflow-y-auto bg-slate-50/40 p-3 sm:p-5 dark:bg-slate-950 lg:p-8">
           {activeTab === "script" && (
-            <div className="grid h-full min-h-[560px] gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
-              <aside className="flex min-h-0 flex-col rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="grid min-h-[420px] gap-4 lg:min-h-[560px] xl:grid-cols-[340px_minmax(0,1fr)] xl:gap-5">
+              <aside className="flex min-h-0 max-h-[280px] flex-col rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4 lg:max-h-none lg:rounded-3xl dark:border-slate-800 dark:bg-slate-900">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-500 dark:text-blue-300">Idea Order</p>
@@ -292,7 +292,7 @@ export function ScriptEditorModal({
               </aside>
 
               <textarea
-                className="h-full min-h-[560px] w-full resize-none rounded-3xl border border-slate-200 bg-white p-8 font-sans text-[17px] leading-8 text-slate-800 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-600"
+                className="min-h-[420px] w-full resize-none rounded-2xl border border-slate-200 bg-white p-5 font-sans text-base leading-7 text-slate-800 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 sm:p-6 sm:text-[17px] sm:leading-8 lg:min-h-[560px] lg:rounded-3xl lg:p-8 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-600"
                 value={formData.content}
                 onChange={(event) => setFormData({ ...formData, content: event.target.value })}
               />
@@ -309,7 +309,7 @@ export function ScriptEditorModal({
                 <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-slate-400">Description</label>
                 <textarea className="h-64 w-full rounded-2xl border border-slate-200 bg-white p-5 text-base leading-7 outline-none shadow-sm focus:border-blue-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100" value={formData.description} onChange={(event) => setFormData({ ...formData, description: event.target.value })} />
               </div>
-              <div className="grid grid-cols-2 gap-10">
+              <div className="grid gap-6 sm:grid-cols-2 lg:gap-10">
                 <div className="space-y-4">
                   <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400"><HashtagIcon className="h-4 w-4" /> Hashtags</label>
                   <div className="flex flex-wrap gap-2">
