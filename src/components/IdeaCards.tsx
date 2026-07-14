@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Bars3Icon, CheckIcon, DocumentDuplicateIcon, EyeIcon, HashtagIcon, PencilSquareIcon, TagIcon, VideoCameraIcon } from "@heroicons/react/24/outline";
+import { Bars3Icon, CheckIcon, DocumentDuplicateIcon, EyeIcon, HashtagIcon, PencilSquareIcon, TagIcon, TrashIcon, VideoCameraIcon } from "@heroicons/react/24/outline";
 import { supabase } from "@/lib/supabaseClient";
 import type { DetailRow, Game, ScriptProject } from "@/types/gamekb";
 import type { VideoTheme } from "@/lib/videoThemes";
@@ -210,6 +210,10 @@ export function ScriptEditorModal({
     applyIdeaOrder(nextIdeas);
   };
 
+  const removeIdea = (ideaId: number) => {
+    applyIdeaOrder(orderedIdeas.filter((idea) => idea.id !== ideaId));
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -218,11 +222,11 @@ export function ScriptEditorModal({
         <div className="flex flex-col gap-3 border-b border-slate-100 bg-white px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8 lg:py-5 dark:border-slate-800 dark:bg-slate-950">
           <div>
             <h2 className="text-xl font-black text-slate-900 sm:text-2xl dark:text-slate-50">Create Video Script</h2>
-            <p className="mt-1 text-sm font-bold text-slate-500">Drafting from {orderedIdeas.length || initialData.ideas.length} ideas</p>
+            <p className="mt-1 text-sm font-bold text-slate-500">Drafting from {orderedIdeas.length} ideas</p>
           </div>
           <div className="flex flex-wrap gap-2 sm:gap-3">
             <button onClick={onClose} className="cursor-pointer rounded-xl px-4 py-2.5 text-sm font-bold text-slate-500 transition hover:bg-slate-100 sm:px-5 sm:py-3 dark:text-slate-300 dark:hover:bg-slate-800" type="button">Cancel</button>
-            <button onClick={() => { onSave(formData); onClose(); }} className="cursor-pointer rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg transition hover:bg-blue-700 active:scale-[0.98] sm:px-8 sm:py-3" type="button">Save Project</button>
+            <button disabled={orderedIdeas.length === 0} onClick={() => { onSave(formData); onClose(); }} className="cursor-pointer rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg transition hover:bg-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-3" type="button">Save Project</button>
           </div>
         </div>
 
@@ -241,12 +245,15 @@ export function ScriptEditorModal({
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-500 dark:text-blue-300">Idea Order</p>
-                    <p className="mt-1 text-xs font-bold text-slate-400 dark:text-slate-500">Drag details to arrange the script.</p>
+                    <p className="mt-1 text-xs font-bold text-slate-400 dark:text-slate-500">Drag to reorder. Remove one to delete its script and footage links.</p>
                   </div>
                   <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-500 dark:bg-slate-800 dark:text-slate-300">{orderedIdeas.length}</span>
                 </div>
 
                 <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+                  {orderedIdeas.length === 0 && (
+                    <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-xs font-bold text-slate-400 dark:border-slate-700 dark:text-slate-500">No ideas left in this script.</div>
+                  )}
                   {orderedIdeas.map((idea, index) => {
                     const isDragOver = dragOverIdeaId === idea.id && draggedIdeaId !== idea.id;
                     return (
@@ -285,6 +292,17 @@ export function ScriptEditorModal({
                           </div>
                           <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">{idea.title}</p>
                         </div>
+                        <button
+                          type="button"
+                          draggable={false}
+                          onPointerDown={(event) => event.stopPropagation()}
+                          onClick={(event) => { event.stopPropagation(); removeIdea(idea.id); }}
+                          className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-xl text-slate-300 transition hover:bg-rose-50 hover:text-rose-500 dark:text-slate-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-300"
+                          title="Remove idea, script, and footage links"
+                          aria-label={`Remove ${idea.title} from script`}
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
                       </div>
                     );
                   })}

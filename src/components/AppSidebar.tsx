@@ -6,7 +6,7 @@ import { TrashIcon } from "@heroicons/react/24/outline";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import type { Group } from "@/types/gamekb";
 
-type ActivePage = "ideas" | "dashboard" | "scripts" | "addGame" | "addIdea" | "migrate";
+type ActivePage = "ideas" | "dashboard" | "scripts" | "addGame" | "addIdea" | "dailyGoal" | "migrate";
 
 type AppSidebarProps = {
   activePage: ActivePage;
@@ -28,6 +28,7 @@ type AppSidebarProps = {
 const navItems: Array<{ key: ActivePage; href: string; icon: string; label: string }> = [
   { key: "ideas", href: "/", icon: "🏠", label: "All Ideas" },
   { key: "dashboard", href: "/dashboard", icon: "📊", label: "Dashboard" },
+  { key: "dailyGoal", href: "/daily-goal", icon: "☑️", label: "Daily To-Do" },
   { key: "addIdea", href: "/add", icon: "✦", label: "Add Idea" },
   { key: "addGame", href: "/games/new", icon: "🕹️", label: "Add Game" },
   { key: "scripts", href: "/scripts", icon: "📜", label: "Video Project" },

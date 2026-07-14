@@ -14,6 +14,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchYoutubeTitle } from "@/lib/youtube";
+import { normalizeMediaLink } from "@/lib/mediaLinks";
 import { AppSidebar } from "@/components/AppSidebar";
 import { useNotifications } from "@/components/NotificationCenter";
 
@@ -39,6 +40,17 @@ type StagedFootage = {
   notes?: string;
 };
 type StagedSource = { url: string; note?: string; reliability: number };
+type ExistingMediaLink = {
+  normalized: string;
+  detailId: number;
+  kind: "footage" | "source";
+  raw: string;
+  title?: string | null;
+};
+type DuplicateMediaCandidate = ExistingMediaLink & {
+  pendingKind: "footage" | "source";
+  pendingValue: string;
+};
 
 type SelectOption<T extends string | number> = {
   value: T;
@@ -457,22 +469,35 @@ export default function AddIdeaPage() {
   const [stagedFootage, setStagedFootage] = useState<StagedFootage[]>([]);
   const [srcUrl, setSrcUrl] = useState("");
   const [stagedSources, setStagedSources] = useState<StagedSource[]>([]);
+  const [existingMediaLinks, setExistingMediaLinks] = useState<ExistingMediaLink[]>([]);
+  const [duplicateMedia, setDuplicateMedia] = useState<DuplicateMediaCandidate | null>(null);
 
   const [savingIdea, setSavingIdea] = useState(false);
 
   useEffect(() => {
     async function loadData() {
-      const { data: gs } = await supabase
-        .from("games")
-        .select("*")
-        .order("title");
-      const { data: grps } = await supabase
-        .from("idea_groups")
-        .select("*")
-        .order("name");
+      const [gamesResult, groupsResult, footageResult, sourcesResult] = await Promise.all([
+        supabase.from("games").select("*").order("title"),
+        supabase.from("idea_groups").select("*").order("name"),
+        supabase.from("footage").select("detail_id,file_path,title").range(0, 4999),
+        supabase.from("sources").select("detail_id,url").range(0, 4999),
+      ]);
 
-      setGames((gs || []) as Game[]);
-      setGroups((grps || []) as IdeaGroup[]);
+      setGames((gamesResult.data || []) as Game[]);
+      setGroups((groupsResult.data || []) as IdeaGroup[]);
+
+      const mediaLinks: ExistingMediaLink[] = [];
+      for (const row of footageResult.data ?? []) {
+        const raw = String((row as any).file_path || "");
+        const normalized = normalizeMediaLink(raw);
+        if (normalized) mediaLinks.push({ normalized, detailId: Number((row as any).detail_id), kind: "footage", raw, title: (row as any).title });
+      }
+      for (const row of sourcesResult.data ?? []) {
+        const raw = String((row as any).url || "");
+        const normalized = normalizeMediaLink(raw);
+        if (normalized) mediaLinks.push({ normalized, detailId: Number((row as any).detail_id), kind: "source", raw });
+      }
+      setExistingMediaLinks(mediaLinks);
     }
     loadData();
   }, []);
@@ -533,18 +558,64 @@ export default function AddIdeaPage() {
     }
   }
 
-  async function handleAddFootage() {
-    if (!fp.trim()) return;
+  function findDuplicateMedia(value: string): ExistingMediaLink | null {
+    const normalized = normalizeMediaLink(value);
+    if (!normalized) return null;
+
+    const stagedFootageMatch = stagedFootage.find((item) => normalizeMediaLink(item.file_path) === normalized);
+    if (stagedFootageMatch) return { normalized, detailId: 0, kind: "footage", raw: stagedFootageMatch.file_path, title: stagedFootageMatch.title };
+
+    const stagedSourceMatch = stagedSources.find((item) => normalizeMediaLink(item.url) === normalized);
+    if (stagedSourceMatch) return { normalized, detailId: 0, kind: "source", raw: stagedSourceMatch.url };
+
+    return existingMediaLinks.find((item) => item.normalized === normalized) ?? null;
+  }
+
+  async function addFootageUnchecked(link: string) {
     setFetchingTitle(true);
-    const link = fp.trim();
     const ytTitle = await fetchYoutubeTitle(link);
     const isLocalFile = !link.startsWith("http");
-    setStagedFootage([
-      ...stagedFootage,
+    setStagedFootage((current) => [
+      ...current,
       { file_path: link, title: ytTitle || undefined, downloaded: isLocalFile },
     ]);
     setFp("");
     setFetchingTitle(false);
+  }
+
+  async function handleAddFootage() {
+    const link = fp.trim();
+    if (!link) return;
+    const duplicate = findDuplicateMedia(link);
+    if (duplicate) {
+      setDuplicateMedia({ ...duplicate, pendingKind: "footage", pendingValue: link });
+      return;
+    }
+    await addFootageUnchecked(link);
+  }
+
+  function addSourceUnchecked(link: string) {
+    setStagedSources((current) => [...current, { url: link, reliability: 3 }]);
+    setSrcUrl("");
+  }
+
+  function handleAddSource() {
+    const link = srcUrl.trim();
+    if (!link) return;
+    const duplicate = findDuplicateMedia(link);
+    if (duplicate) {
+      setDuplicateMedia({ ...duplicate, pendingKind: "source", pendingValue: link });
+      return;
+    }
+    addSourceUnchecked(link);
+  }
+
+  async function addDuplicateAnyway() {
+    if (!duplicateMedia) return;
+    const pending = duplicateMedia;
+    setDuplicateMedia(null);
+    if (pending.pendingKind === "footage") await addFootageUnchecked(pending.pendingValue);
+    else addSourceUnchecked(pending.pendingValue);
   }
 
   async function saveIdea(e: React.FormEvent) {
@@ -632,6 +703,11 @@ export default function AddIdeaPage() {
       return;
     }
 
+    setExistingMediaLinks((current) => [
+      ...current,
+      ...stagedFootage.map((item) => ({ normalized: normalizeMediaLink(item.file_path), detailId, kind: "footage" as const, raw: item.file_path, title: item.title })),
+      ...stagedSources.map((item) => ({ normalized: normalizeMediaLink(item.url), detailId, kind: "source" as const, raw: item.url })),
+    ].filter((item) => item.normalized));
     setSavingIdea(false);
     success("Idea saved successfully!", "Idea saved");
     setTitle("");
@@ -752,6 +828,26 @@ export default function AddIdeaPage() {
                 <h3 className="mb-6 text-sm font-black uppercase tracking-widest text-slate-900 flex items-center gap-2">
                   <span>📂</span> Attachments & Media
                 </h3>
+                {duplicateMedia && (
+                  <div className="mb-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-500/10">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-xs font-black uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300">Duplicate link detected</p>
+                        <p className="mt-1 text-sm font-bold text-amber-950 dark:text-amber-100">
+                          This video is already {duplicateMedia.detailId ? "used in another idea" : "added to this draft"}.
+                          {duplicateMedia.detailId > 0 && (
+                            <> <a href={`/idea/${duplicateMedia.detailId}`} target="_blank" rel="noopener noreferrer" className="cursor-pointer underline decoration-2 underline-offset-2">Open idea #{duplicateMedia.detailId}</a>.</>
+                          )}
+                        </p>
+                        <p className="mt-1 truncate text-xs text-amber-700/80 dark:text-amber-200/70">{duplicateMedia.raw}</p>
+                      </div>
+                      <div className="flex shrink-0 gap-2">
+                        <button type="button" onClick={() => setDuplicateMedia(null)} className="h-10 cursor-pointer rounded-xl px-4 text-xs font-black text-amber-700 transition hover:bg-amber-100 dark:text-amber-200 dark:hover:bg-amber-500/10">Cancel</button>
+                        <button type="button" onClick={() => void addDuplicateAnyway()} className="h-10 cursor-pointer rounded-xl bg-amber-600 px-4 text-xs font-black text-white shadow-sm transition hover:bg-amber-700">Add anyway</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="grid gap-8 md:grid-cols-2">
                   <div className="space-y-4">
                     <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
@@ -833,29 +929,17 @@ export default function AddIdeaPage() {
                         placeholder="URL..."
                         value={srcUrl}
                         onChange={(e) => setSrcUrl(e.target.value)}
-                        onKeyDown={(e) =>
-                          e.key === "Enter" &&
-                          (e.preventDefault(),
-                          srcUrl &&
-                            (setStagedSources([
-                              ...stagedSources,
-                              { url: srcUrl, reliability: 3 },
-                            ]),
-                            setSrcUrl("")))
-                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleAddSource();
+                          }
+                        }}
                       />
                       <button
                         type="button"
                         className={btnGhost}
-                        onClick={() => {
-                          if (srcUrl) {
-                            setStagedSources([
-                              ...stagedSources,
-                              { url: srcUrl, reliability: 3 },
-                            ]);
-                            setSrcUrl("");
-                          }
-                        }}
+                        onClick={handleAddSource}
                       >
                         +
                       </button>

@@ -20,6 +20,20 @@ const ITEMS_PER_PAGE = 24;
 const RANDOM_PICK_COUNT = 3;
 const TOPIC_DB_MIGRATION_STORAGE_KEY = "gamekb-video-themes-db-migrated";
 
+function applyIdeaTextSearch(query: any, rawTerm: string, games: Game[]) {
+  const term = rawTerm.trim().replace(/[(),]/g, " ").replace(/\s+/g, " ");
+  if (!term) return query;
+
+  const pattern = `%${term}%`;
+  const matchingGameIds = games
+    .filter((game) => game.title.toLowerCase().includes(term.toLowerCase()))
+    .map((game) => game.id);
+  const filters = [`title.ilike.${pattern}`, `description.ilike.${pattern}`];
+  if (matchingGameIds.length > 0) filters.push(`game_id.in.(${matchingGameIds.join(",")})`);
+
+  return query.or(filters.join(","));
+}
+
 /* ================= COMPONENTS ================= */
 
 function ComboBox({ placeholder, items, selectedId, onChange }: { placeholder: string; items: { id: number; name: string }[]; selectedId: number | ""; onChange: (id: number | "") => void }) {
@@ -40,7 +54,7 @@ function ComboBox({ placeholder, items, selectedId, onChange }: { placeholder: s
 const TYPE_FILTER_OPTIONS = [
   { value: "", label: "All Types", Icon: Squares2X2Icon },
   { value: "small_detail", label: "Detail", Icon: MagnifyingGlassIcon },
-  { value: "easter_egg", label: "Easter", Icon: SparklesIcon },
+  { value: "easter_egg", label: "Easter Egg", Icon: SparklesIcon },
   { value: "npc_reaction", label: "NPC", Icon: UserGroupIcon },
   { value: "physics", label: "Physics", Icon: CubeTransparentIcon },
   { value: "troll", label: "Troll", Icon: FaceSmileIcon },
@@ -642,14 +656,14 @@ export default function Home() {
       }
       if (gameId) query = query.eq("game_id", gameId);
       if (type) query = query.eq("detail_type", type); 
-      if (debouncedQ.trim()) query = query.ilike("title", `%${debouncedQ.trim()}%`);
+      query = applyIdeaTextSearch(query, debouncedQ, games);
       const { data, count } = await query.order("created_at", { ascending: sortOrder === "oldest" }).range(from, to);
       setIdeas((data ?? []) as DetailRow[]);
       setTotalCount(count ?? 0);
       setLoading(false);
     }
     load();
-  }, [debouncedQ, gameId, groupId, type, sortOrder, currentPage]);
+  }, [debouncedQ, gameId, groupId, type, sortOrder, currentPage, games]);
 
   const toggleSelection = (idea: DetailRow) => {
     setSelectedIds(prev =>
@@ -829,7 +843,7 @@ export default function Home() {
 
     if (gameId) query = query.eq("game_id", gameId);
     if (type) query = query.eq("detail_type", type);
-    if (debouncedQ.trim()) query = query.ilike("title", `%${debouncedQ.trim()}%`);
+    query = applyIdeaTextSearch(query, debouncedQ, games);
     const { data, error } = await query.order("created_at", { ascending: sortOrder === "oldest" }).range(from, to);
     if (error) throw new Error(error.message);
 
@@ -968,7 +982,7 @@ export default function Home() {
                     <MagnifyingGlassIcon className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                     <input
                       className="h-10 w-full rounded-full border border-slate-200 bg-white px-11 text-sm font-bold text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-600 dark:focus:ring-slate-800"
-                      placeholder="Search ideas..."
+                      placeholder="Search titles, content, or games..."
                       value={q}
                       onChange={e=>setQ(e.target.value)}
                     />
