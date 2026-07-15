@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PhotoIcon, PuzzlePieceIcon, ArrowLeftIcon } from "@heroicons/react/24/outline";
 import { useNotifications } from "@/components/NotificationCenter";
+import { normalizeGameTitle } from "@/lib/gameTitles";
 
 /* ================= TYPES ================= */
 
@@ -47,21 +48,45 @@ export default function AddGamePage() {
   // --- ACTIONS ---
 
   const handleAddGame = async () => {
-    if (!title.trim()) {
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
       warning("Please enter a game title.", "Missing title");
       return;
     }
 
     setLoading(true);
-    const { error } = await supabase.from("games").insert({ 
-      title: title.trim(),
-      cover_url: coverUrl.trim() || null 
+
+    const { data: existingGames, error: lookupError } = await supabase
+      .from("games")
+      .select("id,title");
+
+    if (lookupError) {
+      setLoading(false);
+      notifyError(lookupError.message, "Could not check game library");
+      return;
+    }
+
+    const duplicate = (existingGames ?? []).find(
+      (game) => normalizeGameTitle(String(game.title ?? "")) === normalizeGameTitle(trimmedTitle),
+    );
+
+    if (duplicate) {
+      setLoading(false);
+      warning(`“${duplicate.title}” is already in your game library.`, "Game already exists");
+      return;
+    }
+
+    const { error } = await supabase.from("games").insert({
+      title: trimmedTitle,
+      cover_url: coverUrl.trim() || null,
     });
     setLoading(false);
 
     if (!error) {
       success("Game added successfully!", "Game saved");
-      router.push("/"); // Quay về trang chủ
+      router.push("/");
+    } else if ((error as { code?: string }).code === "23505") {
+      warning("A game with this title already exists.", "Game already exists");
     } else {
       notifyError(error.message, "Error adding game");
     }
@@ -106,7 +131,7 @@ export default function AddGamePage() {
         <div className="mx-auto max-w-2xl px-6 py-12">
            
            <div className="mb-8">
-             <Link href="/" className="inline-flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-slate-600 mb-4 transition">
+             <Link href="/" className="inline-flex cursor-pointer items-center gap-2 text-sm font-bold text-slate-400 hover:text-slate-600 mb-4 transition">
                 <ArrowLeftIcon className="w-4 h-4" /> Back to Home
              </Link>
              <h1 className="text-3xl font-black text-slate-900">Add New Game</h1>
@@ -165,13 +190,13 @@ export default function AddGamePage() {
 
               {/* Footer Actions */}
               <div className="bg-slate-50 px-8 py-6 border-t border-slate-100 flex items-center justify-end gap-4">
-                 <Link href="/" className="px-6 py-3 text-sm font-bold text-slate-500 hover:text-slate-800 transition">
+                 <Link href="/" className="cursor-pointer px-6 py-3 text-sm font-bold text-slate-500 hover:text-slate-800 transition">
                     Cancel
                  </Link>
                  <button 
                     onClick={handleAddGame}
                     disabled={loading}
-                    className="px-8 py-3 rounded-xl bg-slate-900 text-white font-bold shadow-lg hover:bg-blue-600 hover:shadow-blue-500/30 active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="cursor-pointer px-8 py-3 rounded-xl bg-slate-900 text-white font-bold shadow-lg hover:bg-blue-600 hover:shadow-blue-500/30 active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed"
                  >
                     {loading ? "Adding..." : "Add Game to Library"}
                  </button>
