@@ -54,10 +54,10 @@ export default function Dashboard() {
         games: gamesData.length
       });
 
-      const pinnedRes = await supabase.from("details").select("*, game:games(*), footage(file_path, title)").eq("status", "idea").eq("pinned", true).order("created_at", { ascending: false });
+      const pinnedRes = await supabase.from("details").select("*, game:games(*), footage(id, file_path, title, channel_name)").eq("status", "idea").eq("pinned", true).order("created_at", { ascending: false });
       setPinnedIdeas((pinnedRes.data || []) as DetailRow[]);
 
-      const recentRes = await supabase.from("details").select("*, game:games(*), footage(file_path, title)").eq("status", "idea").eq("pinned", false).order("created_at", { ascending: false }).limit(10);
+      const recentRes = await supabase.from("details").select("*, game:games(*), footage(id, file_path, title, channel_name)").eq("status", "idea").eq("pinned", false).order("created_at", { ascending: false }).limit(10);
       setRecentIdeas((recentRes.data || []) as DetailRow[]);
     }
     loadData();

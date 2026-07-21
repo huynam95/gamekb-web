@@ -94,9 +94,29 @@ export default function AddGamePage() {
 
   // Sidebar Actions
   async function createGroup() {
-    if (!newGroupName.trim()) return;
-    await supabase.from("idea_groups").insert({ name: newGroupName.trim() });
-    window.location.reload(); 
+    const name = newGroupName.trim();
+    if (!name) return;
+    const { data, error } = await supabase.from("idea_groups").insert({ name }).select("id,name").single();
+    if (error || !data) {
+      notifyError(error?.message || "Could not create collection", "Could not create collection");
+      return;
+    }
+    setGroups((current) => [...current, data as Group].sort((a, b) => a.name.localeCompare(b.name)));
+    setGroupCounts((current) => new Map(current).set(data.id, 0));
+    setNewGroupName("");
+    setShowCreateGroup(false);
+    success("Collection created.", "Saved");
+  }
+  async function renameGroup(id: number, name: string) {
+    const trimmedName = name.trim();
+    if (!trimmedName) return;
+    const { error } = await supabase.from("idea_groups").update({ name: trimmedName }).eq("id", id);
+    if (error) {
+      notifyError(error.message, "Could not rename collection");
+      return;
+    }
+    setGroups((current) => current.map((group) => group.id === id ? { ...group, name: trimmedName } : group).sort((a, b) => a.name.localeCompare(b.name)));
+    success("Collection renamed.", "Saved");
   }
   async function deleteGroup(id: number) {
     const shouldDelete = await confirm({
@@ -106,8 +126,18 @@ export default function AddGamePage() {
       confirmText: "Delete",
     });
     if (!shouldDelete) return;
-    await supabase.from("idea_groups").delete().eq("id", id);
-    window.location.reload();
+    const { error } = await supabase.from("idea_groups").delete().eq("id", id);
+    if (error) {
+      notifyError(error.message, "Could not delete collection");
+      return;
+    }
+    setGroups((current) => current.filter((group) => group.id !== id));
+    setGroupCounts((current) => {
+      const next = new Map(current);
+      next.delete(id);
+      return next;
+    });
+    success("Collection deleted.", "Deleted");
   }
 
   return (
@@ -123,6 +153,7 @@ export default function AddGamePage() {
         onNewGroupNameChange={setNewGroupName}
         onCreateGroup={createGroup}
         onDeleteGroup={deleteGroup}
+        onRenameGroup={renameGroup}
         onSelectGroup={() => router.push("/")}
       />
 

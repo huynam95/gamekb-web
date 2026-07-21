@@ -10,8 +10,10 @@ export type Group = {
 };
 
 export type FootageItem = {
+  id?: number;
   file_path: string;
   title: string | null;
+  channel_name?: string | null;
   downloaded?: boolean | null;
 };
 
@@ -26,13 +28,24 @@ export type DetailRow = {
   status?: string;
   game?: Game;
   footage?: FootageItem[];
+  groups?: Group[];
+};
+
+export type ScriptAsset = {
+  url: string;
+  name: string;
+  channel_name?: string | null;
+  idea_id?: number | null;
+  idea_title?: string | null;
+  game_title?: string | null;
+  idea_order?: number | null;
 };
 
 export type ScriptProject = {
   id: number;
   title: string;
   content: string;
-  assets: { url: string; name: string }[];
+  assets: ScriptAsset[];
   description: string;
   hashtags: string[];
   tags: string[];

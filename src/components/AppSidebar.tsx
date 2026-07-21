@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
-import { TrashIcon } from "@heroicons/react/24/outline";
+import { useState, type ReactNode } from "react";
+import { CheckIcon, PencilSquareIcon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import type { Group } from "@/types/gamekb";
 
@@ -20,6 +20,7 @@ type AppSidebarProps = {
   onNewGroupNameChange?: (name: string) => void;
   onCreateGroup?: () => void;
   onDeleteGroup?: (id: number) => void;
+  onRenameGroup?: (id: number, name: string) => void | Promise<void>;
   onSelectGroup?: (id: number) => void;
   onSelectAllIdeas?: () => void;
   showThemeToggle?: boolean;
@@ -58,10 +59,32 @@ export function AppSidebar({
   onNewGroupNameChange,
   onCreateGroup,
   onDeleteGroup,
+  onRenameGroup,
   onSelectGroup,
   onSelectAllIdeas,
   showThemeToggle = true,
 }: AppSidebarProps) {
+  const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
+  const [editingGroupName, setEditingGroupName] = useState("");
+
+  const startRenameGroup = (group: Group) => {
+    setEditingGroupId(group.id);
+    setEditingGroupName(group.name);
+  };
+
+  const cancelRenameGroup = () => {
+    setEditingGroupId(null);
+    setEditingGroupName("");
+  };
+
+  const saveGroupName = async () => {
+    if (editingGroupId === null) return;
+    const name = editingGroupName.trim();
+    if (!name) return;
+    await onRenameGroup?.(editingGroupId, name);
+    cancelRenameGroup();
+  };
+
   const renderNavItem = (item: (typeof navItems)[number], compact = false) => {
     const active = activePage === item.key;
     const className = compact
@@ -139,34 +162,70 @@ export function AppSidebar({
                   }`
                 : "group/item relative flex w-full cursor-pointer items-center justify-between rounded-xl px-2 py-1 transition hover:bg-slate-50 dark:hover:bg-slate-900"}
             >
-              <button
-                onClick={() => onSelectGroup?.(group.id)}
-                className={compact
-                  ? "flex max-w-[180px] cursor-pointer items-center gap-2 overflow-hidden text-left text-xs font-black"
-                  : `flex flex-1 cursor-pointer items-center gap-2 overflow-hidden py-2 text-left ${
-                      selectedGroupId === group.id ? "font-bold text-blue-700 dark:text-blue-400" : "font-medium text-slate-500 dark:text-slate-400"
-                    }`}
-                type="button"
-              >
-                <span className="truncate">{group.name}</span>
-              </button>
-
-              <div className="flex w-8 shrink-0 items-center justify-center">
-                <span className={`tabular-nums text-[10px] font-bold leading-none opacity-60 group-hover/item:hidden ${selectedGroupId === group.id ? "text-blue-700 dark:text-blue-400" : ""}`}>
-                  {groupCounts.get(group.id) || 0}
-                </span>
+              {editingGroupId === group.id ? (
+                <div className="flex min-w-0 flex-1 items-center gap-1" onClick={(event) => event.stopPropagation()}>
+                  <input
+                    value={editingGroupName}
+                    onChange={(event) => setEditingGroupName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") void saveGroupName();
+                      if (event.key === "Escape") cancelRenameGroup();
+                    }}
+                    className="h-8 min-w-0 flex-1 rounded-lg border border-blue-300 bg-white px-2 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-blue-700 dark:bg-slate-900 dark:text-slate-100"
+                    autoFocus
+                  />
+                  <button type="button" onClick={() => void saveGroupName()} className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10" aria-label="Save collection name">
+                    <CheckIcon className="h-4 w-4" />
+                  </button>
+                  <button type="button" onClick={cancelRenameGroup} className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Cancel rename">
+                    <XMarkIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
                 <button
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onDeleteGroup?.(group.id);
-                  }}
-                  className="hidden h-7 w-8 cursor-pointer items-center justify-center rounded-lg text-rose-500 transition hover:bg-rose-50 hover:text-rose-700 group-hover/item:flex dark:hover:bg-rose-950/30"
+                  onClick={() => onSelectGroup?.(group.id)}
+                  className={compact
+                    ? "flex max-w-[180px] cursor-pointer items-center gap-2 overflow-hidden text-left text-xs font-black"
+                    : `flex flex-1 cursor-pointer items-center gap-2 overflow-hidden py-2 text-left ${
+                        selectedGroupId === group.id ? "font-bold text-blue-700 dark:text-blue-400" : "font-medium text-slate-500 dark:text-slate-400"
+                      }`}
                   type="button"
-                  aria-label={`Delete ${group.name}`}
                 >
-                  <TrashIcon className="h-4 w-4" />
+                  <span className="truncate">{group.name}</span>
                 </button>
-              </div>
+              )}
+
+              {editingGroupId !== group.id && (
+                <div className="flex min-w-[64px] shrink-0 items-center justify-end">
+                  <span className={`mr-1 tabular-nums text-[10px] font-bold leading-none opacity-60 group-hover/item:hidden ${selectedGroupId === group.id ? "text-blue-700 dark:text-blue-400" : ""}`}>
+                    {groupCounts.get(group.id) || 0}
+                  </span>
+                  {onRenameGroup && (
+                    <button
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        startRenameGroup(group);
+                      }}
+                      className="hidden h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition hover:bg-blue-50 hover:text-blue-600 group-hover/item:flex dark:hover:bg-blue-500/10 dark:hover:text-blue-300"
+                      type="button"
+                      aria-label={`Rename ${group.name}`}
+                    >
+                      <PencilSquareIcon className="h-4 w-4" />
+                    </button>
+                  )}
+                  <button
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onDeleteGroup?.(group.id);
+                    }}
+                    className="hidden h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-rose-500 transition hover:bg-rose-50 hover:text-rose-700 group-hover/item:flex dark:hover:bg-rose-950/30"
+                    type="button"
+                    aria-label={`Delete ${group.name}`}
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>

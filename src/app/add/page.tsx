@@ -13,7 +13,7 @@ import {
   UserGroupIcon,
 } from "@heroicons/react/24/outline";
 import { supabase } from "@/lib/supabaseClient";
-import { fetchYoutubeTitle } from "@/lib/youtube";
+import { fetchYoutubeMetadata } from "@/lib/youtube";
 import { AppSidebar } from "@/components/AppSidebar";
 import { useNotifications } from "@/components/NotificationCenter";
 import { normalizeGameTitle } from "@/lib/gameTitles";
@@ -36,6 +36,7 @@ type IdeaGroup = { id: number; name: string; description: string | null };
 type StagedFootage = {
   file_path: string;
   title?: string;
+  channel_name?: string;
   downloaded: boolean;
   notes?: string;
 };
@@ -553,11 +554,16 @@ export default function AddIdeaPage() {
 
   async function addFootage(link: string) {
     setFetchingTitle(true);
-    const ytTitle = await fetchYoutubeTitle(link);
+    const metadata = await fetchYoutubeMetadata(link);
     const isLocalFile = !link.startsWith("http");
     setStagedFootage((current) => [
       ...current,
-      { file_path: link, title: ytTitle || undefined, downloaded: isLocalFile },
+      {
+        file_path: link,
+        title: metadata.title || undefined,
+        channel_name: metadata.channelName || undefined,
+        downloaded: isLocalFile,
+      },
     ]);
     setFp("");
     setFetchingTitle(false);
@@ -627,6 +633,7 @@ export default function AddIdeaPage() {
               detail_id: detailId,
               file_path: f.file_path,
               title: f.title,
+              channel_name: f.channel_name,
               downloaded: f.downloaded,
               notes: f.notes,
             })),

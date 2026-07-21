@@ -12,7 +12,8 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { GameEditorModal, IdeaItem, QuickViewModal, ScriptEditorModal } from "@/components/IdeaCards";
 import { RandomIdeaModal } from "@/components/RandomIdeaModal";
 import { useNotifications } from "@/components/NotificationCenter";
-import type { DetailRow, Game, Group, ScriptProject } from "@/types/gamekb";
+import type { DetailRow, FootageItem, Game, Group, ScriptProject } from "@/types/gamekb";
+import { fetchYoutubeMetadata, isYoutubeUrl } from "@/lib/youtube";
 
 /* ================= CONFIG ================= */
 
@@ -527,6 +528,69 @@ export default function Home() {
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
 
+  async function attachGroupsToIdeas(rows: DetailRow[]): Promise<DetailRow[]> {
+    if (rows.length === 0) return rows;
+    const ids = rows.map((idea) => idea.id);
+    const { data, error } = await supabase
+      .from("idea_group_items")
+      .select("detail_id,group_id")
+      .in("detail_id", ids);
+    if (error) return rows;
+
+    const groupById = new Map(groups.map((group) => [group.id, group]));
+    const groupsByIdea = new Map<number, Group[]>();
+    for (const item of data ?? []) {
+      const detailId = Number((item as { detail_id: number }).detail_id);
+      const groupId = Number((item as { group_id: number }).group_id);
+      const group = groupById.get(groupId);
+      if (!group) continue;
+      groupsByIdea.set(detailId, [...(groupsByIdea.get(detailId) ?? []), group]);
+    }
+
+    return rows.map((idea) => ({
+      ...idea,
+      groups: (groupsByIdea.get(idea.id) ?? []).sort((a, b) => a.name.localeCompare(b.name)),
+    }));
+  }
+
+  async function backfillYoutubeChannels(rows: DetailRow[]) {
+    const missing = new Map<number, FootageItem>();
+    for (const idea of rows) {
+      for (const footage of idea.footage ?? []) {
+        if (footage.id && !footage.channel_name && isYoutubeUrl(footage.file_path)) {
+          missing.set(footage.id, footage);
+        }
+      }
+    }
+
+    const entries = [...missing.entries()];
+    for (let index = 0; index < entries.length; index += 4) {
+      const batch = entries.slice(index, index + 4);
+      const results = await Promise.all(
+        batch.map(async ([footageId, footage]) => {
+          const metadata = await fetchYoutubeMetadata(footage.file_path);
+          if (!metadata.channelName) return null;
+          await supabase
+            .from("footage")
+            .update({ channel_name: metadata.channelName, title: footage.title || metadata.title })
+            .eq("id", footageId);
+          return { footageId, channelName: metadata.channelName, title: footage.title || metadata.title };
+        }),
+      );
+
+      const updates = results.filter(Boolean) as Array<{ footageId: number; channelName: string; title: string | null }>;
+      if (updates.length === 0) continue;
+      const updateById = new Map(updates.map((item) => [item.footageId, item]));
+      setIdeas((current) => current.map((idea) => ({
+        ...idea,
+        footage: idea.footage?.map((footage) => {
+          const update = footage.id ? updateById.get(footage.id) : undefined;
+          return update ? { ...footage, channel_name: update.channelName, title: update.title } : footage;
+        }),
+      })));
+    }
+  }
+
   useEffect(() => {
     Promise.all([
       supabase.from("games").select("*").order("title"),
@@ -640,7 +704,7 @@ export default function Home() {
 
       let query = supabase
         .from("details")
-        .select("*, footage(file_path, title)", { count: "exact" })
+        .select("*, footage(id, file_path, title, channel_name)", { count: "exact" })
         .eq("status", "idea");
 
       if (groupId) {
@@ -657,13 +721,22 @@ export default function Home() {
       if (gameId) query = query.eq("game_id", gameId);
       if (type) query = query.eq("detail_type", type); 
       query = applyIdeaTextSearch(query, debouncedQ, games);
-      const { data, count } = await query.order("created_at", { ascending: sortOrder === "oldest" }).range(from, to);
-      setIdeas((data ?? []) as DetailRow[]);
+      const { data, count, error } = await query.order("created_at", { ascending: sortOrder === "oldest" }).range(from, to);
+      if (error) {
+        notifyError(error.message, "Could not load ideas");
+        setIdeas([]);
+        setTotalCount(0);
+        setLoading(false);
+        return;
+      }
+      const enrichedIdeas = await attachGroupsToIdeas((data ?? []) as DetailRow[]);
+      setIdeas(enrichedIdeas);
       setTotalCount(count ?? 0);
       setLoading(false);
+      void backfillYoutubeChannels(enrichedIdeas);
     }
     load();
-  }, [debouncedQ, gameId, groupId, type, sortOrder, currentPage, games]);
+  }, [debouncedQ, gameId, groupId, type, sortOrder, currentPage, games, groups]);
 
   const toggleSelection = (idea: DetailRow) => {
     setSelectedIds(prev =>
@@ -763,7 +836,7 @@ export default function Home() {
       if (missingIds.length > 0) {
         const { data, error } = await supabase
           .from("details")
-          .select("*, footage(file_path, title)")
+          .select("*, footage(id, file_path, title, channel_name)")
           .in("id", missingIds);
 
         if (error) {
@@ -798,9 +871,33 @@ export default function Home() {
   };
 
   async function createGroup() {
-    if (!newGroupName.trim()) return;
-    await supabase.from("idea_groups").insert({ name: newGroupName.trim() });
-    window.location.reload(); 
+    const name = newGroupName.trim();
+    if (!name) return;
+    const { data, error } = await supabase.from("idea_groups").insert({ name }).select("id,name").single();
+    if (error || !data) {
+      notifyError(error?.message || "Could not create collection", "Could not create collection");
+      return;
+    }
+    setGroups((current) => [...current, data as Group].sort((a, b) => a.name.localeCompare(b.name)));
+    setGroupCounts((current) => new Map(current).set(data.id, 0));
+    setNewGroupName("");
+    setShowCreateGroup(false);
+    success("Collection created.", "Saved");
+  }
+
+  async function renameGroup(id: number, name: string) {
+    const trimmedName = name.trim();
+    if (!trimmedName) return;
+    const { error } = await supabase.from("idea_groups").update({ name: trimmedName }).eq("id", id);
+    if (error) {
+      notifyError(error.message, "Could not rename collection");
+      return;
+    }
+    const updateGroups = (list: Group[] | undefined) => list?.map((group) => group.id === id ? { ...group, name: trimmedName } : group).sort((a, b) => a.name.localeCompare(b.name));
+    setGroups((current) => updateGroups(current) ?? []);
+    setIdeas((current) => current.map((idea) => ({ ...idea, groups: updateGroups(idea.groups) })));
+    setSelectedIdeas((current) => current.map((idea) => ({ ...idea, groups: updateGroups(idea.groups) })));
+    success("Collection renamed.", "Saved");
   }
 
   async function deleteGroup(id: number) {
@@ -811,8 +908,20 @@ export default function Home() {
       confirmText: "Delete",
     });
     if (!shouldDelete) return;
-    await supabase.from("idea_groups").delete().eq("id", id);
-    window.location.reload();
+    const { error } = await supabase.from("idea_groups").delete().eq("id", id);
+    if (error) {
+      notifyError(error.message, "Could not delete collection");
+      return;
+    }
+    setGroups((current) => current.filter((group) => group.id !== id));
+    setGroupCounts((current) => {
+      const next = new Map(current);
+      next.delete(id);
+      return next;
+    });
+    setIdeas((current) => current.map((idea) => ({ ...idea, groups: idea.groups?.filter((group) => group.id !== id) })));
+    if (groupId === id) setGroupId("");
+    success("Collection deleted.", "Deleted");
   }
 
   async function getActiveGroupDetailIds() {
@@ -833,7 +942,7 @@ export default function Home() {
   async function fetchFilteredIdeasRange(from: number, to: number, groupDetailIds: number[] | null) {
     let query = supabase
       .from("details")
-      .select("*, footage(file_path, title)")
+      .select("*, footage(id, file_path, title, channel_name)")
       .eq("status", "idea");
 
     if (groupDetailIds) {
@@ -959,6 +1068,7 @@ export default function Home() {
         onNewGroupNameChange={setNewGroupName}
         onCreateGroup={createGroup}
         onDeleteGroup={deleteGroup}
+        onRenameGroup={renameGroup}
         onSelectGroup={setGroupId}
         onSelectAllIdeas={() => { setGroupId(""); setQ(""); }}
         showThemeToggle={false}

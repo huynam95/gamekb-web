@@ -4,8 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
-import { fetchYoutubeTitle } from "@/lib/youtube";
+import { fetchYoutubeMetadata } from "@/lib/youtube";
 import { useNotifications } from "@/components/NotificationCenter";
+import { buildScriptGuide } from "@/lib/scriptGuide";
 import { 
   HashtagIcon, 
   TagIcon, 
@@ -42,6 +43,7 @@ type FootageRow = {
   detail_id: number;
   file_path: string | null;
   title: string | null;
+  channel_name: string | null;
   downloaded: boolean;
   start_ts: string | null;
   end_ts: string | null;
@@ -69,7 +71,15 @@ type ScriptProject = {
   id?: number; 
   title: string; 
   content: string; 
-  assets: { url: string; name: string }[];
+  assets: {
+    url: string;
+    name: string;
+    channel_name?: string | null;
+    idea_id?: number | null;
+    idea_title?: string | null;
+    game_title?: string | null;
+    idea_order?: number | null;
+  }[];
   description: string; 
   hashtags: string[]; 
   tags: string[];
@@ -227,7 +237,14 @@ function AddToScriptModal({
   const newDescPart = `• ${gameName || "Unknown Game"}: ${ideaTitle}${ideaDesc ? `\n${ideaDesc}` : ""}`;
   const newTags = [gameName, "Shorts", "Gaming", "Game Facts"].filter(Boolean);
   const newHashtags = ["#shorts", "#gaming", gameName ? `#${gameName.replace(/\s+/g, '').toLowerCase()}` : ""].filter(Boolean);
-  const newAssets = footage.map(f => ({ url: f.file_path || "", name: f.title || f.file_path?.split('/').pop() || "Video" }));
+  const baseNewAssets = footage.map(f => ({
+    url: f.file_path || "",
+    name: f.title || f.file_path?.split('/').pop() || "Video",
+    channel_name: f.channel_name || null,
+    idea_id: detail.id,
+    idea_title: ideaTitle,
+    game_title: gameName || "Unknown Game",
+  }));
 
   // Xử lý THÊM VÀO SCRIPT CÓ SẴN
   const handleAddToExisting = async () => {
@@ -247,6 +264,8 @@ function AddToScriptModal({
     const mergedDesc = currentScript.description ? `${currentScript.description}\n\n${newDescPart}` : newDescPart;
     const mergedTags = Array.from(new Set([...(currentScript.tags || []), ...newTags]));
     const mergedHashtags = Array.from(new Set([...(currentScript.hashtags || []), ...newHashtags]));
+    const nextIdeaOrder = buildScriptGuide(String(currentScript.content || "")).filter((section) => !section.isHook).length + 1;
+    const newAssets = baseNewAssets.map((asset) => ({ ...asset, idea_order: nextIdeaOrder }));
     const mergedAssets = [...(currentScript.assets || []), ...newAssets];
 
     const { error: updateErr } = await supabase.from("scripts").update({
@@ -277,7 +296,7 @@ function AddToScriptModal({
       description: `Video tổng hợp các chi tiết thú vị.\n\n${newDescPart}`,
       tags: newTags,
       hashtags: newHashtags,
-      assets: newAssets,
+      assets: baseNewAssets.map((asset) => ({ ...asset, idea_order: 1 })),
       status: "Draft"
     });
 
@@ -456,7 +475,31 @@ export default function IdeaDetailPage() {
     router.push("/");
   }
   async function saveCore() { if (!detail) return; setSavingCore(true); const { error } = await supabase.from("details").update({ title: draftTitle.trim(), description: draftDesc.trim(), detail_type: draftType }).eq("id", detail.id); setSavingCore(false); if (!error) { setEditingCore(false); await loadAll(); } }
-  async function addFootage() { if (!detail || !fp.trim()) return; setFetchingTitle(true); const link = fp.trim(); const ytTitle = await fetchYoutubeTitle(link); const isLocalFile = !link.startsWith("http"); await supabase.from("footage").insert({ detail_id: detail.id, file_path: link, title: ytTitle || null, downloaded: isLocalFile }); setFp(""); setFetchingTitle(false); await loadAll(); }
+  async function addFootage() {
+    if (!detail || !fp.trim()) return;
+    setFetchingTitle(true);
+    const link = fp.trim();
+    const metadata = await fetchYoutubeMetadata(link);
+    const isLocalFile = !link.startsWith("http");
+    const { data, error } = await supabase
+      .from("footage")
+      .insert({
+        detail_id: detail.id,
+        file_path: link,
+        title: metadata.title || null,
+        channel_name: metadata.channelName || null,
+        downloaded: isLocalFile,
+      })
+      .select("*")
+      .single();
+    setFetchingTitle(false);
+    if (error) {
+      notifyError(error.message, "Could not add footage");
+      return;
+    }
+    if (data) setFootage((current) => [data as FootageRow, ...current]);
+    setFp("");
+  }
   async function toggleDownloaded(fid: number, currentStatus: boolean) { setFootage(prev => prev.map(f => f.id === fid ? { ...f, downloaded: !currentStatus } : f)); await supabase.from("footage").update({ downloaded: !currentStatus }).eq("id", fid); }
   async function deleteFootage(fid: number) {
     const shouldDelete = await confirm({ kind: "warning", title: "Remove footage?", message: "Remove this footage?", confirmText: "Remove" });
@@ -475,9 +518,56 @@ export default function IdeaDetailPage() {
     else success("Source removed.", "Removed");
     await loadAll();
   }
-  async function addToGroup(gid: number) { if (!detail) return; await supabase.from("idea_group_items").insert({ group_id: gid, detail_id: detail.id, position: 0 }); loadAll(); }
-  async function removeFromGroup(gid: number) { if (!detail) return; await supabase.from("idea_group_items").delete().eq("group_id", gid).eq("detail_id", detail.id); loadAll(); }
-  async function createGroup(name: string) { const { data } = await supabase.from("idea_groups").insert({ name }).select().single(); if (data) { await addToGroup(data.id); } }
+  async function addToGroup(gid: number) {
+    if (!detail || ideaGroups.some((group) => group.id === gid)) return;
+    const group = allGroups.find((item) => item.id === gid);
+    const { error } = await supabase
+      .from("idea_group_items")
+      .insert({ group_id: gid, detail_id: detail.id, position: 0 });
+    if (error) {
+      notifyError(error.message, "Could not add collection");
+      return;
+    }
+    if (group) {
+      setIdeaGroups((current) => [...current, group].sort((a, b) => a.name.localeCompare(b.name)));
+    }
+  }
+  async function removeFromGroup(gid: number) {
+    if (!detail) return;
+    const { error } = await supabase
+      .from("idea_group_items")
+      .delete()
+      .eq("group_id", gid)
+      .eq("detail_id", detail.id);
+    if (error) {
+      notifyError(error.message, "Could not remove collection");
+      return;
+    }
+    setIdeaGroups((current) => current.filter((group) => group.id !== gid));
+  }
+  async function createGroup(name: string) {
+    const trimmedName = name.trim();
+    if (!trimmedName || !detail) return;
+    const { data, error } = await supabase
+      .from("idea_groups")
+      .insert({ name: trimmedName })
+      .select()
+      .single();
+    if (error || !data) {
+      notifyError(error?.message || "Could not create collection", "Could not create collection");
+      return;
+    }
+    const newGroup = data as Group;
+    setAllGroups((current) => [...current, newGroup].sort((a, b) => a.name.localeCompare(b.name)));
+    const { error: linkError } = await supabase
+      .from("idea_group_items")
+      .insert({ group_id: newGroup.id, detail_id: detail.id, position: 0 });
+    if (linkError) {
+      notifyError(linkError.message, "Collection created, but idea was not added");
+      return;
+    }
+    setIdeaGroups((current) => [...current, newGroup].sort((a, b) => a.name.localeCompare(b.name)));
+  }
 
   if (loading) return <div className="flex h-screen items-center justify-center text-slate-400">Loading mission...</div>;
   if (!detail) return <div className="p-8 text-center text-slate-500">Idea not found.</div>;
@@ -678,7 +768,7 @@ export default function IdeaDetailPage() {
              <div className={`${cardClass} border-t-4 border-t-blue-500`}>
                <div className="mb-4 flex items-center justify-between">
                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Collections</h3>
-                 <GroupAddPicker groups={allGroups} onAdd={addToGroup} onCreate={createGroup} />
+                 <GroupAddPicker groups={allGroups.filter((group) => !ideaGroups.some((current) => current.id === group.id))} onAdd={addToGroup} onCreate={createGroup} />
                </div>
                {ideaGroups.length === 0 ? <p className="text-sm text-slate-400">Uncategorized</p> : (
                  <div className="flex flex-wrap gap-2">

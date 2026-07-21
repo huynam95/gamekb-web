@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { AppSidebar } from "@/components/AppSidebar";
 import { useNotifications } from "@/components/NotificationCenter";
+import { analyzeAssetLinks } from "@/lib/assetLinks";
+import { buildScriptGuide } from "@/lib/scriptGuide";
 import {
   TrashIcon,
   MagnifyingGlassIcon,
@@ -14,6 +16,10 @@ import {
   LinkIcon,
   CheckIcon,
   XMarkIcon,
+  DocumentDuplicateIcon,
+  ExclamationTriangleIcon,
+  VideoCameraIcon,
+  Bars3Icon,
 } from "@heroicons/react/24/outline";
 
 /* ================= TYPES & CONFIG ================= */
@@ -22,7 +28,15 @@ type ScriptProject = {
   id: number;
   title: string;
   content: string;
-  assets: { url: string; name: string }[];
+  assets: {
+    url: string;
+    name: string;
+    channel_name?: string | null;
+    idea_id?: number | null;
+    idea_title?: string | null;
+    game_title?: string | null;
+    idea_order?: number | null;
+  }[];
   description: string;
   hashtags: string[];
   tags: string[];
@@ -58,6 +72,58 @@ function getScriptSummary(script: ScriptProject) {
   return cleaned || "No summary...";
 }
 
+function getScriptChannels(script: ScriptProject) {
+  return Array.from(
+    new Set(
+      (script.assets || [])
+        .map((asset) => asset.channel_name?.trim())
+        .filter((channel): channel is string => Boolean(channel)),
+    ),
+  );
+}
+
+async function enrichScriptsWithFootageChannels(rows: ScriptProject[]) {
+  const urls = Array.from(
+    new Set(
+      rows.flatMap((script) =>
+        (script.assets || [])
+          .filter((asset) => !asset.channel_name && asset.url?.trim())
+          .map((asset) => asset.url.trim()),
+      ),
+    ),
+  );
+
+  if (urls.length === 0) return rows;
+
+  const channelByUrl = new Map<string, string>();
+  for (let index = 0; index < urls.length; index += 100) {
+    const batch = urls.slice(index, index + 100);
+    const { data, error } = await supabase
+      .from("footage")
+      .select("file_path,channel_name")
+      .in("file_path", batch);
+
+    // Older databases may not have channel_name yet. Keep projects usable instead of failing the page.
+    if (error) return rows;
+
+    for (const item of data || []) {
+      const url = String((item as { file_path?: string }).file_path || "").trim();
+      const channel = String((item as { channel_name?: string | null }).channel_name || "").trim();
+      if (url && channel) channelByUrl.set(url, channel);
+    }
+  }
+
+  if (channelByUrl.size === 0) return rows;
+
+  return rows.map((script) => ({
+    ...script,
+    assets: (script.assets || []).map((asset) => ({
+      ...asset,
+      channel_name: asset.channel_name || channelByUrl.get(asset.url?.trim()) || null,
+    })),
+  }));
+}
+
 function getTopicVisual(topic: string) {
   const normalized = topic.toLowerCase();
 
@@ -88,14 +154,105 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
   });
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [activeTab, setActiveTab] = useState<"script" | "metadata" | "assets">("script");
+  const [draggedSectionId, setDraggedSectionId] = useState<string | null>(null);
+  const [dragOverSectionId, setDragOverSectionId] = useState<string | null>(null);
+  const scriptTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const { success, error: notifyError } = useNotifications();
+
+  const assetAnalysis = useMemo(() => analyzeAssetLinks(formData.assets || []), [formData.assets]);
+  const scriptGuide = useMemo(() => buildScriptGuide(String(formData.content || "")), [formData.content]);
 
   useEffect(() => {
     if (isOpen && script) {
       setFormData(script);
       setIsEditingTitle(false);
       setActiveTab("script");
+      setDraggedSectionId(null);
+      setDragOverSectionId(null);
     }
   }, [isOpen, script]);
+
+  const jumpToScriptSection = (start: number, end: number) => {
+    setActiveTab("script");
+    requestAnimationFrame(() => {
+      const textarea = scriptTextareaRef.current;
+      if (!textarea) return;
+      textarea.focus();
+      textarea.setSelectionRange(start, end);
+    });
+  };
+
+  const getSectionChannels = (section: (typeof scriptGuide)[number]) => {
+    if (section.isHook) return [] as string[];
+    const assets = formData.assets || [];
+    const normalizedLabel = section.label.trim().toLowerCase();
+    const matched = assets.filter((asset) =>
+      (section.number != null && asset.idea_order === section.number) ||
+      Boolean(asset.game_title && asset.game_title.trim().toLowerCase() === normalizedLabel),
+    );
+    const fallback = matched.length > 0
+      ? matched
+      : section.number != null && assets[section.number - 1]
+        ? [assets[section.number - 1]]
+        : [];
+
+    return Array.from(
+      new Set(
+        fallback
+          .map((asset) => asset.channel_name?.trim())
+          .filter((channel): channel is string => Boolean(channel)),
+      ),
+    );
+  };
+
+  const moveScriptSection = (sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return;
+    const content = String(formData.content || "");
+    const sections = buildScriptGuide(content);
+    const hook = sections.find((section) => section.isHook);
+    const ideaSections = sections.filter((section) => !section.isHook);
+    const sourceIndex = ideaSections.findIndex((section) => section.id === sourceId);
+    const targetIndex = ideaSections.findIndex((section) => section.id === targetId);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+
+    const blocks = new Map(sections.map((section) => [section.id, content.slice(section.start, section.end).trim()]));
+    const nextSections = [...ideaSections];
+    const [moved] = nextSections.splice(sourceIndex, 1);
+    nextSections.splice(targetIndex, 0, moved);
+
+    const nextContent = [
+      hook ? blocks.get(hook.id) : null,
+      ...nextSections.map((section) => blocks.get(section.id)),
+    ].filter((block): block is string => Boolean(block)).join("\n\n");
+
+    const nextOrderByOldNumber = new Map<number, number>();
+    nextSections.forEach((section, index) => {
+      if (section.number != null) nextOrderByOldNumber.set(section.number, index + 1);
+    });
+
+    const nextAssets = [...(formData.assets || [])].map((asset) => ({
+      ...asset,
+      idea_order: asset.idea_order != null
+        ? nextOrderByOldNumber.get(asset.idea_order) ?? asset.idea_order
+        : asset.idea_order,
+    })).sort((a, b) => (a.idea_order ?? Number.MAX_SAFE_INTEGER) - (b.idea_order ?? Number.MAX_SAFE_INTEGER));
+
+    setFormData((current) => ({ ...current, content: nextContent, assets: nextAssets }));
+  };
+
+  const copyWholeScript = async () => {
+    const content = String(formData.content || "").trim();
+    if (!content) {
+      notifyError("There is no script content to copy.", "Nothing to copy");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(content);
+      success("The full script is ready on your clipboard.", "Script copied");
+    } catch {
+      notifyError("The browser could not copy the script. Please select the text manually.", "Copy failed");
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -184,13 +341,100 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
 
         <div className="flex-1 overflow-y-auto bg-white p-4 sm:p-6 lg:p-12 dark:bg-slate-950">
           {activeTab === "script" && (
-            <div className="mx-auto flex h-full max-w-5xl flex-col">
-              <textarea
-                className="h-full min-h-[420px] w-full resize-none rounded-[1.5rem] border border-slate-100 bg-slate-50 p-5 font-sans text-base font-medium leading-relaxed text-slate-900 shadow-inner outline-none placeholder:text-slate-300 sm:p-7 sm:text-lg lg:rounded-[2rem] lg:p-10 lg:text-xl dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-                placeholder="Bắt đầu soạn thảo kịch bản..."
-                value={formData.content || ""}
-                onChange={(event) => setFormData({ ...formData, content: event.target.value })}
-              />
+            <div className="grid min-h-[420px] gap-4 lg:min-h-[560px] xl:grid-cols-[340px_minmax(0,1fr)] xl:gap-5">
+              <aside className="flex min-h-0 max-h-[300px] flex-col rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm sm:p-4 xl:max-h-none xl:rounded-3xl dark:border-slate-800 dark:bg-slate-900">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-500 dark:text-blue-300">Script Order</p>
+                    <p className="mt-1 text-xs font-bold text-slate-400 dark:text-slate-500">Drag to reorder. Click a card to jump to that section.</p>
+                  </div>
+                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-300">{scriptGuide.filter((section) => !section.isHook).length}</span>
+                </div>
+
+                <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+                  {scriptGuide.length === 0 && (
+                    <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-xs font-bold text-slate-400 dark:border-slate-700 dark:text-slate-500">No script sections found.</div>
+                  )}
+                  {scriptGuide.map((section) => {
+                    const channels = getSectionChannels(section);
+                    const isDragOver = dragOverSectionId === section.id && draggedSectionId !== section.id;
+                    return (
+                      <div
+                        key={section.id}
+                        draggable={!section.isHook}
+                        onClick={() => jumpToScriptSection(section.start, section.end)}
+                        onDragStart={(event) => {
+                          if (section.isHook) return;
+                          setDraggedSectionId(section.id);
+                          event.dataTransfer.effectAllowed = "move";
+                          event.dataTransfer.setData("text/plain", section.id);
+                        }}
+                        onDragOver={(event) => {
+                          if (section.isHook) return;
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = "move";
+                          setDragOverSectionId(section.id);
+                        }}
+                        onDragLeave={() => setDragOverSectionId((current) => current === section.id ? null : current)}
+                        onDrop={(event) => {
+                          if (section.isHook) return;
+                          event.preventDefault();
+                          const sourceId = event.dataTransfer.getData("text/plain") || draggedSectionId;
+                          if (sourceId) moveScriptSection(sourceId, section.id);
+                          setDraggedSectionId(null);
+                          setDragOverSectionId(null);
+                        }}
+                        onDragEnd={() => {
+                          setDraggedSectionId(null);
+                          setDragOverSectionId(null);
+                        }}
+                        className={`group flex items-start gap-3 rounded-2xl border p-3 text-left shadow-sm transition ${section.isHook ? "cursor-pointer border-violet-200 bg-violet-50 hover:bg-violet-100 dark:border-violet-500/25 dark:bg-violet-500/10 dark:hover:bg-violet-500/15" : `cursor-grab active:cursor-grabbing ${isDragOver ? "border-blue-400 bg-blue-50 ring-2 ring-blue-100 dark:border-blue-500 dark:bg-blue-500/10 dark:ring-blue-500/20" : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700"}`}`}
+                      >
+                        <div className={`flex h-8 min-w-8 shrink-0 items-center justify-center rounded-xl px-1 text-xs font-black shadow-sm ${section.isHook ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300"}`}>
+                          {section.isHook ? "H" : section.number}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <p className={`truncate text-sm font-black ${section.isHook ? "text-violet-800 dark:text-violet-200" : "text-slate-800 dark:text-slate-100"}`}>{section.label}</p>
+                            {!section.isHook && <Bars3Icon className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:text-slate-500 dark:text-slate-600 dark:group-hover:text-slate-300" />}
+                          </div>
+                          <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">{section.preview}</p>
+                          {channels.length > 0 && (
+                            <div className="mt-2 flex min-w-0 items-center gap-1.5 text-[10px] font-black text-rose-600 dark:text-rose-300" title={channels.join(", ")}>
+                              <VideoCameraIcon className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate">{channels[0]}</span>
+                              {channels.length > 1 && <span className="shrink-0 text-slate-400 dark:text-slate-500">+{channels.length - 1}</span>}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </aside>
+
+              <div className="flex min-w-0 flex-col gap-3">
+                <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Script Content</p>
+                    <p className="mt-1 text-xs font-bold text-slate-400 dark:text-slate-500">The order panel stays outside the copied script.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={copyWholeScript}
+                    className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-black dark:bg-blue-600 dark:hover:bg-blue-700"
+                  >
+                    <DocumentDuplicateIcon className="h-4 w-4" /> Copy Script
+                  </button>
+                </div>
+
+                <textarea
+                  ref={scriptTextareaRef}
+                  className="min-h-[420px] w-full flex-1 resize-none rounded-2xl border border-slate-200 bg-white p-5 font-sans text-base leading-7 text-slate-800 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 sm:p-6 sm:text-[17px] sm:leading-8 lg:min-h-[500px] lg:rounded-3xl lg:p-8 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-600"
+                  value={formData.content || ""}
+                  onChange={(event) => setFormData({ ...formData, content: event.target.value })}
+                />
+              </div>
             </div>
           )}
 
@@ -215,21 +459,69 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
           )}
 
           {activeTab === "assets" && (
-            <div className="mx-auto grid max-w-4xl gap-4">
-              {formData.assets?.map((asset, index) => (
-                <div key={index} className="group flex items-center gap-5 rounded-2xl border border-slate-200 bg-slate-50 p-5 transition-all hover:border-blue-500 dark:border-slate-800 dark:bg-slate-900">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-slate-100 bg-white font-black text-slate-400 shadow-sm transition-all group-hover:bg-blue-600 group-hover:text-white dark:border-slate-800 dark:bg-slate-950">
-                    #{index + 1}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-base font-black text-slate-900 dark:text-slate-50">{asset.name}</p>
-                    <p className="mt-1 truncate font-mono text-xs font-bold text-slate-500">{asset.url}</p>
-                  </div>
-                  <a href={asset.url} target="_blank" rel="noopener noreferrer" className="cursor-pointer rounded-xl border border-slate-200 bg-white p-3 text-slate-400 shadow-sm hover:text-blue-600 dark:border-slate-800 dark:bg-slate-950">
-                    <LinkIcon className="h-5 w-5" />
-                  </a>
+            <div className="mx-auto max-w-4xl space-y-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Project Assets</p>
+                  <p className="mt-1 text-xs font-bold text-slate-400 dark:text-slate-500">
+                    {(formData.assets || []).length} entries · {assetAnalysis.uniqueLinkCount} unique links
+                  </p>
                 </div>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => navigator.clipboard.writeText(assetAnalysis.uniqueAssets.map((asset) => asset.url).filter(Boolean).join("\n"))}
+                  className="inline-flex cursor-pointer items-center gap-2 self-start rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs font-black text-blue-700 transition hover:bg-blue-100 sm:self-auto dark:border-blue-500/25 dark:bg-blue-500/10 dark:text-blue-300"
+                >
+                  <DocumentDuplicateIcon className="h-4 w-4" /> Copy Unique Links
+                </button>
+              </div>
+
+              {assetAnalysis.repeatedLinkCount > 0 && (
+                <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-100/80 p-4 text-slate-700 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                  <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 shrink-0 text-slate-500 dark:text-slate-300" />
+                  <div>
+                    <p className="text-sm font-black">{assetAnalysis.repeatedLinkCount} duplicate {assetAnalysis.repeatedLinkCount === 1 ? "link" : "links"} detected</p>
+                    <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">
+                      Download only the first occurrence. Equivalent YouTube watch, Shorts, embed, live, and youtu.be URLs are treated as the same source video.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid gap-3">
+                {formData.assets?.map((asset, index) => {
+                  const duplicate = assetAnalysis.duplicateMeta.get(index);
+                  const isRepeated = duplicate && !duplicate.isPrimary;
+                  const displayNumber = assetAnalysis.uniqueOrdinalByIndex.get(index);
+
+                  return (
+                    <div key={`${asset.url}-${index}`} className={`group flex items-center gap-4 rounded-2xl border p-4 transition-all sm:gap-5 sm:p-5 ${isRepeated ? "border-slate-300 bg-slate-100/80 dark:border-slate-700 dark:bg-slate-800/60" : "border-slate-200 bg-slate-50 hover:border-blue-500 dark:border-slate-800 dark:bg-slate-900"}`}>
+                      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border font-black shadow-sm transition-all ${isRepeated ? "border-slate-300 bg-slate-200 text-slate-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300" : "border-slate-100 bg-white text-slate-400 group-hover:bg-blue-600 group-hover:text-white dark:border-slate-800 dark:bg-slate-950"}`}>
+                        {isRepeated ? <LinkIcon className="h-5 w-5" /> : `#${displayNumber ?? ""}`}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <p className="truncate text-base font-black text-slate-900 dark:text-slate-50">{asset.name}</p>
+                          {asset.channel_name && (
+                            <span className="shrink-0 rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-black text-rose-700 dark:border-rose-500/25 dark:bg-rose-500/10 dark:text-rose-300">
+                              {asset.channel_name}
+                            </span>
+                          )}
+                          {duplicate && (
+                            <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-wide ${isRepeated ? "bg-slate-500 text-white dark:bg-slate-600" : "border border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>
+                              {isRepeated ? "Duplicate" : `Same source ×${duplicate.total}`}
+                            </span>
+                          )}
+                        </div>
+                        <p className="mt-1 truncate font-mono text-xs font-bold text-slate-500">{asset.url}</p>
+                      </div>
+                      <a href={asset.url} target="_blank" rel="noopener noreferrer" className="shrink-0 cursor-pointer rounded-xl border border-slate-200 bg-white p-3 text-slate-400 shadow-sm hover:text-blue-600 dark:border-slate-800 dark:bg-slate-950">
+                        <LinkIcon className="h-5 w-5" />
+                      </a>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
@@ -252,8 +544,9 @@ export default function ScriptsPage() {
   useEffect(() => {
     async function load() {
       const { data: sData } = await supabase.from("scripts").select("*").order("created_at", { ascending: false });
-      setScripts((sData || []) as ScriptProject[]);
-      setFilteredScripts((sData || []) as ScriptProject[]);
+      const enrichedScripts = await enrichScriptsWithFootageChannels((sData || []) as ScriptProject[]);
+      setScripts(enrichedScripts);
+      setFilteredScripts(enrichedScripts);
     }
     load();
   }, []);
@@ -262,10 +555,12 @@ export default function ScriptsPage() {
     const query = searchQuery.trim().toLowerCase();
     const result = scripts.filter((script) => {
       const topic = getScriptTopic(script).toLowerCase();
+      const channels = getScriptChannels(script).join(" ").toLowerCase();
       return (
         script.title?.toLowerCase().includes(query) ||
         script.description?.toLowerCase().includes(query) ||
-        topic.includes(query)
+        topic.includes(query) ||
+        channels.includes(query)
       );
     });
     setFilteredScripts(result);
@@ -350,7 +645,7 @@ export default function ScriptsPage() {
               <MagnifyingGlassIcon className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-900 sm:left-6 sm:h-6 sm:w-6 dark:text-slate-200" />
               <input
                 className="h-12 w-full rounded-[1.25rem] border-2 border-slate-200 bg-white pl-12 pr-4 text-base font-bold shadow-sm outline-none transition-all focus:border-slate-900 sm:h-16 sm:rounded-[1.5rem] sm:pl-16 sm:pr-12 sm:text-lg dark:border-slate-800 dark:bg-slate-900 dark:text-slate-50 dark:focus:border-blue-500"
-                placeholder="Search projects, topic, summary..."
+                placeholder="Search projects, topics, channels..."
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
               />
@@ -378,7 +673,7 @@ export default function ScriptsPage() {
           </div>
 
           <div className="overflow-x-auto rounded-[1.5rem] border-2 border-slate-200 bg-white shadow-2xl shadow-slate-200/40 sm:rounded-[2rem] lg:rounded-[2.5rem] dark:border-slate-800 dark:bg-slate-950 dark:shadow-black/20">
-            <table className="min-w-[1120px] table-fixed border-collapse text-left xl:w-full">
+            <table className="min-w-[1280px] table-fixed border-collapse text-left xl:w-full">
               <thead className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/70">
                 <tr>
                   <th className="w-[4%] px-6 py-7 text-center">
@@ -390,10 +685,11 @@ export default function ScriptsPage() {
                       className="h-5 w-5 cursor-pointer rounded border-slate-300 accent-blue-600"
                     />
                   </th>
-                  <th className="w-[32%] px-4 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Project</th>
-                  <th className="w-[32%] px-4 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Topic</th>
+                  <th className="w-[27%] px-4 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Project</th>
+                  <th className="w-[24%] px-4 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Topic</th>
+                  <th className="w-[18%] px-4 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Channel</th>
                   <th className="w-[10%] px-4 py-7 text-center text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Status</th>
-                  <th className="w-[14%] px-4 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Summary</th>
+                  <th className="w-[9%] px-4 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Summary</th>
                   <th className="w-[8%] px-6 py-7 text-right text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Action</th>
                 </tr>
               </thead>
@@ -402,6 +698,7 @@ export default function ScriptsPage() {
                   const topic = getScriptTopic(script);
                   const topicVisual = getTopicVisual(topic);
                   const summary = getScriptSummary(script);
+                  const channels = getScriptChannels(script);
                   const selected = selectedIds.includes(script.id);
                   const status = script.status || "Draft";
 
@@ -450,6 +747,26 @@ export default function ScriptsPage() {
                           <span className="line-clamp-2 min-w-0 flex-1 text-left text-base font-black leading-snug tracking-tight">{topic}</span>
                         </div>
                       </td>
+                      <td className="px-4 py-9">
+                        <div
+                          title={channels.length > 0 ? channels.join(" · ") : "No source channel saved"}
+                          className={`flex h-20 w-full items-center gap-3 rounded-[1.4rem] border px-4 shadow-sm ${
+                            channels.length > 0
+                              ? "border-rose-100 bg-rose-50 text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-100"
+                              : "border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500"
+                          }`}
+                        >
+                          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${channels.length > 0 ? "bg-rose-600 text-white" : "bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400"}`} aria-hidden="true">
+                            <VideoCameraIcon className="h-5 w-5" />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="line-clamp-2 text-sm font-black leading-snug">{channels[0] || "Unknown channel"}</p>
+                            {channels.length > 1 && (
+                              <p className="mt-1 text-[10px] font-black uppercase tracking-wide opacity-65">+{channels.length - 1} more</p>
+                            )}
+                          </div>
+                        </div>
+                      </td>
                       <td className="px-4 py-9 text-center">
                         <span className={`rounded-xl border px-4 py-2 text-[10px] font-black uppercase tracking-widest shadow-sm ${STATUS_STYLE[status] || STATUS_STYLE.Draft}`}>{status}</span>
                       </td>
@@ -487,7 +804,7 @@ export default function ScriptsPage() {
 
                 {filteredScripts.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-10 py-20 text-center">
+                    <td colSpan={7} className="px-10 py-20 text-center">
                       <p className="text-lg font-black text-slate-500 dark:text-slate-400">No video projects found.</p>
                       <p className="mt-2 text-sm font-bold text-slate-400">Try another search or create a new project from selected ideas.</p>
                     </td>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { fetchYoutubeTitle } from "@/lib/youtube";
+import { fetchYoutubeMetadata } from "@/lib/youtube";
 
 export default function MigratePage() {
   const [logs, setLogs] = useState<string[]>([]);
@@ -16,8 +16,8 @@ export default function MigratePage() {
     // 1. Lấy tất cả footage chưa có title
     const { data: footages, error } = await supabase
       .from("footage")
-      .select("id, file_path")
-      .is("title", null); // Chỉ lấy dòng nào title đang NULL
+      .select("id, file_path, title, channel_name")
+      .or("title.is.null,channel_name.is.null");
 
     if (error) {
       setLogs((prev) => [`❌ Error fetching data: ${error.message}`, ...prev]);
@@ -42,17 +42,18 @@ export default function MigratePage() {
       // Cập nhật thanh tiến trình
       setProgress(Math.round(((i + 1) / footages.length) * 100));
 
-      // Lấy tên từ Youtube
-      const ytTitle = await fetchYoutubeTitle(link);
+      // Lấy metadata từ YouTube
+      const metadata = await fetchYoutubeMetadata(link);
 
-      // Nếu lấy được tên (hoặc nếu không phải link youtube thì dùng chính link làm tên tạm)
-      const newTitle = ytTitle || link; 
+      // Giữ title cũ nếu đã có, nếu chưa thì dùng metadata hoặc link làm tên tạm
+      const newTitle = item.title || metadata.title || link; 
 
       // Update ngược lại vào DB
       const { error: updateErr } = await supabase
         .from("footage")
         .update({ 
             title: newTitle,
+            channel_name: item.channel_name || metadata.channelName || null,
             // Logic phụ: Nếu là link youtube thì coi như chưa download, 
             // nếu là đường dẫn file cục bộ (ko chứa http) thì coi như đã download
             downloaded: !link.startsWith("http") 
@@ -81,7 +82,7 @@ export default function MigratePage() {
           🛠 Data Migration Tool
         </h1>
         <p className="mb-6 text-sm text-slate-600">
-          Công cụ này sẽ quét toàn bộ Footage chưa có tên (title is null), tự động lấy tên từ Youtube và cập nhật vào CSDL.
+          Công cụ này sẽ quét Footage còn thiếu title hoặc tên kênh YouTube, rồi cập nhật metadata vào CSDL.
         </p>
 
         <div className="mb-4">

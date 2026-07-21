@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Bars3Icon, CheckIcon, DocumentDuplicateIcon, EyeIcon, HashtagIcon, PencilSquareIcon, TagIcon, TrashIcon, VideoCameraIcon } from "@heroicons/react/24/outline";
+import { Bars3Icon, CheckIcon, DocumentDuplicateIcon, ExclamationTriangleIcon, EyeIcon, FolderIcon, HashtagIcon, LinkIcon, PencilSquareIcon, TagIcon, TrashIcon, VideoCameraIcon } from "@heroicons/react/24/outline";
 import { supabase } from "@/lib/supabaseClient";
 import type { DetailRow, Game, ScriptProject } from "@/types/gamekb";
 import type { VideoTheme } from "@/lib/videoThemes";
 import { themeToHashtag } from "@/lib/videoThemes";
 import { TypePill } from "@/components/TypePill";
+import { analyzeAssetLinks } from "@/lib/assetLinks";
+import { useNotifications } from "@/components/NotificationCenter";
+
 
 export function QuickViewModal({ idea, isOpen, onClose }: { idea: DetailRow | null; isOpen: boolean; onClose: () => void }) {
   if (!isOpen || !idea) return null;
@@ -108,6 +111,9 @@ export function ScriptEditorModal({
   const [orderedIdeas, setOrderedIdeas] = useState<DetailRow[]>([]);
   const [draggedIdeaId, setDraggedIdeaId] = useState<number | null>(null);
   const [dragOverIdeaId, setDragOverIdeaId] = useState<number | null>(null);
+  const { success, error: notifyError } = useNotifications();
+
+  const assetAnalysis = useMemo(() => analyzeAssetLinks(formData.assets || []), [formData.assets]);
 
   const findGameTitle = (idea: DetailRow) => {
     return initialData.games.find((candidate) => candidate.id === idea.game_id)?.title || idea.game?.title || "this game";
@@ -148,7 +154,15 @@ export function ScriptEditorModal({
     );
     const fullDescription = ideas.map((idea) => `• ${findGameTitle(idea)}: ${idea.title}\n${idea.description || ""}`).join("\n\n");
     const allAssets = ideas.flatMap(
-      (idea) => idea.footage?.map((footage) => ({ url: footage.file_path, name: footage.title || footage.file_path.split("/").pop() || "Video" })) || []
+      (idea, ideaIndex) => idea.footage?.map((footage) => ({
+        url: footage.file_path,
+        name: footage.title || footage.file_path.split("/").pop() || "Video",
+        channel_name: footage.channel_name || null,
+        idea_id: idea.id,
+        idea_title: idea.title,
+        game_title: findGameTitle(idea),
+        idea_order: ideaIndex + 1,
+      })) || []
     );
 
     const theme = initialData.theme ?? null;
@@ -167,6 +181,20 @@ export function ScriptEditorModal({
       tags: Array.from(new Set([...themeTags, ...gameNames, "Shorts", "Gaming", "Game Facts"])),
       hashtags: Array.from(new Set(["#shorts", "#gaming", ...themeHashtag, ...gameNames.map((gameName) => `#${gameName.replace(/\s+/g, "").toLowerCase()}`)])),
     };
+  };
+
+  const copyWholeScript = async () => {
+    const content = String(formData.content || "").trim();
+    if (!content) {
+      notifyError("There is no script content to copy.", "Nothing to copy");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(content);
+      success("The full script is ready on your clipboard.", "Script copied");
+    } catch {
+      notifyError("The browser could not copy the script. Please select the text manually.", "Copy failed");
+    }
   };
 
   useEffect(() => {
@@ -256,6 +284,7 @@ export function ScriptEditorModal({
                   )}
                   {orderedIdeas.map((idea, index) => {
                     const isDragOver = dragOverIdeaId === idea.id && draggedIdeaId !== idea.id;
+                    const channels = Array.from(new Set((idea.footage || []).map((item) => item.channel_name?.trim()).filter((channel): channel is string => Boolean(channel))));
                     return (
                       <div
                         key={idea.id}
@@ -291,6 +320,13 @@ export function ScriptEditorModal({
                             <Bars3Icon className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:text-slate-500 dark:text-slate-600 dark:group-hover:text-slate-300" />
                           </div>
                           <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">{idea.title}</p>
+                          {channels.length > 0 && (
+                            <div className="mt-2 flex min-w-0 items-center gap-1.5 text-[10px] font-black text-rose-600 dark:text-rose-300" title={channels.join(", ")}>
+                              <VideoCameraIcon className="h-3.5 w-3.5 shrink-0" />
+                              <span className="truncate">{channels[0]}</span>
+                              {channels.length > 1 && <span className="shrink-0 text-slate-400 dark:text-slate-500">+{channels.length - 1}</span>}
+                            </div>
+                          )}
                         </div>
                         <button
                           type="button"
@@ -309,11 +345,27 @@ export function ScriptEditorModal({
                 </div>
               </aside>
 
-              <textarea
-                className="min-h-[420px] w-full resize-none rounded-2xl border border-slate-200 bg-white p-5 font-sans text-base leading-7 text-slate-800 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 sm:p-6 sm:text-[17px] sm:leading-8 lg:min-h-[560px] lg:rounded-3xl lg:p-8 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-600"
-                value={formData.content}
-                onChange={(event) => setFormData({ ...formData, content: event.target.value })}
-              />
+              <div className="flex min-w-0 flex-col gap-3">
+                <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Script Content</p>
+                    <p className="mt-1 text-xs font-bold text-slate-400 dark:text-slate-500">Use Idea Order on the left to organize each section.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={copyWholeScript}
+                    className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-black dark:bg-blue-600 dark:hover:bg-blue-700"
+                  >
+                    <DocumentDuplicateIcon className="h-4 w-4" /> Copy Script
+                  </button>
+                </div>
+
+                <textarea
+                  className="min-h-[420px] w-full flex-1 resize-none rounded-2xl border border-slate-200 bg-white p-5 font-sans text-base leading-7 text-slate-800 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 sm:p-6 sm:text-[17px] sm:leading-8 lg:min-h-[500px] lg:rounded-3xl lg:p-8 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-600"
+                  value={formData.content}
+                  onChange={(event) => setFormData({ ...formData, content: event.target.value })}
+                />
+              </div>
             </div>
           )}
 
@@ -349,27 +401,75 @@ export function ScriptEditorModal({
           )}
 
           {activeTab === "assets" && (
-            <div className="mx-auto max-w-5xl space-y-6">
-              <div className="flex items-center justify-between px-1">
-                <label className="block text-xs font-bold uppercase tracking-widest text-slate-400">Selected Footage</label>
-                <button onClick={() => navigator.clipboard.writeText(formData.assets?.map((asset) => asset.url).join("\n") || "")} className="flex cursor-pointer items-center gap-1 text-xs font-bold text-blue-600 hover:underline" type="button">
-                  <DocumentDuplicateIcon className="h-4 w-4" /> Copy All Links
+            <div className="mx-auto max-w-5xl space-y-5">
+              <div className="flex flex-col gap-3 px-1 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-400">Selected Footage</label>
+                  <p className="mt-1 text-xs font-semibold text-slate-400 dark:text-slate-500">
+                    {(formData.assets || []).length} entries · {assetAnalysis.uniqueLinkCount} unique links
+                  </p>
+                </div>
+                <button
+                  onClick={() => navigator.clipboard.writeText(assetAnalysis.uniqueAssets.map((asset) => asset.url).filter(Boolean).join("\n"))}
+                  className="inline-flex cursor-pointer items-center gap-2 self-start rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs font-black text-blue-700 transition hover:border-blue-300 hover:bg-blue-100 sm:self-auto dark:border-blue-500/25 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/15"
+                  type="button"
+                  title="Copy each source video only once"
+                >
+                  <DocumentDuplicateIcon className="h-4 w-4" /> Copy Unique Links
                 </button>
               </div>
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm divide-y divide-slate-50 dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900">
+
+              {assetAnalysis.repeatedLinkCount > 0 && (
+                <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-100/80 px-4 py-3.5 text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
+                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-300">
+                    <ExclamationTriangleIcon className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-black">{assetAnalysis.repeatedLinkCount} duplicate {assetAnalysis.repeatedLinkCount === 1 ? "link" : "links"} detected</p>
+                    <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">
+                      {assetAnalysis.duplicateVideoCount} source {assetAnalysis.duplicateVideoCount === 1 ? "video appears" : "videos appear"} in more than one selected idea. Rows marked Duplicate point to the same video, even when the YouTube URL format is different.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm divide-y divide-slate-100 dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900">
                 {(formData.assets || []).length > 0 ? (
-                  formData.assets?.map((asset, index) => (
-                    <div key={index} className="group flex items-center gap-6 p-6 transition hover:bg-slate-50 dark:hover:bg-slate-800/60">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-500 dark:bg-slate-800 dark:text-slate-500 dark:group-hover:bg-blue-500/15 dark:group-hover:text-blue-300">#{index + 1}</div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-base font-bold text-slate-700 dark:text-slate-100">{asset.name}</p>
-                        <p className="mt-1 truncate font-sans text-xs text-slate-400">{asset.url}</p>
+                  formData.assets?.map((asset, index) => {
+                    const duplicate = assetAnalysis.duplicateMeta.get(index);
+                    const isRepeated = duplicate && !duplicate.isPrimary;
+                    const displayNumber = assetAnalysis.uniqueOrdinalByIndex.get(index);
+
+                    return (
+                      <div
+                        key={`${asset.url}-${index}`}
+                        className={`group flex items-center gap-3 p-4 transition sm:gap-5 sm:p-5 ${isRepeated ? "bg-slate-100/70 hover:bg-slate-100 dark:bg-slate-800/55 dark:hover:bg-slate-800/80" : "hover:bg-slate-50 dark:hover:bg-slate-800/60"}`}
+                      >
+                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-black transition ${isRepeated ? "bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-300" : "bg-slate-100 text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-500 dark:bg-slate-800 dark:text-slate-500 dark:group-hover:bg-blue-500/15 dark:group-hover:text-blue-300"}`}>
+                          {isRepeated ? <LinkIcon className="h-4 w-4" /> : `#${displayNumber ?? ""}`}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex min-w-0 flex-wrap items-center gap-2">
+                            <p className="min-w-0 truncate text-sm font-bold text-slate-700 sm:text-base dark:text-slate-100">{asset.name}</p>
+                            {asset.channel_name && (
+                              <span className="shrink-0 rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-black text-rose-700 dark:border-rose-500/25 dark:bg-rose-500/10 dark:text-rose-300">
+                                {asset.channel_name}
+                              </span>
+                            )}
+                            {duplicate && (
+                              <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-wide ${isRepeated ? "bg-slate-500 text-white dark:bg-slate-600" : "border border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>
+                                {isRepeated ? "Duplicate" : `Same source ×${duplicate.total}`}
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-1 truncate font-sans text-xs text-slate-400">{asset.url}</p>
+                        </div>
+                        <a href={asset.url} target="_blank" rel="noopener noreferrer" className="shrink-0 cursor-pointer rounded-xl bg-slate-100 p-3 text-slate-400 shadow-sm transition hover:bg-blue-600 hover:text-white dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-blue-600 dark:hover:text-white" title="Open source video">
+                          <VideoCameraIcon className="h-5 w-5" />
+                        </a>
                       </div>
-                      <a href={asset.url} target="_blank" rel="noopener noreferrer" className="cursor-pointer rounded-xl bg-slate-100 p-3 text-slate-400 shadow-sm transition hover:bg-blue-600 hover:text-white dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-blue-600 dark:hover:text-white">
-                        <VideoCameraIcon className="h-5 w-5" />
-                      </a>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <div className="p-16 text-center text-base italic text-slate-400">No assets linked to these ideas.</div>
                 )}
@@ -402,6 +502,10 @@ export function IdeaItem({
   onQuickView: (idea: DetailRow) => void;
 }) {
   const hasCover = !!game?.cover_url;
+  const ideaGroups = r.groups ?? [];
+  const channelNames = [...new Set((r.footage ?? []).map((item) => item.channel_name?.trim()).filter(Boolean) as string[])];
+  const primaryGroup = ideaGroups[0];
+  const primaryChannel = channelNames[0];
 
   return (
     <li onClick={() => isSelectMode && onToggleSelect(r)} className={`group relative h-64 w-full overflow-hidden rounded-2xl border shadow-sm transition-shadow duration-150 ${isSelectMode ? "cursor-pointer active:scale-[0.99]" : "hover:shadow-xl"} ${isSelected ? "border-blue-500 ring-2 ring-blue-500 ring-offset-2 ring-offset-slate-50" : "border-slate-200 bg-slate-900"}`}>
@@ -439,7 +543,25 @@ export function IdeaItem({
               </button>
             )}
           </div>
-          <h3 className="line-clamp-2 text-base font-bold leading-snug text-white mb-2">{r.title}</h3>
+          <h3 className="mb-2 line-clamp-2 text-base font-bold leading-snug text-white">{r.title}</h3>
+          {(primaryGroup || primaryChannel) && (
+            <div className="mb-2 flex min-w-0 items-center gap-1.5 overflow-hidden">
+              {primaryGroup && (
+                <span className="inline-flex min-w-0 max-w-[55%] items-center gap-1 rounded-md border border-white/10 bg-white/10 px-1.5 py-1 text-[9px] font-bold text-white/85 backdrop-blur-sm" title={ideaGroups.map((group) => group.name).join(", ")}>
+                  <FolderIcon className="h-3 w-3 shrink-0 text-sky-300" />
+                  <span className="truncate">{primaryGroup.name}</span>
+                  {ideaGroups.length > 1 && <span className="shrink-0 text-white/55">+{ideaGroups.length - 1}</span>}
+                </span>
+              )}
+              {primaryChannel && (
+                <span className="inline-flex min-w-0 max-w-[55%] items-center gap-1 rounded-md border border-white/10 bg-black/20 px-1.5 py-1 text-[9px] font-bold text-white/75 backdrop-blur-sm" title={channelNames.join(", ")}>
+                  <VideoCameraIcon className="h-3 w-3 shrink-0 text-rose-300" />
+                  <span className="truncate">{primaryChannel}</span>
+                  {channelNames.length > 1 && <span className="shrink-0 text-white/45">+{channelNames.length - 1}</span>}
+                </span>
+              )}
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <TypePill typeKey={r.detail_type} />
             {r.pinned && <span className="text-[10px] font-bold text-amber-400">★ Pinned</span>}
