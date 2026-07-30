@@ -11,6 +11,7 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { AppSidebar } from "@/components/AppSidebar";
+import { AppPageHeader, appPageMainClass, appPageRootClass } from "@/components/AppPage";
 import { useNotifications } from "@/components/NotificationCenter";
 
 const STORAGE_KEY = "gamekb-daily-todos-v1";
@@ -235,17 +236,15 @@ export default function DailyGoalPage() {
 
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 xl:flex dark:bg-slate-950 dark:text-slate-100">
+    <div className={`${appPageRootClass} xl:flex`}>
       <AppSidebar activePage="dailyGoal" />
-      <main className="min-w-0 flex-1 pb-20 xl:pl-72">
+      <main className={appPageMainClass}>
         <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
-          <header className="mb-7">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-violet-500">Daily To-Do</p>
-            <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">What needs to get done today?</h1>
-            <p className="mt-2 text-sm font-semibold text-slate-500 dark:text-slate-400">
-              {formatToday()} · Every checkbox resets automatically when a new day begins.
-            </p>
-          </header>
+          <AppPageHeader
+            title="Daily To-Do"
+            description={<>{formatToday()} · Every checkbox resets automatically when a new day begins.</>}
+            icon={<ClipboardDocumentCheckIcon className="h-5 w-5" />}
+          />
 
           <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-xl shadow-slate-200/40 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/20">
             <div className="bg-gradient-to-br from-violet-500 via-fuchsia-500 to-orange-400 px-5 py-6 text-white sm:px-8 sm:py-8">

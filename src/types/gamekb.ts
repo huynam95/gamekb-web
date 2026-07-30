@@ -52,3 +52,71 @@ export type ScriptProject = {
   publish_date: string | null;
   status: string;
 };
+
+
+export type AudienceRequest = {
+  id: number;
+  comment_text: string;
+  commenter_name?: string | null;
+  source_url?: string | null;
+  game_id?: number | null;
+  notes?: string | null;
+  content_type: "short" | "long" | "undecided";
+  status: "inbox" | "planned" | "in_progress" | "published" | "replied";
+  promised: boolean;
+  published_url?: string | null;
+  linked_idea_id?: number | null;
+  linked_short_project_id?: number | null;
+  linked_long_project_id?: number | null;
+  created_at?: string;
+  game?: Game | null;
+  linked_idea?: { id: number; title: string } | null;
+  linked_short_project?: { id: number; title: string } | null;
+  linked_long_project?: { id: number; title: string } | null;
+};
+
+export type LongVideoCaptureStatus = "to_record" | "recorded" | "retake" | "approved";
+
+export type LongVideoProjectIdea = {
+  id?: number;
+  project_id?: number;
+  detail_id: number;
+  position: number;
+  capture_status: LongVideoCaptureStatus;
+  recording_notes?: string | null;
+  file_location?: string | null;
+  detail: DetailRow;
+};
+
+// Kept for backward compatibility with projects created by the earlier chapter-based studio.
+export type LongVideoChapterIdea = {
+  id?: number;
+  detail_id: number;
+  position: number;
+  detail: DetailRow;
+};
+
+export type LongVideoChapter = {
+  id?: number;
+  project_id?: number;
+  title: string;
+  position: number;
+  script: string;
+  status: "draft" | "ready" | "recorded";
+  ideas: LongVideoChapterIdea[];
+};
+
+export type LongVideoProject = {
+  id: number;
+  title: string;
+  core_idea?: string | null;
+  viewer_promise?: string | null;
+  target_duration_minutes: number;
+  target_audience?: string | null;
+  thumbnail_notes?: string | null;
+  status: "planning" | "writing" | "recording" | "editing" | "ready" | "published";
+  created_at?: string;
+  updated_at?: string;
+  project_ideas?: LongVideoProjectIdea[];
+  chapters?: Array<{ id: number; script: string; status: string }>;
+};

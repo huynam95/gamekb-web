@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { ACTIVE_VIDEO_THEME_STORAGE_KEY, DEFAULT_VIDEO_THEMES, VIDEO_THEMES_STORAGE_KEY, VIDEO_TOPICS_TABLE, getVideoThemeById, makeVideoThemeId, normalizeVideoTheme, parseVideoThemes, rowToVideoTheme, videoThemeToRow } from "@/lib/videoThemes";
 import type { VideoTheme } from "@/lib/videoThemes";
 import { PlayCircleIcon } from "@heroicons/react/24/solid";
-import { ChevronDoubleLeftIcon, ChevronDoubleRightIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, CubeTransparentIcon, ExclamationTriangleIcon, FaceSmileIcon, MagnifyingGlassIcon, Bars3Icon, PencilSquareIcon, PlusIcon, SparklesIcon, Squares2X2Icon, TrashIcon, UserGroupIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { CheckIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, CubeTransparentIcon, ExclamationTriangleIcon, FaceSmileIcon, FilmIcon, MagnifyingGlassIcon, Bars3Icon, PencilSquareIcon, PlusIcon, SparklesIcon, Squares2X2Icon, TrashIcon, UserGroupIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { AppSidebar } from "@/components/AppSidebar";
+import { AppPageHeader, appPageMainClass, appPageRootClass } from "@/components/AppPage";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { GameEditorModal, IdeaItem, QuickViewModal, ScriptEditorModal } from "@/components/IdeaCards";
 import { RandomIdeaModal } from "@/components/RandomIdeaModal";
@@ -37,20 +39,128 @@ function applyIdeaTextSearch(query: any, rawTerm: string, games: Game[]) {
 
 /* ================= COMPONENTS ================= */
 
-function ComboBox({ placeholder, items, selectedId, onChange }: { placeholder: string; items: { id: number; name: string }[]; selectedId: number | ""; onChange: (id: number | "") => void }) {
-  const [open, setOpen] = useState(false); const [query, setQuery] = useState(""); const boxRef = useRef<HTMLDivElement>(null);
-  const filtered = items.filter(x => x.name.toLowerCase().includes(query.toLowerCase())).slice(0, 50);
-  useEffect(() => { function f(e:any){if(boxRef.current && !boxRef.current.contains(e.target))setOpen(false)} document.addEventListener("mousedown", f); return ()=>document.removeEventListener("mousedown",f)},[]);
+function ComboBox({
+  placeholder,
+  items,
+  selectedId,
+  onChange,
+}: {
+  placeholder: string;
+  items: { id: number; name: string; coverUrl?: string | null }[];
+  selectedId: number | "";
+  onChange: (id: number | "") => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const boxRef = useRef<HTMLDivElement>(null);
+  const selected = items.find((item) => item.id === selectedId);
+  const filtered = items
+    .filter((item) => item.name.toLowerCase().includes(query.trim().toLowerCase()))
+    .slice(0, 50);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (boxRef.current && !boxRef.current.contains(event.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   return (
-    <div ref={boxRef} className="relative w-full h-10">
-      <button className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-left text-sm text-slate-900 cursor-pointer flex items-center justify-between shadow-sm" onClick={() => setOpen(!open)}>
-        <span className="truncate">{items.find(x=>x.id===selectedId)?.name || <span className="text-slate-400">{placeholder}</span>}</span>
-        <span className="text-slate-400 text-xs">▼</span>
+    <div ref={boxRef} className="relative h-10 w-full">
+      <button
+        type="button"
+        className="flex h-10 w-full cursor-pointer items-center justify-between rounded-full border border-slate-200 bg-white px-2.5 text-left text-sm text-slate-900 shadow-sm transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-600"
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span className="flex min-w-0 items-center gap-2.5">
+          <span className="relative h-7 w-7 shrink-0 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
+            {selected?.coverUrl ? (
+              <span className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${selected.coverUrl})` }} />
+            ) : (
+              <span className="flex h-full w-full items-center justify-center text-xs">🎮</span>
+            )}
+          </span>
+          <span className={`truncate font-bold ${selected ? "" : "text-slate-400"}`}>
+            {selected?.name || placeholder}
+          </span>
+        </span>
+        <ChevronDownIcon className={`h-4 w-4 shrink-0 text-slate-400 transition ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && <div className="absolute left-0 top-full z-[70] mt-1 w-full min-w-[200px] rounded-xl border border-slate-200 bg-white shadow-xl p-2"><input className="w-full rounded-lg border px-2 py-1 text-sm mb-2 outline-none focus:border-blue-500 bg-slate-50" value={query} onChange={e=>setQuery(e.target.value)} autoFocus placeholder="Search..."/><div className="max-h-60 overflow-auto"><button className="w-full text-left p-2 hover:bg-slate-100 text-sm cursor-pointer rounded-lg font-bold text-slate-500" onClick={()=>{onChange("");setOpen(false)}}>All Games</button>{filtered.map(x=><button key={x.id} className="w-full text-left p-2 hover:bg-blue-50 text-sm cursor-pointer rounded-lg truncate" onClick={()=>{onChange(x.id);setOpen(false)}}>{x.name}</button>)}</div></div>}
+
+      {open && (
+        <div className="absolute left-0 top-full z-[170] mt-2 w-full min-w-[260px] overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl ring-1 ring-black/5 dark:border-slate-700 dark:bg-slate-950 dark:ring-white/10">
+          <label className="relative block">
+            <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm font-semibold outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              autoFocus
+              placeholder="Search games..."
+            />
+          </label>
+          <div className="mt-2 max-h-72 space-y-1 overflow-auto">
+            <button
+              type="button"
+              className={`flex w-full cursor-pointer items-center justify-between rounded-xl px-3 py-2 text-left text-sm font-black transition ${
+                selectedId === ""
+                  ? "bg-slate-900 text-white dark:bg-white dark:text-slate-950"
+                  : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+              }`}
+              onClick={() => {
+                onChange("");
+                setOpen(false);
+                setQuery("");
+              }}
+            >
+              <span className="flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-sm dark:bg-slate-800">🎮</span>
+                All Games
+              </span>
+              {selectedId === "" && <CheckIcon className="h-4 w-4" />}
+            </button>
+            {filtered.map((item) => {
+              const active = item.id === selectedId;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`flex w-full cursor-pointer items-center justify-between rounded-xl px-3 py-2 text-left text-sm font-bold transition ${
+                    active
+                      ? "bg-blue-600 text-white"
+                      : "text-slate-700 hover:bg-blue-50 hover:text-blue-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-blue-300"
+                  }`}
+                  onClick={() => {
+                    onChange(item.id);
+                    setOpen(false);
+                    setQuery("");
+                  }}
+                >
+                  <span className="flex min-w-0 items-center gap-3">
+                    <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-black/5 dark:bg-slate-800 dark:ring-white/10">
+                      {item.coverUrl ? (
+                        <span className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${item.coverUrl})` }} />
+                      ) : (
+                        <span className="flex h-full w-full items-center justify-center text-xs">🎮</span>
+                      )}
+                    </span>
+                    <span className="truncate">{item.name}</span>
+                  </span>
+                  {active && <CheckIcon className="h-4 w-4 shrink-0" />}
+                </button>
+              );
+            })}
+            {filtered.length === 0 && (
+              <div className="px-3 py-5 text-center text-sm font-semibold text-slate-400">No games found.</div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
 
 const TYPE_FILTER_OPTIONS = [
   { value: "", label: "All Types", Icon: Squares2X2Icon },
@@ -493,7 +603,12 @@ function SortToggle({ value, onChange }: { value: "newest" | "oldest"; onChange:
 /* ================= PAGE LOGIC (MAIN) ================= */
 
 export default function Home() {
+  const router = useRouter();
   const { success, error: notifyError, warning, confirm: confirmNotice } = useNotifications();
+  const [longPickTarget, setLongPickTarget] = useState<{ id: number; title: string } | null>(null);
+  const longProjectId = longPickTarget?.id ?? Number.NaN;
+  const longProjectTitle = longPickTarget?.title || "Long video project";
+  const isLongProjectPickMode = Boolean(longPickTarget);
   const [games, setGames] = useState<Game[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupCounts, setGroupCounts] = useState<Map<number, number>>(new Map());
@@ -690,6 +805,24 @@ export default function Home() {
     else window.localStorage.removeItem(ACTIVE_VIDEO_THEME_STORAGE_KEY);
   }, [selectedThemeId]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const id = Number(params.get("longProject"));
+    if (Number.isFinite(id) && id > 0) {
+      setLongPickTarget({ id, title: params.get("longProjectTitle")?.trim() || "Long video project" });
+    } else {
+      setLongPickTarget(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isLongProjectPickMode) return;
+    setSelectedThemeId("");
+    setIsSelectMode(true);
+    setSelectedIds([]);
+    setSelectedIdeas([]);
+  }, [isLongProjectPickMode, longProjectId, themesLoaded]);
+
   useEffect(() => { const t = setTimeout(() => setDebouncedQ(q), 300); return () => clearTimeout(t); }, [q]);
 
   useEffect(() => {
@@ -855,6 +988,38 @@ export default function Home() {
     setShowEditor(true);
   };
 
+  const addIdeasToLongProject = async (sourceIdeas?: DetailRow[]) => {
+    if (!isLongProjectPickMode) return;
+    const ids = sourceIdeas ? sourceIdeas.map((idea) => idea.id) : selectedIds;
+    if (ids.length === 0) return;
+
+    try {
+      const response = await fetch(`/api/long-videos/${longProjectId}/ideas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ detail_ids: ids }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Could not add ideas");
+
+      const added = Number(payload.added ?? 0);
+      const skipped = Number(payload.skipped ?? 0);
+      success(
+        added > 0
+          ? `${added} idea${added === 1 ? "" : "s"} added${skipped ? ` · ${skipped} already in project` : ""}.`
+          : "All selected ideas were already in this project.",
+        "Recording list updated",
+      );
+      setSelectedIds([]);
+      setSelectedIdeas([]);
+      setRandomPickedIdeas([]);
+      setRandomIdeas([]);
+      router.push(`/long-videos/${longProjectId}`);
+    } catch (err) {
+      notifyError(err instanceof Error ? err.message : "Could not add ideas", "Long video project not updated");
+    }
+  };
+
   const handleSaveScript = async (data: Partial<ScriptProject>) => {
     const { error } = await supabase.from("scripts").insert(data);
     if (error) {
@@ -1010,7 +1175,7 @@ export default function Home() {
   const btnPage = "inline-flex h-10 min-w-[40px] cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800";
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 xl:flex">
+    <div className={`${appPageRootClass} xl:flex`}>
       <ScriptEditorModal isOpen={showEditor} onClose={() => { setShowEditor(false); setProjectIdeas([]); }} onSave={handleSaveScript} initialData={{ ids: projectIdeas.map((idea) => idea.id), ideas: projectIdeas, games: games, theme: selectedTheme }} />
       <GameEditorModal game={editingGame} isOpen={!!editingGame} onClose={() => setEditingGame(null)} onUpdate={(updatedGame) => { setGames(prev => prev.map(g => g.id === updatedGame.id ? updatedGame : g)); }} />
       <QuickViewModal idea={previewIdea} isOpen={!!previewIdea} onClose={() => setPreviewIdea(null)} />
@@ -1028,32 +1193,42 @@ export default function Home() {
         onClearSelection={() => setRandomPickedIdeas([])}
         onSaveProject={() => {
           setRandomIdeas([]);
-          void openScriptEditor(randomPickedIdeas);
+          if (isLongProjectPickMode) void addIdeasToLongProject(randomPickedIdeas);
+          else void openScriptEditor(randomPickedIdeas);
         }}
       />
 
       {isSelectMode && (
-         <div className="fixed bottom-0 inset-x-0 z-[80] border-t border-slate-200 bg-white/95 p-4 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
-            <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
-               <div className="flex min-w-0 items-center gap-4">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-sm font-black text-white dark:bg-slate-800">{selectedIds.length}</span>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-black uppercase tracking-[0.16em] text-slate-700 dark:text-slate-200">Ideas Selected</p>
-                    {selectedTheme && <p className="truncate text-xs font-bold text-slate-400 dark:text-slate-500">Topic: {selectedTheme.title}</p>}
-                  </div>
-               </div>
-               <div className="flex items-center gap-2">
-                 <button
-                   type="button"
-                   onClick={() => handleThemeChange("")}
-                   className="h-11 cursor-pointer rounded-xl border border-slate-200 bg-white px-4 text-xs font-black uppercase tracking-[0.14em] text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-                 >
-                   Cancel
-                 </button>
-                 <button disabled={selectedIds.length === 0} onClick={() => void openScriptEditor()} className="flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-bold text-white shadow-lg transition hover:bg-blue-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"><PlayCircleIcon className="h-5 w-5" /> Create Script</button>
-               </div>
+        <div className="fixed inset-x-0 bottom-0 z-[80] border-t border-slate-200 bg-white/95 p-4 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
+          <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-4">
+              <span className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-black text-white ${isLongProjectPickMode ? "bg-violet-600" : "bg-slate-900 dark:bg-slate-800"}`}>{selectedIds.length}</span>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-black uppercase tracking-[0.16em] text-slate-700 dark:text-slate-200">{isLongProjectPickMode ? "Ideas for long video" : "Ideas selected"}</p>
+                <p className="truncate text-xs font-bold text-slate-400 dark:text-slate-500">{isLongProjectPickMode ? longProjectTitle : selectedTheme ? `Topic: ${selectedTheme.title}` : "Select ideas for your script"}</p>
+              </div>
             </div>
-         </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedIds([]);
+                  setSelectedIdeas([]);
+                  if (isLongProjectPickMode) router.push(`/long-videos/${longProjectId}`);
+                  else handleThemeChange("");
+                }}
+                className="h-11 cursor-pointer rounded-xl border border-slate-200 bg-white px-4 text-xs font-black uppercase tracking-[0.14em] text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+              >
+                Cancel
+              </button>
+              {isLongProjectPickMode ? (
+                <button disabled={selectedIds.length === 0} onClick={() => void addIdeasToLongProject()} className="flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-violet-600 px-5 text-sm font-bold text-white shadow-lg transition hover:bg-violet-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"><FilmIcon className="h-5 w-5" /> Add to project</button>
+              ) : (
+                <button disabled={selectedIds.length === 0} onClick={() => void openScriptEditor()} className="flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-bold text-white shadow-lg transition hover:bg-blue-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"><PlayCircleIcon className="h-5 w-5" /> Create Script</button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       <AppSidebar
@@ -1074,18 +1249,39 @@ export default function Home() {
         showThemeToggle={false}
       />
 
-      <main className="flex-1 pl-0 xl:pl-72 pb-32 min-w-0">
-        <div className="mx-auto max-w-[1900px] px-4 py-5 sm:px-6 sm:py-8">
+      <main className={`${appPageMainClass} pb-32`}>
+        <div className="mx-auto max-w-[1900px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          <AppPageHeader
+            title="All Ideas"
+            description={isLongProjectPickMode ? `Browse and select ideas for ${longProjectTitle}.` : "Choose a topic, search your library, and build the next video from the ideas you already have."}
+            icon={<Squares2X2Icon className="h-5 w-5" />}
+          />
           <header className="relative z-40 mb-8 space-y-4">
-              <VideoThemeBoard
-                value={selectedThemeId}
-                themes={videoThemes}
-                onChange={handleThemeChange}
-                onCreate={handleCreateTheme}
-                onUpdate={handleUpdateTheme}
-                onDelete={handleDeleteTheme}
-                onReorder={handleReorderThemes}
-              />
+              {isLongProjectPickMode ? (
+                <section className="overflow-hidden rounded-[1.75rem] border border-violet-200 bg-gradient-to-r from-violet-600 via-fuchsia-600 to-rose-500 p-5 text-white shadow-sm dark:border-violet-900">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex min-w-0 items-center gap-4">
+                      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 backdrop-blur"><FilmIcon className="h-6 w-6" /></span>
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/65">Picking for long video</p>
+                        <h2 className="truncate text-xl font-black">{longProjectTitle}</h2>
+                        <p className="mt-1 text-sm font-semibold text-white/70">Search, filter, preview and select ideas. They will become your recording checklist.</p>
+                      </div>
+                    </div>
+                    <button type="button" onClick={() => router.push(`/long-videos/${longProjectId}`)} className="h-10 cursor-pointer rounded-xl bg-white/15 px-4 text-xs font-black uppercase tracking-wider text-white backdrop-blur transition hover:bg-white/25">Back to project</button>
+                  </div>
+                </section>
+              ) : (
+                <VideoThemeBoard
+                  value={selectedThemeId}
+                  themes={videoThemes}
+                  onChange={handleThemeChange}
+                  onCreate={handleCreateTheme}
+                  onUpdate={handleUpdateTheme}
+                  onDelete={handleDeleteTheme}
+                  onReorder={handleReorderThemes}
+                />
+              )}
               <div className="relative z-50 flex flex-col gap-3 overflow-visible rounded-[1.6rem] border border-slate-200 bg-white/80 p-2.5 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 xl:flex-row xl:items-center xl:justify-between">
                 <div className="flex min-w-0 flex-1 flex-col gap-3 lg:flex-row lg:items-center">
                   <div className="relative min-w-0 flex-1">
@@ -1098,7 +1294,7 @@ export default function Home() {
                     />
                   </div>
                   <div className="w-full lg:w-[240px]">
-                    <ComboBox placeholder="Game" items={games.map(g=>({id:g.id, name:g.title}))} selectedId={gameId} onChange={setGameId} />
+                    <ComboBox placeholder="Game" items={games.map(g=>({id:g.id, name:g.title, coverUrl:g.cover_url}))} selectedId={gameId} onChange={setGameId} />
                   </div>
                   <TypeFilterDropdown value={type} onChange={setType} />
                   {(q||gameId||groupId||type) && (

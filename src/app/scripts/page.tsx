@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { AppSidebar } from "@/components/AppSidebar";
+import { AppPageHeader, appPageMainClass, appPageRootClass } from "@/components/AppPage";
 import { useNotifications } from "@/components/NotificationCenter";
 import { analyzeAssetLinks } from "@/lib/assetLinks";
 import { buildScriptGuide } from "@/lib/scriptGuide";
@@ -633,14 +634,19 @@ export default function ScriptsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white font-sans text-slate-900 xl:flex dark:bg-slate-950 dark:text-slate-50">
+    <div className={`${appPageRootClass} xl:flex`}>
       <ScriptEditorModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} script={editingScript} onSave={handleUpdate} />
 
       <AppSidebar activePage="scripts" />
 
-      <main className="min-w-0 flex-1 pl-0 xl:pl-72">
-        <div className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 lg:px-10 lg:py-12">
-          <div className="mb-8 flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+      <main className={appPageMainClass}>
+        <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          <AppPageHeader
+            title="Short Projects"
+            description="Organize scripts, source channels, assets, topics, and production status in one place."
+            icon={<DocumentTextIcon className="h-5 w-5" />}
+          />
+          <div className="mb-6 flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
             <div className="relative w-full max-w-2xl">
               <MagnifyingGlassIcon className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-900 sm:left-6 sm:h-6 sm:w-6 dark:text-slate-200" />
               <input
@@ -672,7 +678,7 @@ export default function ScriptsPage() {
             )}
           </div>
 
-          <div className="overflow-x-auto rounded-[1.5rem] border-2 border-slate-200 bg-white shadow-2xl shadow-slate-200/40 sm:rounded-[2rem] lg:rounded-[2.5rem] dark:border-slate-800 dark:bg-slate-950 dark:shadow-black/20">
+          <div className="overflow-x-auto rounded-[1.75rem] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <table className="min-w-[1280px] table-fixed border-collapse text-left xl:w-full">
               <thead className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/70">
                 <tr>

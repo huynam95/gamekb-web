@@ -15,6 +15,7 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import { fetchYoutubeMetadata } from "@/lib/youtube";
 import { AppSidebar } from "@/components/AppSidebar";
+import { AppPageHeader, appPageMainClass, appPageRootClass } from "@/components/AppPage";
 import { useNotifications } from "@/components/NotificationCenter";
 import { normalizeGameTitle } from "@/lib/gameTitles";
 
@@ -90,19 +91,19 @@ const DETAIL_TYPE_OPTIONS: SelectOption<string>[] = [
 /* ================= STYLES ================= */
 
 const inputClass =
-  "h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-4 focus:ring-slate-100 transition shadow-sm";
+  "h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition shadow-sm focus:border-slate-400 focus:ring-4 focus:ring-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:ring-slate-800";
 const textareaClass =
-  "min-h-[140px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-4 focus:ring-slate-100 transition resize-y shadow-sm";
+  "min-h-[140px] w-full resize-y rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition shadow-sm focus:border-slate-400 focus:ring-4 focus:ring-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:ring-slate-800";
 const btnBase =
   "inline-flex h-11 items-center justify-center gap-2 rounded-xl px-6 text-sm font-bold whitespace-nowrap cursor-pointer transition active:scale-[0.98]";
 const btnPrimary =
   btnBase +
-  " bg-slate-900 text-white shadow-lg shadow-slate-200 hover:bg-slate-800 disabled:opacity-70";
+  " bg-slate-900 text-white shadow-sm hover:bg-slate-800 disabled:opacity-70 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200";
 const btnGhost =
   btnBase +
-  " border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50";
+  " border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-800";
 const cardClass =
-  "rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm";
+  "rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8 dark:border-slate-800 dark:bg-slate-900";
 
 /* ================= HELPERS (Giữ nguyên) ================= */
 
@@ -460,6 +461,19 @@ export default function AddIdeaPage() {
   const [stagedSources, setStagedSources] = useState<StagedSource[]>([]);
 
   const [savingIdea, setSavingIdea] = useState(false);
+  const [audienceRequestId, setAudienceRequestId] = useState<number | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestId = Number(params.get("audienceRequestId"));
+    const presetGameId = Number(params.get("gameId"));
+    if (Number.isFinite(requestId) && requestId > 0) setAudienceRequestId(requestId);
+    if (Number.isFinite(presetGameId) && presetGameId > 0) setGameId(presetGameId);
+    const presetTitle = params.get("title");
+    const presetDescription = params.get("description");
+    if (presetTitle) setTitle(presetTitle);
+    if (presetDescription) setDescription(presetDescription);
+  }, []);
 
   useEffect(() => {
     async function loadData() {
@@ -668,8 +682,25 @@ export default function AddIdeaPage() {
       return;
     }
 
+    if (audienceRequestId) {
+      try {
+        const response = await fetch(`/api/audience-requests/${audienceRequestId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ linked_idea_id: detailId, status: "planned" }),
+        });
+        if (!response.ok) throw new Error("Could not link the audience request");
+      } catch {
+        warning("The idea was saved, but the audience request could not be linked.", "Linking skipped");
+      }
+    }
+
     setSavingIdea(false);
-    success("Idea saved successfully!", "Idea saved");
+    success(audienceRequestId ? "Idea saved and linked to the audience request." : "Idea saved successfully!", "Idea saved");
+    if (audienceRequestId) {
+      setAudienceRequestId(null);
+      window.history.replaceState({}, "", "/add");
+    }
     setTitle("");
     setDescription("");
     setStagedFootage([]);
@@ -679,20 +710,17 @@ export default function AddIdeaPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 xl:flex">
+    <div className={`${appPageRootClass} xl:flex`}>
       <AppSidebar activePage="addIdea" />
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 xl:pl-72 pb-32">
+      <main className={`${appPageMainClass} pb-32`}>
         <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
-          <div className="mb-10">
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight">
-              Create Idea
-            </h1>
-            <p className="text-slate-500 font-medium mt-1">
-              Ghi lại một chi tiết, cơ chế hoặc bí mật thú vị.
-            </p>
-          </div>
+          <AppPageHeader
+            title="Create Idea"
+            description="Capture a game detail, mechanic, secret, or video idea in your library."
+            icon={<SparklesIcon className="h-5 w-5" />}
+          />
 
 
           <form

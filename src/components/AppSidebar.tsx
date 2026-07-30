@@ -6,7 +6,7 @@ import { CheckIcon, PencilSquareIcon, TrashIcon, XMarkIcon } from "@heroicons/re
 import { ThemeToggle } from "@/components/ThemeToggle";
 import type { Group } from "@/types/gamekb";
 
-type ActivePage = "ideas" | "dashboard" | "scripts" | "addGame" | "addIdea" | "dailyGoal" | "migrate";
+type ActivePage = "ideas" | "dashboard" | "scripts" | "audienceRequests" | "longVideos" | "addGame" | "addIdea" | "dailyGoal" | "migrate";
 
 type AppSidebarProps = {
   activePage: ActivePage;
@@ -32,7 +32,9 @@ const navItems: Array<{ key: ActivePage; href: string; icon: string; label: stri
   { key: "dailyGoal", href: "/daily-goal", icon: "☑️", label: "Daily To-Do" },
   { key: "addIdea", href: "/add", icon: "✦", label: "Add Idea" },
   { key: "addGame", href: "/games/new", icon: "🕹️", label: "Add Game" },
-  { key: "scripts", href: "/scripts", icon: "📜", label: "Video Project" },
+  { key: "scripts", href: "/scripts", icon: "📜", label: "Short Projects" },
+  { key: "longVideos", href: "/long-videos", icon: "🎬", label: "Long Video Studio" },
+  { key: "audienceRequests", href: "/audience-requests", icon: "💬", label: "Audience Requests" },
 ];
 
 function navClass(active: boolean) {
@@ -123,7 +125,7 @@ export function AppSidebar({
   };
 
   const collectionsBlock = (compact = false) => (
-    showCollections && (
+    activePage === "ideas" && showCollections && (
       <div className={compact ? "space-y-2 border-t border-slate-100 px-3 py-3 dark:border-slate-800" : "border-t border-slate-100 pt-4 dark:border-slate-800"}>
         <div className="mb-2 flex items-center justify-between px-2 text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">
           <span className="leading-none">Collections</span>

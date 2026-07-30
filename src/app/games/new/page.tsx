@@ -1,49 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { AppSidebar } from "@/components/AppSidebar";
+import { AppPageHeader, appPageMainClass, appPageRootClass } from "@/components/AppPage";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PhotoIcon, PuzzlePieceIcon, ArrowLeftIcon } from "@heroicons/react/24/outline";
 import { useNotifications } from "@/components/NotificationCenter";
 import { normalizeGameTitle } from "@/lib/gameTitles";
 
-/* ================= TYPES ================= */
-
-type Group = { id: number; name: string };
-
 /* ================= PAGE LOGIC ================= */
 
 export default function AddGamePage() {
   const router = useRouter();
-  const { success, error: notifyError, warning, confirm } = useNotifications();
+  const { success, error: notifyError, warning } = useNotifications();
   
   // Form State
   const [title, setTitle] = useState("");
   const [coverUrl, setCoverUrl] = useState("");
   const [loading, setLoading] = useState(false);
-
-  // Sidebar State
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [groupCounts, setGroupCounts] = useState<Map<number, number>>(new Map());
-  const [showCreateGroup, setShowCreateGroup] = useState(false);
-  const [newGroupName, setNewGroupName] = useState("");
-
-  // Load Sidebar Data
-  useEffect(() => {
-    async function loadSidebar() {
-      const grps = await supabase.from("idea_groups").select("*").order("name");
-      const grpItems = await supabase.from("idea_group_items").select("group_id");
-      
-      setGroups((grps.data || []) as Group[]);
-      
-      const m = new Map<number, number>();
-      for (const row of grpItems.data ?? []) { const gid = Number((row as any).group_id); m.set(gid, (m.get(gid) ?? 0) + 1); }
-      setGroupCounts(m);
-    }
-    loadSidebar();
-  }, []);
 
   // --- ACTIONS ---
 
@@ -92,85 +68,28 @@ export default function AddGamePage() {
     }
   };
 
-  // Sidebar Actions
-  async function createGroup() {
-    const name = newGroupName.trim();
-    if (!name) return;
-    const { data, error } = await supabase.from("idea_groups").insert({ name }).select("id,name").single();
-    if (error || !data) {
-      notifyError(error?.message || "Could not create collection", "Could not create collection");
-      return;
-    }
-    setGroups((current) => [...current, data as Group].sort((a, b) => a.name.localeCompare(b.name)));
-    setGroupCounts((current) => new Map(current).set(data.id, 0));
-    setNewGroupName("");
-    setShowCreateGroup(false);
-    success("Collection created.", "Saved");
-  }
-  async function renameGroup(id: number, name: string) {
-    const trimmedName = name.trim();
-    if (!trimmedName) return;
-    const { error } = await supabase.from("idea_groups").update({ name: trimmedName }).eq("id", id);
-    if (error) {
-      notifyError(error.message, "Could not rename collection");
-      return;
-    }
-    setGroups((current) => current.map((group) => group.id === id ? { ...group, name: trimmedName } : group).sort((a, b) => a.name.localeCompare(b.name)));
-    success("Collection renamed.", "Saved");
-  }
-  async function deleteGroup(id: number) {
-    const shouldDelete = await confirm({
-      kind: "warning",
-      title: "Delete collection?",
-      message: "Delete this collection? Ideas will stay in your database.",
-      confirmText: "Delete",
-    });
-    if (!shouldDelete) return;
-    const { error } = await supabase.from("idea_groups").delete().eq("id", id);
-    if (error) {
-      notifyError(error.message, "Could not delete collection");
-      return;
-    }
-    setGroups((current) => current.filter((group) => group.id !== id));
-    setGroupCounts((current) => {
-      const next = new Map(current);
-      next.delete(id);
-      return next;
-    });
-    success("Collection deleted.", "Deleted");
-  }
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 xl:flex">
-      <AppSidebar
-        activePage="addGame"
-        groups={groups}
-        groupCounts={groupCounts}
-        showCollections
-        showCreateGroup={showCreateGroup}
-        newGroupName={newGroupName}
-        onToggleCreateGroup={() => setShowCreateGroup(!showCreateGroup)}
-        onNewGroupNameChange={setNewGroupName}
-        onCreateGroup={createGroup}
-        onDeleteGroup={deleteGroup}
-        onRenameGroup={renameGroup}
-        onSelectGroup={() => router.push("/")}
-      />
+    <div className={`${appPageRootClass} xl:flex`}>
+      <AppSidebar activePage="addGame" />
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 pl-0 xl:pl-72 pb-32">
-        <div className="mx-auto max-w-2xl px-6 py-12">
+      <main className={`${appPageMainClass} pb-32`}>
+        <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
            
-           <div className="mb-8">
-             <Link href="/" className="inline-flex cursor-pointer items-center gap-2 text-sm font-bold text-slate-400 hover:text-slate-600 mb-4 transition">
-                <ArrowLeftIcon className="w-4 h-4" /> Back to Home
-             </Link>
-             <h1 className="text-3xl font-black text-slate-900">Add New Game</h1>
-             <p className="text-slate-500 mt-2">Add a game to your library to start tracking details and ideas.</p>
-           </div>
+           <AppPageHeader
+             title="Add New Game"
+             description="Add a game to your library so you can start collecting details and video ideas."
+             icon={<PuzzlePieceIcon className="h-5 w-5" />}
+             action={
+               <Link href="/" className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-500 transition hover:bg-slate-50 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white">
+                 <ArrowLeftIcon className="h-4 w-4" /> Back to Ideas
+               </Link>
+             }
+           />
 
            {/* ADD FORM CARD */}
-           <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
+           <div className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
               <div className="p-8 space-y-8">
                  
                  {/* Title Input */}
@@ -180,7 +99,7 @@ export default function AddGamePage() {
                     </label>
                     <input 
                       type="text" 
-                      className="w-full h-14 rounded-2xl border border-slate-200 bg-slate-50 px-5 text-lg font-bold text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition"
+                      className="h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-5 text-lg font-bold text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-blue-500/10"
                       placeholder="e.g. Elden Ring"
                       value={title}
                       onChange={e => setTitle(e.target.value)}
@@ -195,7 +114,7 @@ export default function AddGamePage() {
                     </label>
                     <input 
                       type="text" 
-                      className="w-full h-12 rounded-2xl border border-slate-200 px-5 text-sm font-medium text-slate-700 outline-none focus:border-blue-500 transition"
+                      className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-5 text-sm font-medium text-slate-700 outline-none transition focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                       placeholder="https://..."
                       value={coverUrl}
                       onChange={e => setCoverUrl(e.target.value)}
@@ -205,7 +124,7 @@ export default function AddGamePage() {
 
                  {/* Image Preview */}
                  {coverUrl && (
-                    <div className="relative w-full h-64 rounded-2xl overflow-hidden border border-slate-100 bg-slate-50 shadow-inner group">
+                    <div className="group relative h-64 w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-inner dark:border-slate-700 dark:bg-slate-950">
                        <img 
                           src={coverUrl} 
                           alt="Cover Preview" 
@@ -220,14 +139,14 @@ export default function AddGamePage() {
               </div>
 
               {/* Footer Actions */}
-              <div className="bg-slate-50 px-8 py-6 border-t border-slate-100 flex items-center justify-end gap-4">
-                 <Link href="/" className="cursor-pointer px-6 py-3 text-sm font-bold text-slate-500 hover:text-slate-800 transition">
+              <div className="flex items-center justify-end gap-4 border-t border-slate-100 bg-slate-50 px-8 py-6 dark:border-slate-800 dark:bg-slate-950/50">
+                 <Link href="/" className="cursor-pointer px-6 py-3 text-sm font-bold text-slate-500 transition hover:text-slate-800 dark:text-slate-400 dark:hover:text-white">
                     Cancel
                  </Link>
                  <button 
                     onClick={handleAddGame}
                     disabled={loading}
-                    className="cursor-pointer px-8 py-3 rounded-xl bg-slate-900 text-white font-bold shadow-lg hover:bg-blue-600 hover:shadow-blue-500/30 active:scale-95 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="cursor-pointer rounded-xl bg-slate-900 px-8 py-3 font-bold text-white shadow-sm transition hover:bg-slate-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
                  >
                     {loading ? "Adding..." : "Add Game to Library"}
                  </button>
