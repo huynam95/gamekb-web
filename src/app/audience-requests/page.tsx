@@ -392,13 +392,13 @@ export default function AudienceRequestsPage() {
               <p className="mt-1 text-sm text-slate-500">The next great comment can become your next video.</p>
             </div>
           ) : (
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
               {filtered.map((item) => {
                 const gameTitle = item.game?.title ?? "Game not decided";
                 return (
                   <article
                     key={item.id}
-                    className="group relative min-h-[280px] overflow-hidden rounded-[1.6rem] border border-slate-800 bg-slate-900 shadow-sm transition-shadow duration-150 hover:shadow-xl"
+                    className="group relative h-[220px] overflow-hidden rounded-[1.5rem] border border-slate-800 bg-slate-900 shadow-sm transition-shadow duration-150 hover:shadow-lg"
                   >
                     {item.game?.cover_url ? (
                       <div
@@ -410,13 +410,13 @@ export default function AudienceRequestsPage() {
                     )}
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/75 to-slate-950/15" />
 
-                    <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between p-4">
+                    <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between p-3">
                       {item.source_url ? (
                         <a
                           href={item.source_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full border border-white/15 bg-black/30 px-3 text-[11px] font-black text-white/85 backdrop-blur-md transition hover:bg-white/15 hover:text-white"
+                          className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full border border-white/15 bg-black/30 px-3 text-[11px] font-black text-white/85 backdrop-blur-md transition hover:bg-white/15 hover:text-white"
                         >
                           <LinkIcon className="h-3.5 w-3.5" /> Source
                         </a>
@@ -427,7 +427,7 @@ export default function AudienceRequestsPage() {
                         <button
                           type="button"
                           onClick={() => openEdit(item)}
-                          className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-black/30 text-white/75 backdrop-blur-md transition hover:bg-white/20 hover:text-white"
+                          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-black/30 text-white/75 backdrop-blur-md transition hover:bg-white/20 hover:text-white"
                           title="Edit request"
                         >
                           <PencilSquareIcon className="h-4 w-4" />
@@ -435,7 +435,7 @@ export default function AudienceRequestsPage() {
                         <button
                           type="button"
                           onClick={() => void remove(item)}
-                          className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-black/30 text-white/75 backdrop-blur-md transition hover:bg-rose-500 hover:text-white"
+                          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-white/15 bg-black/30 text-white/75 backdrop-blur-md transition hover:bg-rose-500 hover:text-white"
                           title="Delete request"
                         >
                           <TrashIcon className="h-4 w-4" />
@@ -443,14 +443,14 @@ export default function AudienceRequestsPage() {
                       </div>
                     </div>
 
-                    <div className="absolute inset-0 z-10 flex flex-col justify-end p-5 sm:p-6">
+                    <div className="absolute inset-0 z-10 flex flex-col justify-end p-4 sm:p-5">
                       <p className="mb-2 truncate text-[10px] font-black uppercase tracking-[0.16em] text-white/55">
                         {gameTitle}
                       </p>
-                      <blockquote className="line-clamp-5 text-base font-bold leading-6 text-white sm:text-[17px]">
+                      <blockquote className="line-clamp-3 text-[15px] font-bold leading-5 text-white sm:text-base">
                         “{item.comment_text}”
                       </blockquote>
-                      <div className="mt-3 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold text-white/55">
+                      <div className="mt-2 flex min-w-0 items-center gap-3 text-[11px] font-semibold text-white/55">
                         {item.commenter_name && <span className="truncate">@ {item.commenter_name}</span>}
                         {item.notes && <span className="line-clamp-1 min-w-0 flex-1">{item.notes}</span>}
                       </div>
@@ -481,7 +481,7 @@ export default function AudienceRequestsPage() {
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 <XMarkIcon className="h-5 w-5" />
               </button>

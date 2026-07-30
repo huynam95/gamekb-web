@@ -5,14 +5,17 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeftIcon,
+  ArrowUpTrayIcon,
   Bars3Icon,
   CameraIcon,
   CheckCircleIcon,
   ClockIcon,
   FilmIcon,
   FolderOpenIcon,
+  PhotoIcon,
   PlusIcon,
   TrashIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppPageHeader, appPageMainClass, appPageRootClass } from "@/components/AppPage";
@@ -52,6 +55,7 @@ export default function LongVideoProjectPage() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
 
@@ -132,6 +136,65 @@ export default function LongVideoProjectPage() {
     setDirty(true);
   };
 
+
+  const uploadThumbnail = async (file?: File) => {
+    if (!file || !workspace) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      notifyError("Use a JPG, PNG, or WebP image.", "Unsupported image");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      notifyError("Thumbnail must be 5 MB or smaller.", "Image too large");
+      return;
+    }
+
+    setUploadingThumbnail(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch(`/api/long-videos/${projectId}/thumbnail`, {
+        method: "POST",
+        body: formData,
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Could not upload thumbnail");
+      setWorkspace((current) => current ? {
+        ...current,
+        project: { ...current.project, thumbnail_url: payload.data.thumbnail_url },
+      } : current);
+      success("Project thumbnail updated.", "Thumbnail ready");
+    } catch (err) {
+      notifyError(err instanceof Error ? err.message : "Could not upload thumbnail");
+    } finally {
+      setUploadingThumbnail(false);
+    }
+  };
+
+  const removeThumbnail = async () => {
+    if (!workspace?.project.thumbnail_url) return;
+    if (!(await confirm({
+      title: "Remove project thumbnail?",
+      message: "The project card will fall back to a game cover until you upload another thumbnail.",
+      confirmText: "Remove",
+    }))) return;
+
+    setUploadingThumbnail(true);
+    try {
+      const response = await fetch(`/api/long-videos/${projectId}/thumbnail`, { method: "DELETE" });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "Could not remove thumbnail");
+      setWorkspace((current) => current ? {
+        ...current,
+        project: { ...current.project, thumbnail_url: null },
+      } : current);
+      success("Project thumbnail removed.", "Thumbnail removed");
+    } catch (err) {
+      notifyError(err instanceof Error ? err.message : "Could not remove thumbnail");
+    } finally {
+      setUploadingThumbnail(false);
+    }
+  };
+
   const save = async () => {
     if (!workspace || !workspace.project.title.trim()) return;
     setSaving(true);
@@ -187,14 +250,65 @@ export default function LongVideoProjectPage() {
           />
 
           <section className="mb-5 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_180px_220px]">
-              <label className="block"><span className="mb-1.5 block text-xs font-black text-slate-500">Project title</span><input value={workspace.project.title} onChange={(event) => updateProject("title", event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-black outline-none focus:border-violet-400 dark:border-slate-700 dark:bg-slate-950" /></label>
-              <label className="block"><span className="mb-1.5 block text-xs font-black text-slate-500">Status</span><select value={workspace.project.status} onChange={(event) => updateProject("status", event.target.value as LongVideoProject["status"])} className="h-11 w-full cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold outline-none dark:border-slate-700 dark:bg-slate-950">{PROJECT_STATUS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-              <label className="block"><span className="mb-1.5 block text-xs font-black text-slate-500">Target duration</span><div className="relative"><input type="number" min={1} value={workspace.project.target_duration_minutes} onChange={(event) => updateProject("target_duration_minutes", Number(event.target.value))} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 pr-12 text-sm font-bold outline-none dark:border-slate-700 dark:bg-slate-950" /><span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">min</span></div></label>
-            </div>
-            <div className="mt-4 grid gap-4 lg:grid-cols-2">
-              <label className="block"><span className="mb-1.5 block text-xs font-black text-slate-500">Main goal</span><textarea value={workspace.project.core_idea ?? ""} onChange={(event) => updateProject("core_idea", event.target.value)} rows={3} className="w-full resize-y rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold outline-none focus:border-violet-400 dark:border-slate-700 dark:bg-slate-950" placeholder="What should this video deliver?" /></label>
-              <label className="block"><span className="mb-1.5 block text-xs font-black text-slate-500">Thumbnail concept</span><textarea value={workspace.project.thumbnail_notes ?? ""} onChange={(event) => updateProject("thumbnail_notes", event.target.value)} rows={3} className="w-full resize-y rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold outline-none focus:border-violet-400 dark:border-slate-700 dark:bg-slate-950" placeholder="Main subject, text, background, contrast..." /></label>
+            <div className="grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
+              <div className="min-w-0">
+                <div className="mb-1.5 flex items-center justify-between gap-3">
+                  <span className="text-xs font-black text-slate-500">Project thumbnail</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">JPG, PNG or WebP · 5 MB</span>
+                </div>
+                <div className="group relative aspect-video overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 dark:border-slate-700">
+                  {workspace.project.thumbnail_url ? (
+                    <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${workspace.project.thumbnail_url})` }} />
+                  ) : (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-violet-600 via-fuchsia-600 to-slate-950 text-white">
+                      <PhotoIcon className="h-9 w-9 text-white/75" />
+                      <p className="mt-2 text-xs font-black uppercase tracking-[0.16em] text-white/65">No thumbnail yet</p>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-black/10" />
+                  <div className="absolute inset-x-3 bottom-3 flex items-center gap-2">
+                    <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-xl bg-white px-3 text-xs font-black text-slate-900 shadow-lg transition hover:bg-slate-100">
+                      <ArrowUpTrayIcon className="h-4 w-4" />
+                      {uploadingThumbnail ? "Uploading..." : workspace.project.thumbnail_url ? "Replace" : "Upload"}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        disabled={uploadingThumbnail}
+                        className="hidden"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          event.target.value = "";
+                          void uploadThumbnail(file);
+                        }}
+                      />
+                    </label>
+                    {workspace.project.thumbnail_url && (
+                      <button
+                        type="button"
+                        onClick={() => void removeThumbnail()}
+                        disabled={uploadingThumbnail}
+                        className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl bg-black/45 text-white backdrop-blur transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label="Remove project thumbnail"
+                      >
+                        <XMarkIcon className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <p className="mt-2 text-xs font-semibold leading-5 text-slate-400">This image becomes the background of the project card in Long Video Projects.</p>
+              </div>
+
+              <div className="min-w-0">
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_180px_220px]">
+                  <label className="block"><span className="mb-1.5 block text-xs font-black text-slate-500">Project title</span><input value={workspace.project.title} onChange={(event) => updateProject("title", event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-black outline-none focus:border-violet-400 dark:border-slate-700 dark:bg-slate-950" /></label>
+                  <label className="block"><span className="mb-1.5 block text-xs font-black text-slate-500">Status</span><select value={workspace.project.status} onChange={(event) => updateProject("status", event.target.value as LongVideoProject["status"])} className="h-11 w-full cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold outline-none dark:border-slate-700 dark:bg-slate-950">{PROJECT_STATUS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+                  <label className="block"><span className="mb-1.5 block text-xs font-black text-slate-500">Target duration</span><div className="relative"><input type="number" min={1} value={workspace.project.target_duration_minutes} onChange={(event) => updateProject("target_duration_minutes", Number(event.target.value))} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 pr-12 text-sm font-bold outline-none dark:border-slate-700 dark:bg-slate-950" /><span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">min</span></div></label>
+                </div>
+                <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                  <label className="block"><span className="mb-1.5 block text-xs font-black text-slate-500">Main goal</span><textarea value={workspace.project.core_idea ?? ""} onChange={(event) => updateProject("core_idea", event.target.value)} rows={3} className="w-full resize-y rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold outline-none focus:border-violet-400 dark:border-slate-700 dark:bg-slate-950" placeholder="What should this video deliver?" /></label>
+                  <label className="block"><span className="mb-1.5 block text-xs font-black text-slate-500">Thumbnail concept</span><textarea value={workspace.project.thumbnail_notes ?? ""} onChange={(event) => updateProject("thumbnail_notes", event.target.value)} rows={3} className="w-full resize-y rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold outline-none focus:border-violet-400 dark:border-slate-700 dark:bg-slate-950" placeholder="Main subject, text, background, contrast..." /></label>
+                </div>
+              </div>
             </div>
           </section>
 

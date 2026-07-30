@@ -114,6 +114,7 @@ export type LongVideoProject = {
   target_duration_minutes: number;
   target_audience?: string | null;
   thumbnail_notes?: string | null;
+  thumbnail_url?: string | null;
   status: "planning" | "writing" | "recording" | "editing" | "ready" | "published";
   created_at?: string;
   updated_at?: string;

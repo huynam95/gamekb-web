@@ -142,7 +142,9 @@ export default function LongVideosPage() {
                 const recorded = items.filter((item) => item.capture_status === "recorded" || item.capture_status === "approved").length;
                 const remaining = Math.max(0, items.length - recorded);
                 const progress = items.length ? Math.round((recorded / items.length) * 100) : 0;
-                const cover = items.find((item) => item.detail?.game?.cover_url)?.detail?.game?.cover_url;
+                const ideaCover = items.find((item) => item.detail?.game?.cover_url)?.detail?.game?.cover_url;
+                const cover = project.thumbnail_url || ideaCover;
+                const hasProjectThumbnail = Boolean(project.thumbnail_url);
 
                 return (
                   <article
@@ -150,7 +152,7 @@ export default function LongVideosPage() {
                     onClick={() => router.push(`/long-videos/${project.id}`)}
                     className="group relative min-h-[270px] cursor-pointer overflow-hidden rounded-[1.75rem] border border-slate-200 bg-slate-900 shadow-sm transition hover:border-violet-300 hover:shadow-xl dark:border-slate-800"
                   >
-                    {cover && <div className="absolute inset-0 bg-cover bg-center opacity-30" style={{ backgroundImage: `url(${cover})` }} />}
+                    {cover && <div className={`absolute inset-0 bg-cover bg-center ${hasProjectThumbnail ? "opacity-55" : "opacity-30"}`} style={{ backgroundImage: `url(${cover})` }} />}
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/90 to-slate-900/35" />
                     <div className="relative flex min-h-[270px] flex-col p-5 text-white">
                       <div className="flex items-start justify-between gap-3">
