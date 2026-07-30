@@ -6,8 +6,15 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   try {
     const { id } = await context.params;
     const projectId = Number(id);
-    const body = await request.json();
-    const detailIds = [...new Set((Array.isArray(body.detail_ids) ? body.detail_ids : []).map(Number).filter(Number.isFinite))];
+    const body = (await request.json()) as { detail_ids?: unknown };
+    const rawDetailIds: unknown[] = Array.isArray(body.detail_ids) ? body.detail_ids : [];
+    const detailIds: number[] = Array.from(
+      new Set(
+        rawDetailIds
+          .map((value) => Number(value))
+          .filter((value): value is number => Number.isFinite(value)),
+      ),
+    );
     if (detailIds.length === 0) return NextResponse.json({ error: "Select at least one idea" }, { status: 400 });
 
     const supabase = getAdminSupabase();
