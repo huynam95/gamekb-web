@@ -9,9 +9,8 @@ import {
   Bars3Icon,
   CameraIcon,
   CheckCircleIcon,
-  ClockIcon,
+  CheckIcon,
   FilmIcon,
-  FolderOpenIcon,
   PhotoIcon,
   PlusIcon,
   TrashIcon,
@@ -20,7 +19,7 @@ import {
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppPageHeader, appPageMainClass, appPageRootClass } from "@/components/AppPage";
 import { useNotifications } from "@/components/NotificationCenter";
-import type { LongVideoCaptureStatus, LongVideoProject, LongVideoProjectIdea } from "@/types/gamekb";
+import type { LongVideoProject, LongVideoProjectIdea } from "@/types/gamekb";
 
 type Workspace = { project: LongVideoProject; ideas: LongVideoProjectIdea[] };
 
@@ -33,12 +32,31 @@ const PROJECT_STATUS: Array<{ value: LongVideoProject["status"]; label: string }
   { value: "published", label: "Published" },
 ];
 
-const CAPTURE_STATUS: Array<{ value: LongVideoCaptureStatus; label: string; style: string }> = [
-  { value: "to_record", label: "To record", style: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300" },
-  { value: "recorded", label: "Recorded", style: "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300" },
-  { value: "retake", label: "Retake", style: "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" },
-  { value: "approved", label: "Ready", style: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300" },
-];
+const ensurePeriod = (text: string) => {
+  const trimmed = text.trim();
+  if (!trimmed) return trimmed;
+  return /[.!?…]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+};
+
+const smoothNarrationDetail = (text: string) => {
+  const trimmed = text.trim();
+  if (!trimmed) return trimmed;
+  return /^(If|When|During|After|Before|At|Right|There|You|Most|But|And)\b/.test(trimmed)
+    ? trimmed.charAt(0).toLowerCase() + trimmed.slice(1)
+    : trimmed;
+};
+
+const buildDefaultNarration = (item: LongVideoProjectIdea) => {
+  const gameTitle = item.detail.game?.title?.trim() || "this game";
+  const rawDetail = (item.detail.description || item.detail.title || "")
+    .replace(/\s+/g, " ")
+    .replace(/^\[[^\]]+\]\s*/, "")
+    .trim();
+
+  if (!rawDetail) return `In ${gameTitle}, ${smoothNarrationDetail(item.detail.title)}`;
+  if (/^in\s+/i.test(rawDetail)) return ensurePeriod(rawDetail);
+  return ensurePeriod(`In ${gameTitle}, ${smoothNarrationDetail(rawDetail)}`);
+};
 
 async function api<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, { ...options, headers: { "Content-Type": "application/json" } });
@@ -70,6 +88,7 @@ export default function LongVideoProjectPage() {
           ...item,
           position,
           capture_status: item.capture_status || "to_record",
+          narration_text: item.narration_text?.trim() || buildDefaultNarration(item),
         })),
       });
       setDirty(false);
@@ -84,16 +103,12 @@ export default function LongVideoProjectPage() {
 
   const stats = useMemo(() => {
     const ideas = workspace?.ideas ?? [];
-    const recorded = ideas.filter((item) => item.capture_status === "recorded" || item.capture_status === "approved").length;
-    const retakes = ideas.filter((item) => item.capture_status === "retake").length;
-    const ready = ideas.filter((item) => item.capture_status === "approved").length;
+    const completed = ideas.filter((item) => item.capture_status === "recorded" || item.capture_status === "approved").length;
     return {
       total: ideas.length,
-      recorded,
-      remaining: Math.max(0, ideas.length - recorded),
-      retakes,
-      ready,
-      progress: ideas.length ? Math.round((recorded / ideas.length) * 100) : 0,
+      completed,
+      remaining: Math.max(0, ideas.length - completed),
+      progress: ideas.length ? Math.round((completed / ideas.length) * 100) : 0,
     };
   }, [workspace]);
 
@@ -207,8 +222,7 @@ export default function LongVideoProjectPage() {
             detail_id: item.detail_id,
             position,
             capture_status: item.capture_status,
-            recording_notes: item.recording_notes,
-            file_location: item.file_location,
+            narration_text: item.narration_text,
           })),
         }),
       });
@@ -312,27 +326,26 @@ export default function LongVideoProjectPage() {
             </div>
           </section>
 
-          <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Ideas</p><p className="mt-2 text-2xl font-black">{stats.total}</p></div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Recorded</p><p className="mt-2 text-2xl font-black text-blue-600">{stats.recorded}</p></div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Remaining</p><p className="mt-2 text-2xl font-black">{stats.remaining}</p></div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Retakes</p><p className="mt-2 text-2xl font-black text-amber-600">{stats.retakes}</p></div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"><div className="flex items-center justify-between"><p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-400">Progress</p><p className="text-sm font-black">{stats.progress}%</p></div><div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${stats.progress}%` }} /></div></div>
-          </section>
-
           <section className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-500">Recording list</p><h2 className="text-xl font-black">Ideas to capture</h2><p className="mt-1 text-xs font-semibold text-slate-400">Drag to reorder. Update status, notes and file location as you record.</p></div>
-              <Link href={`/?longProject=${projectId}&longProjectTitle=${encodedTitle}`} className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-4 text-xs font-black uppercase tracking-wider text-violet-700 transition hover:bg-violet-100 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-300"><PlusIcon className="h-4 w-4" /> Add ideas</Link>
+            <div className="mb-4 flex flex-wrap items-center gap-3">
+              <div className="min-w-0">
+                <h2 className="text-lg font-black">Ideas</h2>
+                <p className="text-xs font-semibold text-slate-400">{stats.completed}/{stats.total} done · {stats.remaining} left</p>
+              </div>
+              <div className="h-1.5 min-w-[120px] flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${stats.progress}%` }} />
+              </div>
+              <span className="text-xs font-black text-slate-400">{stats.progress}%</span>
+              <Link href={`/?longProject=${projectId}&longProjectTitle=${encodedTitle}`} className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-3 text-xs font-black text-violet-700 transition hover:bg-violet-100 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-300"><PlusIcon className="h-4 w-4" /> Add</Link>
             </div>
 
             {workspace.ideas.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-300 p-12 text-center dark:border-slate-700"><CameraIcon className="mx-auto h-10 w-10 text-slate-300" /><h3 className="mt-3 text-lg font-black">No ideas in this project yet</h3><p className="mt-1 text-sm text-slate-400">Pick ideas from All Ideas, then return here to plan your recording.</p><Link href={`/?longProject=${projectId}&longProjectTitle=${encodedTitle}`} className="mt-5 inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-violet-600 px-5 text-sm font-black text-white hover:bg-violet-700"><PlusIcon className="h-4 w-4" /> Pick ideas</Link></div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {workspace.ideas.map((item, index) => {
-                  const status = CAPTURE_STATUS.find((option) => option.value === item.capture_status) ?? CAPTURE_STATUS[0];
-                  const cover = item.detail.game?.cover_url;
+                  const completed = item.capture_status === "recorded" || item.capture_status === "approved";
+                  const gameTitle = item.detail.game?.title || "Unknown game";
                   return (
                     <article
                       key={`${item.detail_id}-${index}`}
@@ -340,23 +353,42 @@ export default function LongVideoProjectPage() {
                       onDragStart={() => setDragIndex(index)}
                       onDragOver={(event) => event.preventDefault()}
                       onDrop={() => reorderIdeas(index)}
-                      className="group overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 transition hover:border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-slate-600"
+                      className={`group rounded-xl border px-3 py-2.5 transition ${
+                        completed
+                          ? "border-emerald-200 bg-emerald-50/45 dark:border-emerald-900/60 dark:bg-emerald-950/10"
+                          : "border-slate-200 bg-slate-50 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-slate-600"
+                      }`}
                     >
-                      <div className="grid gap-0 lg:grid-cols-[56px_110px_minmax(0,1fr)_210px_48px]">
-                        <div className="flex items-center justify-center border-b border-slate-200 p-3 lg:border-b-0 lg:border-r dark:border-slate-700"><Bars3Icon className="h-5 w-5 cursor-grab text-slate-300 active:cursor-grabbing" /></div>
-                        <div className="relative min-h-[96px] overflow-hidden bg-slate-800 lg:min-h-full">{cover ? <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${cover})` }} /> : <div className="flex h-full min-h-[96px] items-center justify-center text-2xl">🎮</div>}<div className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-lg bg-black/55 text-[10px] font-black text-white backdrop-blur">{index + 1}</div></div>
-                        <div className="min-w-0 p-4">
-                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-violet-500">{item.detail.game?.title || "Unknown game"}</p>
-                          <h3 className="mt-1 text-base font-black">{item.detail.title}</h3>
-                          <p className="mt-1 line-clamp-2 text-sm font-medium leading-5 text-slate-500 dark:text-slate-400">{item.detail.description}</p>
-                          <Link href={`/idea/${item.detail_id}`} className="mt-2 inline-flex cursor-pointer items-center gap-1 text-xs font-black text-sky-600 hover:text-sky-700">Open idea →</Link>
-                        </div>
-                        <div className="space-y-3 border-t border-slate-200 p-4 lg:border-l lg:border-t-0 dark:border-slate-700">
-                          <label className="block"><span className="mb-1 block text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Capture status</span><select value={item.capture_status} onChange={(event) => updateIdea(index, { capture_status: event.target.value as LongVideoCaptureStatus })} className={`h-10 w-full cursor-pointer rounded-xl border-0 px-3 text-xs font-black outline-none ${status.style}`}>{CAPTURE_STATUS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-                          <label className="block"><span className="mb-1 block text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Recording note</span><input value={item.recording_notes ?? ""} onChange={(event) => updateIdea(index, { recording_notes: event.target.value })} className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold outline-none focus:border-violet-400 dark:border-slate-700 dark:bg-slate-900" placeholder="Location, setup, shot..." /></label>
-                          <label className="block"><span className="mb-1 block text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">File / folder</span><div className="relative"><FolderOpenIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={item.file_location ?? ""} onChange={(event) => updateIdea(index, { file_location: event.target.value })} className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs font-semibold outline-none focus:border-violet-400 dark:border-slate-700 dark:bg-slate-900" placeholder="Drive link or path" /></div></label>
-                        </div>
-                        <div className="flex items-center justify-center border-t border-slate-200 p-3 lg:border-l lg:border-t-0 dark:border-slate-700"><button type="button" onClick={() => void removeIdea(index)} className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-300 transition hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/30" aria-label={`Remove ${item.detail.title}`}><TrashIcon className="h-4 w-4" /></button></div>
+                      <div className="grid min-w-0 grid-cols-[18px_24px_28px_minmax(0,1fr)_32px] items-center gap-2 lg:grid-cols-[18px_24px_28px_minmax(180px,0.8fr)_minmax(260px,1.2fr)_32px]">
+                        <Bars3Icon className="h-4 w-4 cursor-grab text-slate-300 active:cursor-grabbing" />
+                        <span className="text-center text-[11px] font-black tabular-nums text-slate-400">{String(index + 1).padStart(2, "0")}</span>
+                        <button
+                          type="button"
+                          onClick={() => updateIdea(index, { capture_status: completed ? "to_record" : "approved" })}
+                          className={`flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border transition ${
+                            completed
+                              ? "border-emerald-500 bg-emerald-500 text-white"
+                              : "border-slate-300 bg-white text-transparent hover:border-emerald-400 dark:border-slate-600 dark:bg-slate-900"
+                          }`}
+                          aria-label={completed ? `Mark ${item.detail.title} as not completed` : `Mark ${item.detail.title} as completed`}
+                        >
+                          <CheckIcon className="h-4 w-4" />
+                        </button>
+
+                        <Link href={`/idea/${item.detail_id}`} className="min-w-0 cursor-pointer" title={`${gameTitle} · ${item.detail.title}`}>
+                          <p className={`truncate text-sm font-black ${completed ? "text-slate-500 line-through dark:text-slate-400" : "text-slate-900 dark:text-white"}`}>{item.detail.title}</p>
+                          <p className="truncate text-[10px] font-bold text-slate-400">{gameTitle}</p>
+                        </Link>
+
+                        <input
+                          value={item.narration_text ?? ""}
+                          onChange={(event) => updateIdea(index, { narration_text: event.target.value })}
+                          className="col-start-4 row-start-2 h-8 min-w-0 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 outline-none transition focus:border-violet-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 lg:col-start-5 lg:row-start-1"
+                          placeholder="Custom narration..."
+                          aria-label={`Narration for ${item.detail.title}`}
+                        />
+
+                        <button type="button" onClick={() => void removeIdea(index)} className="col-start-5 row-start-1 flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-slate-300 transition hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/30 lg:col-start-6" aria-label={`Remove ${item.detail.title}`}><TrashIcon className="h-4 w-4" /></button>
                       </div>
                     </article>
                   );

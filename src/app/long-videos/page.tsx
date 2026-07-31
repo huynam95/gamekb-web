@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CameraIcon,
-  CheckCircleIcon,
   ClockIcon,
   FilmIcon,
   PlusIcon,
@@ -150,36 +149,41 @@ export default function LongVideosPage() {
                   <article
                     key={project.id}
                     onClick={() => router.push(`/long-videos/${project.id}`)}
-                    className="group relative min-h-[270px] cursor-pointer overflow-hidden rounded-[1.75rem] border border-slate-200 bg-slate-900 shadow-sm transition hover:border-violet-300 hover:shadow-xl dark:border-slate-800"
+                    className="group cursor-pointer overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900"
                   >
-                    {cover && <div className={`absolute inset-0 bg-cover bg-center ${hasProjectThumbnail ? "opacity-55" : "opacity-30"}`} style={{ backgroundImage: `url(${cover})` }} />}
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/90 to-slate-900/35" />
-                    <div className="relative flex min-h-[270px] flex-col p-5 text-white">
-                      <div className="flex items-start justify-between gap-3">
-                        <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${STATUS_STYLE[project.status]}`}>{STATUS_LABEL[project.status]}</span>
-                        <button
-                          type="button"
-                          onClick={(event) => { event.stopPropagation(); void remove(project); }}
-                          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl bg-black/20 text-white/55 opacity-0 backdrop-blur transition hover:bg-rose-500 hover:text-white group-hover:opacity-100"
-                          aria-label={`Delete ${project.title}`}
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
+                    <div className="relative aspect-video overflow-hidden bg-slate-900">
+                      {cover ? (
+                        <div
+                          className={`absolute inset-0 bg-cover bg-center transition duration-300 group-hover:scale-[1.02] ${hasProjectThumbnail ? "opacity-100" : "opacity-80"}`}
+                          style={{ backgroundImage: `url(${cover})` }}
+                        />
+                      ) : (
+                        <div className="absolute inset-0 bg-gradient-to-br from-violet-600 via-fuchsia-600 to-slate-950" />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/15" />
+                      <span className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider shadow-sm ${STATUS_STYLE[project.status]}`}>{STATUS_LABEL[project.status]}</span>
+                      <button
+                        type="button"
+                        onClick={(event) => { event.stopPropagation(); void remove(project); }}
+                        className="absolute right-3 top-3 flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl bg-black/35 text-white/70 opacity-0 backdrop-blur transition hover:bg-rose-500 hover:text-white group-hover:opacity-100"
+                        aria-label={`Delete ${project.title}`}
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                      <div className="absolute inset-x-3 bottom-3 flex items-center gap-2">
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/25 backdrop-blur">
+                          <div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${progress}%` }} />
+                        </div>
+                        <span className="rounded-lg bg-black/40 px-2 py-1 text-[10px] font-black text-white backdrop-blur">{progress}%</span>
                       </div>
+                    </div>
 
-                      <h2 className="mt-4 line-clamp-2 text-xl font-black leading-tight">{project.title}</h2>
-                      <p className="mt-2 line-clamp-3 text-sm font-medium leading-5 text-white/60">{project.core_idea || "No project goal written yet."}</p>
-
-                      <div className="mt-auto pt-6">
-                        <div className="mb-2 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.16em] text-white/55">
-                          <span>Recording progress</span><span>{progress}%</span>
-                        </div>
-                        <div className="h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${progress}%` }} /></div>
-                        <div className="mt-4 grid grid-cols-3 gap-2">
-                          <div><p className="text-[9px] font-black uppercase tracking-wider text-white/40">Ideas</p><p className="mt-1 text-sm font-black">{items.length}</p></div>
-                          <div><p className="text-[9px] font-black uppercase tracking-wider text-white/40">Remaining</p><p className="mt-1 text-sm font-black">{remaining}</p></div>
-                          <div><p className="text-[9px] font-black uppercase tracking-wider text-white/40">Target</p><p className="mt-1 text-sm font-black">{project.target_duration_minutes}m</p></div>
-                        </div>
+                    <div className="p-4">
+                      <h2 className="line-clamp-2 min-h-[2.5rem] text-base font-black leading-5 text-slate-900 dark:text-white">{project.title}</h2>
+                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-bold text-slate-500 dark:text-slate-400">
+                        <span className="inline-flex items-center gap-1.5"><FilmIcon className="h-4 w-4" />{items.length}</span>
+                        <span className="inline-flex items-center gap-1.5"><CameraIcon className="h-4 w-4" />{remaining} left</span>
+                        <span className="inline-flex items-center gap-1.5"><ClockIcon className="h-4 w-4" />{project.target_duration_minutes}m</span>
                       </div>
                     </div>
                   </article>

@@ -83,6 +83,7 @@ export type LongVideoProjectIdea = {
   detail_id: number;
   position: number;
   capture_status: LongVideoCaptureStatus;
+  narration_text?: string | null;
   recording_notes?: string | null;
   file_location?: string | null;
   detail: DetailRow;

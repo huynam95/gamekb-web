@@ -16,7 +16,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
 
     const { data: projectIdeas, error: ideasError } = await supabase
       .from("long_video_project_ideas")
-      .select("id,project_id,detail_id,position,capture_status,recording_notes,file_location,detail:details(id,title,description,detail_type,game:games(id,title,cover_url),footage(id,file_path,title,channel_name))")
+      .select("id,project_id,detail_id,position,capture_status,narration_text,detail:details(id,title,description,detail_type,game:games(id,title,cover_url),footage(id,file_path,title,channel_name))")
       .eq("project_id", projectId)
       .order("position", { ascending: true });
     if (ideasError) throw ideasError;
@@ -59,8 +59,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         detail_id: Number(item.detail_id),
         position,
         capture_status: CAPTURE_STATUSES.has(String(item.capture_status)) ? String(item.capture_status) : "to_record",
-        recording_notes: String(item.recording_notes ?? "").trim() || null,
-        file_location: String(item.file_location ?? "").trim() || null,
+        narration_text: String(item.narration_text ?? "").trim() || null,
       }))
       .filter((item: { detail_id: number }) => Number.isFinite(item.detail_id));
 
