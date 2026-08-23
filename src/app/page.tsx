@@ -12,7 +12,6 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { AppPageHeader, appPageMainClass, appPageRootClass } from "@/components/AppPage";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { GameEditorModal, IdeaItem, QuickViewModal, ScriptEditorModal } from "@/components/IdeaCards";
-import { RandomIdeaModal } from "@/components/RandomIdeaModal";
 import { useNotifications } from "@/components/NotificationCenter";
 import type { DetailRow, FootageItem, Game, Group, ScriptProject } from "@/types/gamekb";
 import { fetchYoutubeMetadata, isYoutubeUrl } from "@/lib/youtube";
@@ -20,7 +19,6 @@ import { fetchYoutubeMetadata, isYoutubeUrl } from "@/lib/youtube";
 /* ================= CONFIG ================= */
 
 const ITEMS_PER_PAGE = 24;
-const RANDOM_PICK_COUNT = 3;
 const TOPIC_DB_MIGRATION_STORAGE_KEY = "gamekb-video-themes-db-migrated";
 
 function applyIdeaTextSearch(query: any, rawTerm: string, games: Game[]) {
@@ -571,10 +569,35 @@ function VideoThemeBoard({
   );
 }
 
-function SortToggle({ value, onChange }: { value: "newest" | "oldest"; onChange: (value: "newest" | "oldest") => void }) {
-  const options: { value: "newest" | "oldest"; label: string; mark: string }[] = [
-    { value: "newest", label: "Newest", mark: "↓" },
-    { value: "oldest", label: "Oldest", mark: "↑" },
+type SortOrder = "newest" | "oldest" | "random";
+
+function makeRandomSeed() {
+  return Math.floor(Math.random() * 2_147_483_647) || 1;
+}
+
+function seededShuffle<T>(items: T[], seed: number) {
+  const next = [...items];
+  let state = seed >>> 0;
+  const random = () => {
+    state += 0x6D2B79F5;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+
+  for (let index = next.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(random() * (index + 1));
+    [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+  }
+  return next;
+}
+
+function SortToggle({ value, onChange }: { value: SortOrder; onChange: (value: SortOrder) => void }) {
+  const options: { value: SortOrder; label: string; mark: string; title: string }[] = [
+    { value: "newest", label: "Newest", mark: "↓", title: "Newest ideas first" },
+    { value: "oldest", label: "Oldest", mark: "↑", title: "Oldest ideas first" },
+    { value: "random", label: "Random", mark: "↻", title: "Shuffle the current results" },
   ];
 
   return (
@@ -589,7 +612,7 @@ function SortToggle({ value, onChange }: { value: "newest" | "oldest"; onChange:
             className={`flex h-8 cursor-pointer items-center gap-1.5 rounded-full px-3 text-xs font-black uppercase tracking-[0.14em] transition active:scale-[0.98] ${
               active ? "bg-slate-900 text-white dark:bg-slate-800 dark:text-slate-100" : "text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
             }`}
-            title={option.value === "newest" ? "Newest ideas first" : "Oldest ideas first"}
+            title={option.title}
           >
             <span className="text-sm leading-none">{option.mark}</span>
             {option.label}
@@ -622,10 +645,6 @@ export default function Home() {
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const [projectIdeas, setProjectIdeas] = useState<DetailRow[]>([]);
   
-  // STATE RANDOM
-  const [randomIdeas, setRandomIdeas] = useState<DetailRow[]>([]);
-  const [randomPickedIdeas, setRandomPickedIdeas] = useState<DetailRow[]>([]);
-  const [randomLoading, setRandomLoading] = useState(false);
   const [previewIdea, setPreviewIdea] = useState<DetailRow | null>(null);
 
   const [currentPage, setCurrentPage] = useState(1);
@@ -637,7 +656,8 @@ export default function Home() {
   const [selectedThemeId, setSelectedThemeId] = useState<string | "">("");
   const [videoThemes, setVideoThemes] = useState<VideoTheme[]>(DEFAULT_VIDEO_THEMES);
   const [themesLoaded, setThemesLoaded] = useState(false);
-  const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
+  const [randomSeed, setRandomSeed] = useState(() => makeRandomSeed());
   const [loading, setLoading] = useState(true);
 
   const [showCreateGroup, setShowCreateGroup] = useState(false);
@@ -835,41 +855,108 @@ export default function Home() {
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
       const to = from + ITEMS_PER_PAGE - 1;
 
-      let query = supabase
-        .from("details")
-        .select("*, footage(id, file_path, title, channel_name)", { count: "exact" })
-        .eq("status", "idea");
+      try {
+        let groupDetailIds: number[] | null = null;
+        if (groupId) {
+          const { data: items, error: groupError } = await supabase
+            .from("idea_group_items")
+            .select("detail_id")
+            .eq("group_id", groupId);
+          if (groupError) throw new Error(groupError.message);
+          groupDetailIds = (items ?? [])
+            .map((item: any) => Number(item.detail_id))
+            .filter((id: number) => Number.isFinite(id));
+          if (groupDetailIds.length === 0) {
+            setIdeas([]);
+            setTotalCount(0);
+            return;
+          }
+        }
 
-      if (groupId) {
-         const { data: items } = await supabase.from("idea_group_items").select("detail_id").eq("group_id", groupId);
-         const ids = (items || []).map((x:any) => x.detail_id);
-         if (ids.length === 0) {
-           setIdeas([]);
-           setTotalCount(0);
-           setLoading(false);
-           return;
-         }
-         query = query.in("id", ids);
-      }
-      if (gameId) query = query.eq("game_id", gameId);
-      if (type) query = query.eq("detail_type", type); 
-      query = applyIdeaTextSearch(query, debouncedQ, games);
-      const { data, count, error } = await query.order("created_at", { ascending: sortOrder === "oldest" }).range(from, to);
-      if (error) {
-        notifyError(error.message, "Could not load ideas");
+        const applyFilters = (query: any) => {
+          let nextQuery = query;
+          if (groupDetailIds) nextQuery = nextQuery.in("id", groupDetailIds);
+          if (gameId) nextQuery = nextQuery.eq("game_id", gameId);
+          if (type) nextQuery = nextQuery.eq("detail_type", type);
+          return applyIdeaTextSearch(nextQuery, debouncedQ, games);
+        };
+
+        if (sortOrder === "random") {
+          const allIds: number[] = [];
+          const chunkSize = 1000;
+          let offset = 0;
+          let exactCount = 0;
+
+          while (true) {
+            let idQuery = supabase
+              .from("details")
+              .select("id", { count: "exact" })
+              .eq("status", "idea");
+            idQuery = applyFilters(idQuery);
+            const { data: idRows, count, error: idError } = await idQuery
+              .order("id", { ascending: true })
+              .range(offset, offset + chunkSize - 1);
+            if (idError) throw new Error(idError.message);
+
+            if (offset === 0) exactCount = count ?? 0;
+            const chunkIds = (idRows ?? [])
+              .map((row: any) => Number(row.id))
+              .filter((id: number) => Number.isFinite(id));
+            allIds.push(...chunkIds);
+
+            if (chunkIds.length < chunkSize || allIds.length >= exactCount) break;
+            offset += chunkSize;
+          }
+
+          const shuffledIds = seededShuffle(allIds, randomSeed);
+          const pageIds = shuffledIds.slice(from, to + 1);
+          setTotalCount(exactCount || allIds.length);
+
+          if (pageIds.length === 0) {
+            setIdeas([]);
+            return;
+          }
+
+          const { data, error } = await supabase
+            .from("details")
+            .select("*, footage(id, file_path, title, channel_name)")
+            .in("id", pageIds);
+          if (error) throw new Error(error.message);
+
+          const rowById = new Map(((data ?? []) as DetailRow[]).map((row) => [row.id, row]));
+          const orderedRows = pageIds
+            .map((id) => rowById.get(id))
+            .filter((row): row is DetailRow => Boolean(row));
+          const enrichedIdeas = await attachGroupsToIdeas(orderedRows);
+          setIdeas(enrichedIdeas);
+          void backfillYoutubeChannels(enrichedIdeas);
+          return;
+        }
+
+        let query = supabase
+          .from("details")
+          .select("*, footage(id, file_path, title, channel_name)", { count: "exact" })
+          .eq("status", "idea");
+        query = applyFilters(query);
+        const { data, count, error } = await query
+          .order("created_at", { ascending: sortOrder === "oldest" })
+          .range(from, to);
+        if (error) throw new Error(error.message);
+
+        const enrichedIdeas = await attachGroupsToIdeas((data ?? []) as DetailRow[]);
+        setIdeas(enrichedIdeas);
+        setTotalCount(count ?? 0);
+        void backfillYoutubeChannels(enrichedIdeas);
+      } catch (err) {
+        notifyError(err instanceof Error ? err.message : "Could not load ideas", "Could not load ideas");
         setIdeas([]);
         setTotalCount(0);
+      } finally {
         setLoading(false);
-        return;
       }
-      const enrichedIdeas = await attachGroupsToIdeas((data ?? []) as DetailRow[]);
-      setIdeas(enrichedIdeas);
-      setTotalCount(count ?? 0);
-      setLoading(false);
-      void backfillYoutubeChannels(enrichedIdeas);
     }
-    load();
-  }, [debouncedQ, gameId, groupId, type, sortOrder, currentPage, games, groups]);
+    void load();
+  }, [debouncedQ, gameId, groupId, type, sortOrder, randomSeed, currentPage, games, groups]);
 
   const toggleSelection = (idea: DetailRow) => {
     setSelectedIds(prev =>
@@ -948,14 +1035,6 @@ export default function Home() {
     }
   };
 
-
-  const toggleRandomSelection = (idea: DetailRow) => {
-    setRandomPickedIdeas(prev =>
-      prev.some(item => item.id === idea.id)
-        ? prev.filter(item => item.id !== idea.id)
-        : [...prev, idea]
-    );
-  };
 
   const openScriptEditor = async (sourceIdeas?: DetailRow[]) => {
     let nextIdeas = sourceIdeas ?? selectedIdeas;
@@ -1089,81 +1168,6 @@ export default function Home() {
     success("Collection deleted.", "Deleted");
   }
 
-  async function getActiveGroupDetailIds() {
-    if (!groupId) return null;
-
-    const { data, error } = await supabase
-      .from("idea_group_items")
-      .select("detail_id")
-      .eq("group_id", groupId);
-
-    if (error) throw new Error(error.message);
-
-    return (data ?? [])
-      .map((item: any) => Number(item.detail_id))
-      .filter((id: number) => Number.isFinite(id));
-  }
-
-  async function fetchFilteredIdeasRange(from: number, to: number, groupDetailIds: number[] | null) {
-    let query = supabase
-      .from("details")
-      .select("*, footage(id, file_path, title, channel_name)")
-      .eq("status", "idea");
-
-    if (groupDetailIds) {
-      if (groupDetailIds.length === 0) return [];
-      query = query.in("id", groupDetailIds);
-    }
-
-    if (gameId) query = query.eq("game_id", gameId);
-    if (type) query = query.eq("detail_type", type);
-    query = applyIdeaTextSearch(query, debouncedQ, games);
-    const { data, error } = await query.order("created_at", { ascending: sortOrder === "oldest" }).range(from, to);
-    if (error) throw new Error(error.message);
-
-    return (data ?? []) as DetailRow[];
-  }
-
-  // Random from the full filtered result set, not just the 24 visible rows on the current page.
-  const handleRandom = async () => {
-    if (randomLoading) return;
-    setRandomLoading(true);
-
-    try {
-      const groupDetailIds = await getActiveGroupDetailIds();
-      const poolCount = groupDetailIds?.length === 0 ? 0 : totalCount;
-
-      if (poolCount === 0) {
-        warning("No ideas available to randomize.", "Nothing to spin");
-        return;
-      }
-
-      const count = Math.min(RANDOM_PICK_COUNT, poolCount);
-      const offsets = new Set<number>();
-
-      while (offsets.size < count) {
-        offsets.add(Math.floor(Math.random() * poolCount));
-      }
-
-      const rows = (await Promise.all([...offsets].map((offset) => fetchFilteredIdeasRange(offset, offset, groupDetailIds)))).flat();
-      const uniqueRows = Array.from(new Map(rows.map((row) => [row.id, row])).values());
-
-      if (uniqueRows.length < count) {
-        const fallbackRows = await fetchFilteredIdeasRange(0, Math.min(poolCount - 1, count * 6), groupDetailIds);
-        for (const row of fallbackRows.sort(() => Math.random() - 0.5)) {
-          if (!uniqueRows.some((idea) => idea.id === row.id)) uniqueRows.push(row);
-          if (uniqueRows.length === count) break;
-        }
-      }
-
-      const picks = uniqueRows.slice(0, count);
-      setRandomIdeas(picks);
-    } catch (err) {
-      notifyError(err instanceof Error ? err.message : "Could not randomize ideas.", "Random failed");
-    } finally {
-      setRandomLoading(false);
-    }
-  };
 
   const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
   const currentIdeas = ideas;
@@ -1179,24 +1183,6 @@ export default function Home() {
       <ScriptEditorModal isOpen={showEditor} onClose={() => { setShowEditor(false); setProjectIdeas([]); }} onSave={handleSaveScript} initialData={{ ids: projectIdeas.map((idea) => idea.id), ideas: projectIdeas, games: games, theme: selectedTheme }} />
       <GameEditorModal game={editingGame} isOpen={!!editingGame} onClose={() => setEditingGame(null)} onUpdate={(updatedGame) => { setGames(prev => prev.map(g => g.id === updatedGame.id ? updatedGame : g)); }} />
       <QuickViewModal idea={previewIdea} isOpen={!!previewIdea} onClose={() => setPreviewIdea(null)} />
-
-      <RandomIdeaModal
-        items={randomIdeas}
-        games={games}
-        isOpen={randomIdeas.length > 0}
-        loading={randomLoading}
-        selectedIds={randomPickedIdeas.map((idea) => idea.id)}
-        onClose={() => setRandomIdeas([])}
-        onReshuffle={handleRandom}
-        onQuickView={setPreviewIdea}
-        onToggleSelect={toggleRandomSelection}
-        onClearSelection={() => setRandomPickedIdeas([])}
-        onSaveProject={() => {
-          setRandomIdeas([]);
-          if (isLongProjectPickMode) void addIdeasToLongProject(randomPickedIdeas);
-          else void openScriptEditor(randomPickedIdeas);
-        }}
-      />
 
       {isSelectMode && (
         <div className="fixed inset-x-0 bottom-0 z-[80] border-t border-slate-200 bg-white/95 p-4 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
@@ -1308,17 +1294,18 @@ export default function Home() {
                   )}
                 </div>
                 <div className="flex flex-wrap items-center justify-start gap-2 xl:justify-end">
-                  <SortToggle value={sortOrder} onChange={setSortOrder} />
-                  <button
-                    type="button"
-                    onClick={handleRandom}
-                    disabled={loading || randomLoading}
-                    className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-xs font-black uppercase tracking-[0.14em] text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98] disabled:cursor-wait disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800"
-                    title="Random from the current filters"
-                  >
-                    <SparklesIcon className={`h-4 w-4 text-purple-500 ${randomLoading ? "animate-spin" : ""}`} />
-                    <span>{randomLoading ? "Spinning" : "Random"}</span>
-                  </button>
+                  <SortToggle
+                    value={sortOrder}
+                    onChange={(nextSort) => {
+                      if (nextSort === "random") {
+                        setRandomSeed(makeRandomSeed());
+                        setSortOrder("random");
+                        setCurrentPage(1);
+                        return;
+                      }
+                      setSortOrder(nextSort);
+                    }}
+                  />
                   <ThemeToggle variant="compact" />
                 </div>
               </div>

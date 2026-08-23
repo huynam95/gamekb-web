@@ -158,20 +158,95 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
   const [draggedSectionId, setDraggedSectionId] = useState<string | null>(null);
   const [dragOverSectionId, setDragOverSectionId] = useState<string | null>(null);
   const scriptTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedSnapshotRef = useRef("");
+  const latestFormDataRef = useRef<Partial<ScriptProject>>(formData);
+  const saveVersionRef = useRef(0);
+  const hydratedScriptIdRef = useRef<number | null>(null);
+  const onSaveRef = useRef(onSave);
+  const [saveState, setSaveState] = useState<"saved" | "saving" | "error">("saved");
   const { success, error: notifyError } = useNotifications();
 
   const assetAnalysis = useMemo(() => analyzeAssetLinks(formData.assets || []), [formData.assets]);
   const scriptGuide = useMemo(() => buildScriptGuide(String(formData.content || "")), [formData.content]);
 
   useEffect(() => {
+    onSaveRef.current = onSave;
+  }, [onSave]);
+
+  useEffect(() => {
     if (isOpen && script) {
+      hydratedScriptIdRef.current = null;
       setFormData(script);
+      latestFormDataRef.current = script;
+      lastSavedSnapshotRef.current = JSON.stringify(script);
+      setSaveState("saved");
       setIsEditingTitle(false);
       setActiveTab("script");
       setDraggedSectionId(null);
       setDragOverSectionId(null);
     }
-  }, [isOpen, script]);
+  }, [isOpen, script?.id]);
+
+  const saveNow = async (data: Partial<ScriptProject>) => {
+    if (!script) return true;
+    const snapshot = JSON.stringify(data);
+    if (snapshot === lastSavedSnapshotRef.current) {
+      setSaveState("saved");
+      return true;
+    }
+
+    const version = ++saveVersionRef.current;
+    setSaveState("saving");
+    const ok = await onSaveRef.current(data);
+    if (ok === false) {
+      if (version === saveVersionRef.current) setSaveState("error");
+      return false;
+    }
+
+    lastSavedSnapshotRef.current = snapshot;
+    if (version === saveVersionRef.current) {
+      const latestSnapshot = JSON.stringify(latestFormDataRef.current);
+      setSaveState(latestSnapshot === snapshot ? "saved" : "saving");
+    }
+    return true;
+  };
+
+  useEffect(() => {
+    latestFormDataRef.current = formData;
+    if (!isOpen || !script) return;
+
+    const snapshot = JSON.stringify(formData);
+    const initialSnapshot = JSON.stringify(script);
+    if (hydratedScriptIdRef.current !== script.id) {
+      if (snapshot === initialSnapshot) hydratedScriptIdRef.current = script.id;
+      return;
+    }
+    if (snapshot === lastSavedSnapshotRef.current) return;
+
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    setSaveState("saving");
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null;
+      void saveNow(latestFormDataRef.current);
+    }, 350);
+
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+    };
+  }, [formData, isOpen, script?.id]);
+
+  const closeWithSave = async () => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    await saveNow(latestFormDataRef.current);
+    onClose();
+  };
 
   const jumpToScriptSection = (start: number, end: number) => {
     setActiveTab("script");
@@ -260,7 +335,7 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
   return (
     <div
       className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/70 p-2 sm:p-4 lg:p-6 backdrop-blur-md"
-      onClick={onClose}
+      onClick={() => void closeWithSave()}
     >
       <div
         className="flex h-[94vh] w-full max-w-[min(1300px,calc(100vw-1rem))] flex-col overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-2xl sm:rounded-[2rem] lg:h-[90vh] lg:rounded-[2.5rem] dark:border-slate-800 dark:bg-slate-950"
@@ -308,16 +383,19 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
                 </option>
               ))}
             </select>
-            <button
-              onClick={() => {
-                onSave(formData);
-                onClose();
-              }}
-              className="h-11 cursor-pointer rounded-2xl bg-slate-900 px-5 text-sm font-black text-white shadow-xl transition-all hover:bg-black active:scale-95 sm:px-8 lg:px-10 dark:bg-blue-600 dark:hover:bg-blue-700"
-              type="button"
+            <div
+              className={`inline-flex h-11 items-center gap-2 rounded-2xl border px-4 text-xs font-black uppercase tracking-[0.12em] ${
+                saveState === "error"
+                  ? "border-rose-200 bg-rose-50 text-rose-600 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300"
+                  : saveState === "saving"
+                    ? "border-blue-200 bg-blue-50 text-blue-600 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-300"
+                    : "border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300"
+              }`}
+              title="Changes are saved automatically"
             >
-              Save Changes
-            </button>
+              <CheckIcon className={`h-4 w-4 ${saveState === "saving" ? "animate-pulse" : ""}`} />
+              {saveState === "error" ? "Save failed" : saveState === "saving" ? "Saving" : "Saved"}
+            </div>
           </div>
         </div>
 
@@ -583,15 +661,14 @@ export default function ScriptsPage() {
   };
 
   const handleUpdate = async (data: any) => {
-    if (!editingScript) return;
+    if (!editingScript) return false;
     const { error } = await supabase.from("scripts").update(data).eq("id", editingScript.id);
     if (error) {
       notifyError(error.message, "Could not update project");
-      return;
+      return false;
     }
     setScripts((prev) => prev.map((script) => (script.id === editingScript.id ? { ...script, ...data } : script)));
-    setIsModalOpen(false);
-    success("Project updated successfully.", "Project updated");
+    return true;
   };
 
   const handleDelete = async (id: number) => {

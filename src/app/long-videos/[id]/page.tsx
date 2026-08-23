@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -8,7 +8,6 @@ import {
   ArrowUpTrayIcon,
   Bars3Icon,
   CameraIcon,
-  CheckCircleIcon,
   CheckIcon,
   FilmIcon,
   PhotoIcon,
@@ -65,6 +64,22 @@ async function api<T>(url: string, options?: RequestInit): Promise<T> {
   return payload;
 }
 
+function buildWorkspacePayload(workspace: Workspace) {
+  return {
+    project: workspace.project,
+    ideas: workspace.ideas.map((item, position) => ({
+      detail_id: item.detail_id,
+      position,
+      capture_status: item.capture_status,
+      narration_text: item.narration_text,
+    })),
+  };
+}
+
+function workspaceSnapshot(workspace: Workspace) {
+  return JSON.stringify(buildWorkspacePayload(workspace));
+}
+
 export default function LongVideoProjectPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -72,17 +87,20 @@ export default function LongVideoProjectPage() {
   const projectId = Number(params.id);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
-  const [dirty, setDirty] = useState(false);
+  const [saveState, setSaveState] = useState<"saved" | "saving" | "error">("saved");
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedSnapshotRef = useRef("");
+  const latestWorkspaceRef = useRef<Workspace | null>(null);
+  const saveVersionRef = useRef(0);
 
   const load = async () => {
     if (!Number.isFinite(projectId)) return;
     setLoading(true);
     try {
       const result = await api<{ data: Workspace }>(`/api/long-videos/${projectId}`);
-      setWorkspace({
+      const nextWorkspace: Workspace = {
         project: result.data.project,
         ideas: (result.data.ideas ?? []).map((item, position) => ({
           ...item,
@@ -90,8 +108,11 @@ export default function LongVideoProjectPage() {
           capture_status: item.capture_status || "to_record",
           narration_text: item.narration_text?.trim() || buildDefaultNarration(item),
         })),
-      });
-      setDirty(false);
+      };
+      latestWorkspaceRef.current = nextWorkspace;
+      lastSavedSnapshotRef.current = workspaceSnapshot(nextWorkspace);
+      setWorkspace(nextWorkspace);
+      setSaveState("saved");
     } catch (err) {
       notifyError(err instanceof Error ? err.message : "Could not load long video project");
     } finally {
@@ -112,17 +133,82 @@ export default function LongVideoProjectPage() {
     };
   }, [workspace]);
 
-  const updateProject = <K extends keyof LongVideoProject>(key: K, value: LongVideoProject[K]) => {
-    setWorkspace((current) => current ? { ...current, project: { ...current.project, [key]: value } } : current);
-    setDirty(true);
+  const persistWorkspace = async (nextWorkspace: Workspace) => {
+    const snapshot = workspaceSnapshot(nextWorkspace);
+    if (snapshot === lastSavedSnapshotRef.current) {
+      setSaveState("saved");
+      return true;
+    }
+
+    const version = ++saveVersionRef.current;
+    setSaveState("saving");
+    try {
+      await api(`/api/long-videos/${projectId}`, {
+        method: "PATCH",
+        body: JSON.stringify(buildWorkspacePayload(nextWorkspace)),
+      });
+      lastSavedSnapshotRef.current = snapshot;
+      if (version === saveVersionRef.current) {
+        const latest = latestWorkspaceRef.current;
+        setSaveState(latest && workspaceSnapshot(latest) === snapshot ? "saved" : "saving");
+      }
+      return true;
+    } catch (err) {
+      if (version === saveVersionRef.current) setSaveState("error");
+      notifyError(err instanceof Error ? err.message : "Could not save project", "Autosave failed");
+      return false;
+    }
   };
 
-  const updateIdea = (index: number, patch: Partial<LongVideoProjectIdea>) => {
-    setWorkspace((current) => current ? {
-      ...current,
-      ideas: current.ideas.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item),
-    } : current);
-    setDirty(true);
+  useEffect(() => {
+    if (!workspace) return;
+    latestWorkspaceRef.current = workspace;
+    const snapshot = workspaceSnapshot(workspace);
+    if (snapshot === lastSavedSnapshotRef.current) return;
+
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    setSaveState("saving");
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null;
+      const latest = latestWorkspaceRef.current;
+      if (latest) void persistWorkspace(latest);
+    }, 450);
+
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+    };
+  }, [workspace, projectId]);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      const latest = latestWorkspaceRef.current;
+      if (!latest || workspaceSnapshot(latest) === lastSavedSnapshotRef.current) return;
+      void fetch(`/api/long-videos/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildWorkspacePayload(latest)),
+        keepalive: true,
+      });
+    };
+  }, [projectId]);
+
+  const updateProject = <K extends keyof LongVideoProject>(key: K, value: LongVideoProject[K]) => {
+    setWorkspace((current) => current ? { ...current, project: { ...current.project, [key]: value } } : current);
+  };
+
+  const updateIdea = (index: number, patch: Partial<LongVideoProjectIdea>, immediate = false) => {
+    if (!workspace) return;
+    const nextWorkspace: Workspace = {
+      ...workspace,
+      ideas: workspace.ideas.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item),
+    };
+    latestWorkspaceRef.current = nextWorkspace;
+    setWorkspace(nextWorkspace);
+    if (immediate) void persistWorkspace(nextWorkspace);
   };
 
   const removeIdea = async (index: number) => {
@@ -134,11 +220,15 @@ export default function LongVideoProjectPage() {
       confirmText: "Remove",
     }))) return;
 
-    setWorkspace((current) => current ? {
-      ...current,
-      ideas: current.ideas.filter((_, itemIndex) => itemIndex !== index).map((idea, position) => ({ ...idea, position })),
-    } : current);
-    setDirty(true);
+    const nextWorkspace: Workspace = {
+      ...workspace,
+      ideas: workspace.ideas
+        .filter((_, itemIndex) => itemIndex !== index)
+        .map((idea, position) => ({ ...idea, position })),
+    };
+    latestWorkspaceRef.current = nextWorkspace;
+    setWorkspace(nextWorkspace);
+    void persistWorkspace(nextWorkspace);
   };
 
   const reorderIdeas = (toIndex: number) => {
@@ -146,9 +236,14 @@ export default function LongVideoProjectPage() {
     const next = [...workspace.ideas];
     const [moved] = next.splice(dragIndex, 1);
     next.splice(toIndex, 0, moved);
-    setWorkspace({ ...workspace, ideas: next.map((item, position) => ({ ...item, position })) });
+    const nextWorkspace: Workspace = {
+      ...workspace,
+      ideas: next.map((item, position) => ({ ...item, position })),
+    };
+    latestWorkspaceRef.current = nextWorkspace;
+    setWorkspace(nextWorkspace);
     setDragIndex(null);
-    setDirty(true);
+    void persistWorkspace(nextWorkspace);
   };
 
 
@@ -210,30 +305,7 @@ export default function LongVideoProjectPage() {
     }
   };
 
-  const save = async () => {
-    if (!workspace || !workspace.project.title.trim()) return;
-    setSaving(true);
-    try {
-      await api(`/api/long-videos/${projectId}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          project: workspace.project,
-          ideas: workspace.ideas.map((item, position) => ({
-            detail_id: item.detail_id,
-            position,
-            capture_status: item.capture_status,
-            narration_text: item.narration_text,
-          })),
-        }),
-      });
-      success("Long video project saved.", "Saved");
-      await load();
-    } catch (err) {
-      notifyError(err instanceof Error ? err.message : "Could not save project");
-    } finally {
-      setSaving(false);
-    }
-  };
+
 
   if (loading) {
     return <div className={appPageRootClass}><AppSidebar activePage="longVideos" /><main className={`${appPageMainClass} flex min-h-screen items-center justify-center`}><p className="text-sm font-black text-slate-400">Opening project...</p></main></div>;
@@ -258,7 +330,19 @@ export default function LongVideoProjectPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <Link href={`/long-videos`} className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black uppercase tracking-wider text-slate-500 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"><ArrowLeftIcon className="h-4 w-4" /> Projects</Link>
                 <Link href={`/?longProject=${projectId}&longProjectTitle=${encodedTitle}`} className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl bg-violet-600 px-4 text-xs font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-violet-700"><PlusIcon className="h-4 w-4" /> Pick ideas</Link>
-                <button type="button" onClick={() => void save()} disabled={saving || !dirty} className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 text-xs font-black uppercase tracking-wider text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"><CheckCircleIcon className="h-4 w-4" /> {saving ? "Saving..." : "Save"}</button>
+                <span
+                  className={`inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-[10px] font-black uppercase tracking-wider ${
+                    saveState === "error"
+                      ? "border-rose-200 bg-rose-50 text-rose-600 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300"
+                      : saveState === "saving"
+                        ? "border-violet-200 bg-violet-50 text-violet-600 dark:border-violet-900/60 dark:bg-violet-950/30 dark:text-violet-300"
+                        : "border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300"
+                  }`}
+                  title="Changes are saved automatically"
+                >
+                  <CheckIcon className={`h-4 w-4 ${saveState === "saving" ? "animate-pulse" : ""}`} />
+                  {saveState === "error" ? "Save failed" : saveState === "saving" ? "Saving" : "Saved"}
+                </span>
               </div>
             }
           />
@@ -364,7 +448,7 @@ export default function LongVideoProjectPage() {
                         <span className="text-center text-[11px] font-black tabular-nums text-slate-400">{String(index + 1).padStart(2, "0")}</span>
                         <button
                           type="button"
-                          onClick={() => updateIdea(index, { capture_status: completed ? "to_record" : "approved" })}
+                          onClick={() => updateIdea(index, { capture_status: completed ? "to_record" : "approved" }, true)}
                           className={`flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border transition ${
                             completed
                               ? "border-emerald-500 bg-emerald-500 text-white"
