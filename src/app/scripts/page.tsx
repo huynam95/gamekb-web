@@ -371,7 +371,7 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 lg:gap-5">
+          <div className="flex items-center gap-3 lg:gap-5">
             <select
               className="h-11 cursor-pointer rounded-2xl bg-slate-100 px-4 text-sm font-black outline-none dark:bg-slate-900 dark:text-slate-100"
               value={formData.status || "Draft"}
@@ -805,7 +805,7 @@ export default function ScriptsPage() {
                         />
                       </td>
                       <td className="px-4 py-9">
-                        <div className="flex flex-wrap items-center gap-3 lg:gap-5">
+                        <div className="flex items-center gap-3 lg:gap-5">
                           <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-2xl shadow-lg shadow-slate-200 transition-transform group-hover:scale-[1.03] dark:shadow-black/30 ${topicVisual.className}`}>
                             <span aria-hidden="true">{topicVisual.emoji}</span>
                           </div>
@@ -818,7 +818,7 @@ export default function ScriptsPage() {
                       <td className="px-4 py-9">
                         <div
                           title={topic}
-                          className={`flex h-20 w-full items-center gap-4 rounded-[1.65rem] border px-5 shadow-sm transition-colors ${
+                          className={`flex h-16 w-full items-center gap-3 rounded-[1.35rem] border px-4 shadow-sm transition-colors ${
                             topic === "No topic"
                               ? "border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500"
                               : "border-violet-100 bg-violet-50 text-violet-800 dark:border-violet-900/70 dark:bg-violet-950/40 dark:text-violet-100"
@@ -827,13 +827,13 @@ export default function ScriptsPage() {
                           <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-lg shadow-sm ${topicVisual.className}`} aria-hidden="true">
                             {topicVisual.emoji}
                           </span>
-                          <span className="line-clamp-2 min-w-0 flex-1 text-left text-base font-black leading-snug tracking-tight">{topic}</span>
+                          <span className="min-w-0 flex-1 truncate whitespace-nowrap text-left text-[15px] font-black tracking-tight">{topic}</span>
                         </div>
                       </td>
                       <td className="px-4 py-9">
                         <div
                           title={channels.length > 0 ? channels.join(" · ") : "No source channel saved"}
-                          className={`flex h-20 w-full items-center gap-3 rounded-[1.4rem] border px-4 shadow-sm ${
+                          className={`flex h-16 w-full items-center gap-3 rounded-[1.35rem] border px-4 shadow-sm ${
                             channels.length > 0
                               ? "border-rose-100 bg-rose-50 text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-100"
                               : "border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500"
@@ -843,7 +843,7 @@ export default function ScriptsPage() {
                             <VideoCameraIcon className="h-5 w-5" />
                           </span>
                           <div className="min-w-0 flex-1">
-                            <p className="line-clamp-2 text-sm font-black leading-snug">{channels[0] || "Unknown channel"}</p>
+                            <p className="truncate whitespace-nowrap text-sm font-black">{channels[0] || "Unknown channel"}</p>
                             {channels.length > 1 && (
                               <p className="mt-1 text-[10px] font-black uppercase tracking-wide opacity-65">+{channels.length - 1} more</p>
                             )}

@@ -641,6 +641,7 @@ export default function Home() {
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [selectedIdeas, setSelectedIdeas] = useState<DetailRow[]>([]);
+  const [showSelectedReview, setShowSelectedReview] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const [projectIdeas, setProjectIdeas] = useState<DetailRow[]>([]);
@@ -974,6 +975,7 @@ export default function Home() {
     setSelectedThemeId(themeId);
     setSelectedIds([]);
     setSelectedIdeas([]);
+    setShowSelectedReview(false);
     setIsSelectMode(Boolean(themeId));
   };
 
@@ -1091,6 +1093,7 @@ export default function Home() {
       );
       setSelectedIds([]);
       setSelectedIdeas([]);
+      setShowSelectedReview(false);
       router.push(`/long-videos/${longProjectId}`);
     } catch (err) {
       notifyError(err instanceof Error ? err.message : "Could not add ideas", "Long video project not updated");
@@ -1108,6 +1111,7 @@ export default function Home() {
     setIsSelectMode(Boolean(selectedThemeId));
     setSelectedIds([]);
     setSelectedIdeas([]);
+    setShowSelectedReview(false);
     setProjectIdeas([]);
   };
 
@@ -1181,6 +1185,102 @@ export default function Home() {
       <GameEditorModal game={editingGame} isOpen={!!editingGame} onClose={() => setEditingGame(null)} onUpdate={(updatedGame) => { setGames(prev => prev.map(g => g.id === updatedGame.id ? updatedGame : g)); }} />
       <QuickViewModal idea={previewIdea} isOpen={!!previewIdea} onClose={() => setPreviewIdea(null)} />
 
+      {isSelectMode && showSelectedReview && createPortal(
+        <div className="fixed inset-0 z-[190]">
+          <button
+            type="button"
+            aria-label="Close selected ideas"
+            onClick={() => setShowSelectedReview(false)}
+            className="absolute inset-0 cursor-default bg-slate-950/45 backdrop-blur-[2px]"
+          />
+          <aside className="absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+              <div>
+                <p className="text-base font-black text-slate-900 dark:text-white">Selected ideas</p>
+                <p className="mt-0.5 text-xs font-bold text-slate-400">{selectedIds.length} selected across all pages</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSelectedReview(false)}
+                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:hover:bg-slate-900 dark:hover:text-white"
+                aria-label="Close"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+
+            {selectedIdeas.length === 0 ? (
+              <div className="flex flex-1 items-center justify-center px-6 text-center">
+                <div>
+                  <Squares2X2Icon className="mx-auto h-9 w-9 text-slate-300 dark:text-slate-700" />
+                  <p className="mt-3 text-sm font-black text-slate-700 dark:text-slate-200">No ideas selected yet</p>
+                  <p className="mt-1 text-xs font-semibold text-slate-400">Pick ideas from any page and they will stay here.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+                <div className="space-y-1.5">
+                  {selectedIdeas.map((idea, index) => {
+                    const game = games.find((item) => item.id === idea.game_id);
+                    return (
+                      <div key={idea.id} className="group flex items-center gap-3 rounded-xl border border-transparent px-2.5 py-2.5 transition hover:border-slate-200 hover:bg-slate-50 dark:hover:border-slate-800 dark:hover:bg-slate-900">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[11px] font-black text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                          {index + 1}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPreviewIdea(idea);
+                            setShowSelectedReview(false);
+                          }}
+                          className="min-w-0 flex-1 cursor-pointer text-left"
+                        >
+                          <p className="truncate text-sm font-bold text-slate-800 transition group-hover:text-blue-600 dark:text-slate-100 dark:group-hover:text-blue-400">{idea.title}</p>
+                          {game && <p className="mt-0.5 truncate text-[11px] font-bold text-slate-400">{game.title}</p>}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => toggleSelection(idea)}
+                          className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/30"
+                          aria-label={`Remove ${idea.title} from selection`}
+                          title="Remove from selection"
+                        >
+                          <XMarkIcon className="h-4 w-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="border-t border-slate-200 p-4 dark:border-slate-800">
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={selectedIds.length === 0}
+                  onClick={() => {
+                    setSelectedIds([]);
+                    setSelectedIdeas([]);
+                  }}
+                  className="h-10 cursor-pointer rounded-xl border border-slate-200 px-4 text-xs font-black uppercase tracking-[0.12em] text-slate-500 transition hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:hover:border-red-900 dark:hover:bg-red-950/30"
+                >
+                  Clear all
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowSelectedReview(false)}
+                  className="h-10 flex-1 cursor-pointer rounded-xl bg-slate-900 px-4 text-sm font-bold text-white transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+                >
+                  Continue picking
+                </button>
+              </div>
+            </div>
+          </aside>
+        </div>,
+        document.body,
+      )}
+
       {isSelectMode && (
         <div className="fixed inset-x-0 bottom-0 z-[80] border-t border-slate-200 bg-white/95 p-4 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
           <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
@@ -1194,9 +1294,19 @@ export default function Home() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
+                disabled={selectedIds.length === 0}
+                onClick={() => setShowSelectedReview(true)}
+                className="flex h-11 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black uppercase tracking-[0.12em] text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800 dark:hover:text-white"
+              >
+                <Squares2X2Icon className="h-4 w-4" />
+                Review ({selectedIds.length})
+              </button>
+              <button
+                type="button"
                 onClick={() => {
                   setSelectedIds([]);
                   setSelectedIdeas([]);
+                  setShowSelectedReview(false);
                   if (isLongProjectPickMode) router.push(`/long-videos/${longProjectId}`);
                   else handleThemeChange("");
                 }}
