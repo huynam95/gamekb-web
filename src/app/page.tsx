@@ -1091,8 +1091,6 @@ export default function Home() {
       );
       setSelectedIds([]);
       setSelectedIdeas([]);
-      setRandomPickedIdeas([]);
-      setRandomIdeas([]);
       router.push(`/long-videos/${longProjectId}`);
     } catch (err) {
       notifyError(err instanceof Error ? err.message : "Could not add ideas", "Long video project not updated");
@@ -1110,7 +1108,6 @@ export default function Home() {
     setIsSelectMode(Boolean(selectedThemeId));
     setSelectedIds([]);
     setSelectedIdeas([]);
-    setRandomPickedIdeas([]);
     setProjectIdeas([]);
   };
 
