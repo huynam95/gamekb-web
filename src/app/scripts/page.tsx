@@ -21,6 +21,7 @@ import {
   ExclamationTriangleIcon,
   VideoCameraIcon,
   Bars3Icon,
+  ArrowPathIcon,
 } from "@heroicons/react/24/outline";
 
 /* ================= TYPES & CONFIG ================= */
@@ -143,7 +144,7 @@ function getTopicVisual(topic: string) {
 
 /* ================= MODAL: STUDIO WORKSPACE ================= */
 
-function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
+function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh }: any) {
   const [formData, setFormData] = useState<Partial<ScriptProject>>({
     title: "",
     content: "",
@@ -159,12 +160,15 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
   const [dragOverSectionId, setDragOverSectionId] = useState<string | null>(null);
   const scriptTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const assetSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastAssetSyncedContentRef = useRef("");
   const lastSavedSnapshotRef = useRef("");
   const latestFormDataRef = useRef<Partial<ScriptProject>>(formData);
   const saveVersionRef = useRef(0);
   const hydratedScriptIdRef = useRef<number | null>(null);
   const onSaveRef = useRef(onSave);
   const [saveState, setSaveState] = useState<"saved" | "saving" | "error">("saved");
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const { success, error: notifyError } = useNotifications();
 
   const assetAnalysis = useMemo(() => analyzeAssetLinks(formData.assets || []), [formData.assets]);
@@ -179,6 +183,7 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
       hydratedScriptIdRef.current = null;
       setFormData(script);
       latestFormDataRef.current = script;
+      lastAssetSyncedContentRef.current = String(script.content || "");
       lastSavedSnapshotRef.current = JSON.stringify(script);
       setSaveState("saved");
       setIsEditingTitle(false);
@@ -244,7 +249,25 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
     }
-    await saveNow(latestFormDataRef.current);
+    if (assetSyncTimerRef.current) {
+      clearTimeout(assetSyncTimerRef.current);
+      assetSyncTimerRef.current = null;
+    }
+
+    const latest = latestFormDataRef.current;
+    const latestContent = String(latest.content || "");
+    const syncedAssets = reconcileAssetsWithScript(
+      lastAssetSyncedContentRef.current,
+      latestContent,
+      latest.assets || [],
+    );
+    const dataToSave = JSON.stringify(syncedAssets) === JSON.stringify(latest.assets || [])
+      ? latest
+      : { ...latest, assets: syncedAssets };
+
+    latestFormDataRef.current = dataToSave;
+    lastAssetSyncedContentRef.current = latestContent;
+    await saveNow(dataToSave);
     onClose();
   };
 
@@ -313,7 +336,120 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
         : asset.idea_order,
     })).sort((a, b) => (a.idea_order ?? Number.MAX_SAFE_INTEGER) - (b.idea_order ?? Number.MAX_SAFE_INTEGER));
 
-    setFormData((current) => ({ ...current, content: nextContent, assets: nextAssets }));
+    const nextFormData = { ...latestFormDataRef.current, content: nextContent, assets: nextAssets };
+    latestFormDataRef.current = nextFormData;
+    lastAssetSyncedContentRef.current = nextContent;
+    setFormData(nextFormData);
+  };
+
+  const normalizeSectionBlock = (content: string, section: (typeof scriptGuide)[number]) =>
+    content.slice(section.start, section.end).replace(/\s+/g, " ").trim().toLowerCase();
+
+  const reconcileAssetsWithScript = (previousContent: string, nextContent: string, assets: ScriptProject["assets"]) => {
+    const previousSections = buildScriptGuide(previousContent).filter((section) => !section.isHook);
+    const nextSections = buildScriptGuide(nextContent).filter((section) => !section.isHook);
+
+    if (nextSections.length >= previousSections.length) return assets;
+
+    const usedPreviousIds = new Set<string>();
+    const newOrderByOldOrder = new Map<number, number>();
+
+    for (const nextSection of nextSections) {
+      const exactText = normalizeSectionBlock(nextContent, nextSection);
+      let previousSection = previousSections.find(
+        (candidate) => !usedPreviousIds.has(candidate.id) && normalizeSectionBlock(previousContent, candidate) === exactText,
+      );
+
+      if (!previousSection) {
+        const normalizedLabel = nextSection.label.trim().toLowerCase();
+        const labelMatches = previousSections.filter(
+          (candidate) => !usedPreviousIds.has(candidate.id) && candidate.label.trim().toLowerCase() === normalizedLabel,
+        );
+        if (labelMatches.length === 1) previousSection = labelMatches[0];
+      }
+
+      if (previousSection?.number != null && nextSection.number != null) {
+        usedPreviousIds.add(previousSection.id);
+        newOrderByOldOrder.set(previousSection.number, nextSection.number);
+      }
+    }
+
+    const previousOrders = new Set(
+      previousSections.map((section) => section.number).filter((value): value is number => value != null),
+    );
+
+    return assets
+      .filter((asset) => asset.idea_order == null || !previousOrders.has(asset.idea_order) || newOrderByOldOrder.has(asset.idea_order))
+      .map((asset) => ({
+        ...asset,
+        idea_order: asset.idea_order != null
+          ? newOrderByOldOrder.get(asset.idea_order) ?? asset.idea_order
+          : asset.idea_order,
+      }))
+      .sort((a, b) => (a.idea_order ?? Number.MAX_SAFE_INTEGER) - (b.idea_order ?? Number.MAX_SAFE_INTEGER));
+  };
+
+  const handleScriptContentChange = (nextContent: string) => {
+    const nextFormData = { ...latestFormDataRef.current, content: nextContent };
+    latestFormDataRef.current = nextFormData;
+    setFormData(nextFormData);
+
+    if (assetSyncTimerRef.current) clearTimeout(assetSyncTimerRef.current);
+    assetSyncTimerRef.current = setTimeout(() => {
+      assetSyncTimerRef.current = null;
+      const previousContent = lastAssetSyncedContentRef.current;
+      const latest = latestFormDataRef.current;
+      const latestContent = String(latest.content || "");
+      const nextAssets = reconcileAssetsWithScript(previousContent, latestContent, latest.assets || []);
+      lastAssetSyncedContentRef.current = latestContent;
+
+      if (JSON.stringify(nextAssets) !== JSON.stringify(latest.assets || [])) {
+        const nextFormData = { ...latestFormDataRef.current, assets: nextAssets };
+        latestFormDataRef.current = nextFormData;
+        setFormData(nextFormData);
+      }
+    }, 650);
+  };
+
+  const refreshProject = async () => {
+    if (!script || isRefreshing) return;
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    if (assetSyncTimerRef.current) {
+      clearTimeout(assetSyncTimerRef.current);
+      assetSyncTimerRef.current = null;
+    }
+
+    const latest = latestFormDataRef.current;
+    const latestContent = String(latest.content || "");
+    const syncedAssets = reconcileAssetsWithScript(
+      lastAssetSyncedContentRef.current,
+      latestContent,
+      latest.assets || [],
+    );
+    const dataToSave = JSON.stringify(syncedAssets) === JSON.stringify(latest.assets || [])
+      ? latest
+      : { ...latest, assets: syncedAssets };
+    latestFormDataRef.current = dataToSave;
+    lastAssetSyncedContentRef.current = latestContent;
+    await saveNow(dataToSave);
+    setIsRefreshing(true);
+    try {
+      const fresh = await onRefresh?.(script.id);
+      if (!fresh) return;
+      setFormData(fresh);
+      latestFormDataRef.current = fresh;
+      lastAssetSyncedContentRef.current = String(fresh.content || "");
+      lastSavedSnapshotRef.current = JSON.stringify(fresh);
+      setSaveState("saved");
+      success("Project refreshed from the database.", "Refreshed");
+    } catch {
+      notifyError("Could not refresh the latest project data.", "Refresh failed");
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const copyWholeScript = async () => {
@@ -346,8 +482,8 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
             <div className="rounded-2xl bg-blue-600 p-3 text-white shadow-lg shadow-blue-100 dark:shadow-blue-950/40">
               <DocumentTextIcon className="h-7 w-7" />
             </div>
-            <div className="flex flex-1 flex-col">
-              <div className="flex items-center gap-3">
+            <div className="min-w-0 flex flex-1 flex-col">
+              <div className="flex min-w-0 items-center gap-3">
                 {isEditingTitle ? (
                   <input
                     autoFocus
@@ -357,7 +493,7 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
                     onBlur={() => setIsEditingTitle(false)}
                   />
                 ) : (
-                  <h2 className="line-clamp-2 text-xl font-black tracking-tight text-slate-900 sm:text-2xl dark:text-slate-50">{formData.title}</h2>
+                  <h2 title={String(formData.title || "Untitled project")} className="min-w-0 flex-1 truncate whitespace-nowrap text-xl font-black tracking-tight text-slate-900 sm:text-2xl dark:text-slate-50">{formData.title}</h2>
                 )}
                 <button
                   onClick={() => setIsEditingTitle(!isEditingTitle)}
@@ -383,6 +519,16 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
                 </option>
               ))}
             </select>
+            <button
+              type="button"
+              onClick={() => void refreshProject()}
+              disabled={isRefreshing}
+              title="Refresh project from database"
+              className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-xs font-black uppercase tracking-[0.12em] text-slate-600 shadow-sm transition hover:border-blue-300 hover:text-blue-600 disabled:cursor-wait disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-blue-700 dark:hover:text-blue-300"
+            >
+              <ArrowPathIcon className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
             <div
               className={`inline-flex h-11 items-center gap-2 rounded-2xl border px-4 text-xs font-black uppercase tracking-[0.12em] ${
                 saveState === "error"
@@ -511,7 +657,7 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave }: any) {
                   ref={scriptTextareaRef}
                   className="min-h-[420px] w-full flex-1 resize-none rounded-2xl border border-slate-200 bg-white p-5 font-sans text-base leading-7 text-slate-800 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 sm:p-6 sm:text-[17px] sm:leading-8 lg:min-h-[500px] lg:rounded-3xl lg:p-8 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-600"
                   value={formData.content || ""}
-                  onChange={(event) => setFormData({ ...formData, content: event.target.value })}
+                  onChange={(event) => handleScriptContentChange(event.target.value)}
                 />
               </div>
             </div>
@@ -660,6 +806,20 @@ export default function ScriptsPage() {
     }
   };
 
+  const refreshScriptProject = async (id: number) => {
+    const { data, error } = await supabase.from("scripts").select("*").eq("id", id).single();
+    if (error || !data) {
+      notifyError(error?.message || "Could not load the latest project data.", "Refresh failed");
+      return null;
+    }
+
+    const [fresh] = await enrichScriptsWithFootageChannels([data as ScriptProject]);
+    if (!fresh) return null;
+    setScripts((current) => current.map((item) => (item.id === id ? fresh : item)));
+    setEditingScript(fresh);
+    return fresh;
+  };
+
   const handleUpdate = async (data: any) => {
     if (!editingScript) return false;
     const { error } = await supabase.from("scripts").update(data).eq("id", editingScript.id);
@@ -712,7 +872,7 @@ export default function ScriptsPage() {
 
   return (
     <div className={`${appPageRootClass} xl:flex`}>
-      <ScriptEditorModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} script={editingScript} onSave={handleUpdate} />
+      <ScriptEditorModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} script={editingScript} onSave={handleUpdate} onRefresh={refreshScriptProject} />
 
       <AppSidebar activePage="scripts" />
 
@@ -809,8 +969,8 @@ export default function ScriptsPage() {
                           <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-2xl shadow-lg shadow-slate-200 transition-transform group-hover:scale-[1.03] dark:shadow-black/30 ${topicVisual.className}`}>
                             <span aria-hidden="true">{topicVisual.emoji}</span>
                           </div>
-                          <div className="min-w-0">
-                            <p className="truncate text-base font-black uppercase tracking-tight text-slate-900 dark:text-slate-50">{script.title}</p>
+                          <div className="min-w-0 flex-1 overflow-hidden">
+                            <p title={script.title} className="block max-w-full truncate whitespace-nowrap text-base font-black uppercase tracking-tight text-slate-900 dark:text-slate-50">{script.title}</p>
                             <p className="mt-1 text-[10px] font-bold uppercase text-slate-400">{new Date(script.created_at).toLocaleDateString("vi-VN")}</p>
                           </div>
                         </div>
