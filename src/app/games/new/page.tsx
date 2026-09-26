@@ -6,7 +6,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { AppPageHeader, appPageMainClass, appPageRootClass } from "@/components/AppPage";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { PhotoIcon, PuzzlePieceIcon, ArrowLeftIcon } from "@heroicons/react/24/outline";
+import { PhotoIcon, PuzzlePieceIcon, ArrowLeftIcon, CalendarDaysIcon } from "@heroicons/react/24/outline";
 import { useNotifications } from "@/components/NotificationCenter";
 import { normalizeGameTitle } from "@/lib/gameTitles";
 
@@ -19,6 +19,7 @@ export default function AddGamePage() {
   // Form State
   const [title, setTitle] = useState("");
   const [coverUrl, setCoverUrl] = useState("");
+  const [releaseYear, setReleaseYear] = useState("");
   const [loading, setLoading] = useState(false);
 
   // --- ACTIONS ---
@@ -52,9 +53,17 @@ export default function AddGamePage() {
       return;
     }
 
+    const parsedReleaseYear = releaseYear.trim() ? Number(releaseYear) : null;
+    if (parsedReleaseYear !== null && (!Number.isInteger(parsedReleaseYear) || parsedReleaseYear < 1970 || parsedReleaseYear > 2100)) {
+      setLoading(false);
+      warning("Please enter a valid release year.", "Invalid year");
+      return;
+    }
+
     const { error } = await supabase.from("games").insert({
       title: trimmedTitle,
       cover_url: coverUrl.trim() || null,
+      release_year: parsedReleaseYear,
     });
     setLoading(false);
 
@@ -105,6 +114,23 @@ export default function AddGamePage() {
                       onChange={e => setTitle(e.target.value)}
                       autoFocus
                     />
+                 </div>
+
+                 {/* Release Year Input */}
+                 <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-slate-500">
+                       <CalendarDaysIcon className="h-4 w-4" /> Release Year
+                    </label>
+                    <input
+                      type="number"
+                      min="1970"
+                      max="2100"
+                      className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-5 text-sm font-bold text-slate-700 outline-none transition focus:border-blue-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                      placeholder="e.g. 2026"
+                      value={releaseYear}
+                      onChange={(e) => setReleaseYear(e.target.value)}
+                    />
+                    <p className="pl-2 text-xs text-slate-400">Used by the Year filter on All Ideas. You can leave it blank and add it later.</p>
                  </div>
 
                  {/* Cover URL Input */}

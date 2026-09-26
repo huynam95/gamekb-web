@@ -2,6 +2,7 @@ export type Game = {
   id: number;
   title: string;
   cover_url?: string | null;
+  release_year?: number | null;
 };
 
 export type Group = {

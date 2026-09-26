@@ -36,22 +36,26 @@ export function QuickViewModal({ idea, isOpen, onClose }: { idea: DetailRow | nu
 export function GameEditorModal({ game, isOpen, onClose, onUpdate }: { game: Game | null; isOpen: boolean; onClose: () => void; onUpdate: (game: Game) => void }) {
   const [title, setTitle] = useState("");
   const [cover, setCover] = useState("");
+  const [releaseYear, setReleaseYear] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (game) {
       setTitle(game.title);
       setCover(game.cover_url || "");
+      setReleaseYear(game.release_year ? String(game.release_year) : "");
     }
   }, [game]);
 
   async function handleSave() {
     if (!game) return;
+    const parsedReleaseYear = releaseYear.trim() ? Number(releaseYear) : null;
+    if (parsedReleaseYear !== null && (!Number.isInteger(parsedReleaseYear) || parsedReleaseYear < 1970 || parsedReleaseYear > 2100)) return;
     setLoading(true);
-    const { error } = await supabase.from("games").update({ title, cover_url: cover }).eq("id", game.id);
+    const { error } = await supabase.from("games").update({ title, cover_url: cover, release_year: parsedReleaseYear }).eq("id", game.id);
     setLoading(false);
     if (!error) {
-      onUpdate({ ...game, title, cover_url: cover });
+      onUpdate({ ...game, title, cover_url: cover, release_year: parsedReleaseYear });
       onClose();
     }
   }
@@ -69,6 +73,10 @@ export function GameEditorModal({ game, isOpen, onClose, onUpdate }: { game: Gam
           <div>
             <label className="text-[10px] font-bold uppercase text-gray-400 mb-1 block tracking-wider">Title</label>
             <input className="w-full h-10 border rounded-lg px-3 text-sm outline-none focus:border-blue-500 shadow-sm" value={title} onChange={(event) => setTitle(event.target.value)} />
+          </div>
+          <div>
+            <label className="text-[10px] font-bold uppercase text-gray-400 mb-1 block tracking-wider">Release Year</label>
+            <input type="number" min="1970" max="2100" className="w-full h-10 border rounded-lg px-3 text-sm outline-none focus:border-blue-500 shadow-sm" value={releaseYear} onChange={(event) => setReleaseYear(event.target.value)} placeholder="2026" />
           </div>
           <div>
             <label className="text-[10px] font-bold uppercase text-gray-400 mb-1 block tracking-wider">Cover URL</label>

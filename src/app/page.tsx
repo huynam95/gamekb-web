@@ -241,6 +241,65 @@ function TypeFilterDropdown({ value, onChange }: { value: string | ""; onChange:
 }
 
 
+
+function YearFilterDropdown({ value, years, onChange }: { value: number | "" | "unknown"; years: number[]; onChange: (value: number | "" | "unknown") => void }) {
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const label = value === "" ? "All Years" : value === "unknown" ? "Unknown" : String(value);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (boxRef.current && !boxRef.current.contains(event.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const options: Array<{ value: number | "" | "unknown"; label: string }> = [
+    { value: "", label: "All Years" },
+    ...years.map((year) => ({ value: year, label: String(year) })),
+    { value: "unknown", label: "Unknown" },
+  ];
+
+  return (
+    <div ref={boxRef} className="relative z-[120] w-full sm:w-[150px]">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className={`flex h-10 w-full cursor-pointer items-center justify-between rounded-full border px-3.5 text-sm font-bold shadow-sm transition hover:border-slate-300 hover:bg-slate-50 dark:hover:border-slate-600 dark:hover:bg-slate-800 ${
+          value !== ""
+            ? "border-slate-900 bg-slate-900 text-white dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+            : "border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+        }`}
+      >
+        <span className="truncate">{label}</span>
+        <ChevronDownIcon className={`h-4 w-4 shrink-0 transition ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-[999] mt-2 max-h-80 w-full overflow-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl ring-1 ring-black/5 dark:border-slate-700 dark:bg-slate-900 dark:ring-white/10">
+          <div className="px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Release year</div>
+          <div className="space-y-1">
+            {options.map((option) => {
+              const active = value === option.value;
+              return (
+                <button
+                  key={String(option.value || "all")}
+                  type="button"
+                  onClick={() => { onChange(option.value); setOpen(false); }}
+                  className={`flex h-9 w-full cursor-pointer items-center justify-between rounded-xl px-3 text-left text-sm font-bold transition ${active ? "bg-slate-900 text-white dark:bg-slate-800" : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"}`}
+                >
+                  {option.label}
+                  {active && <span className="text-xs">✓</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 type TopicDraft = {
   id?: string;
   title: string;
@@ -654,6 +713,7 @@ export default function Home() {
   const [gameId, setGameId] = useState<number | "">("");
   const [groupId, setGroupId] = useState<number | "">("");
   const [type, setType] = useState<string | "">("");
+  const [releaseYear, setReleaseYear] = useState<number | "" | "unknown">("");
   const [selectedThemeId, setSelectedThemeId] = useState<string | "">("");
   const [videoThemes, setVideoThemes] = useState<VideoTheme[]>(DEFAULT_VIDEO_THEMES);
   const [themesLoaded, setThemesLoaded] = useState(false);
@@ -848,7 +908,7 @@ export default function Home() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedQ, gameId, groupId, type, sortOrder]);
+  }, [debouncedQ, gameId, groupId, type, releaseYear, sortOrder]);
 
   useEffect(() => {
     async function load() {
@@ -878,6 +938,12 @@ export default function Home() {
           let nextQuery = query;
           if (groupDetailIds) nextQuery = nextQuery.in("id", groupDetailIds);
           if (gameId) nextQuery = nextQuery.eq("game_id", gameId);
+          if (releaseYear !== "") {
+            const yearGameIds = games
+              .filter((game) => releaseYear === "unknown" ? game.release_year == null : game.release_year === releaseYear)
+              .map((game) => game.id);
+            nextQuery = nextQuery.in("game_id", yearGameIds.length > 0 ? yearGameIds : [-1]);
+          }
           if (type) nextQuery = nextQuery.eq("detail_type", type);
           return applyIdeaTextSearch(nextQuery, debouncedQ, games);
         };
@@ -957,7 +1023,7 @@ export default function Home() {
       }
     }
     void load();
-  }, [debouncedQ, gameId, groupId, type, sortOrder, randomSeed, currentPage, games, groups]);
+  }, [debouncedQ, gameId, groupId, type, releaseYear, sortOrder, randomSeed, currentPage, games, groups]);
 
   const toggleSelection = (idea: DetailRow) => {
     setSelectedIds(prev =>
@@ -1389,11 +1455,16 @@ export default function Home() {
                   <div className="w-full lg:w-[240px]">
                     <ComboBox placeholder="Game" items={games.map(g=>({id:g.id, name:g.title, coverUrl:g.cover_url}))} selectedId={gameId} onChange={setGameId} />
                   </div>
+                  <YearFilterDropdown
+                    value={releaseYear}
+                    years={Array.from(new Set(games.map((game) => game.release_year).filter((year): year is number => typeof year === "number"))).sort((a, b) => b - a)}
+                    onChange={setReleaseYear}
+                  />
                   <TypeFilterDropdown value={type} onChange={setType} />
-                  {(q||gameId||groupId||type) && (
+                  {(q||gameId||groupId||type||releaseYear!=="") && (
                     <button
                       type="button"
-                      onClick={()=>{setQ("");setGameId("");setGroupId("");setType("")}}
+                      onClick={()=>{setQ("");setGameId("");setGroupId("");setType("");setReleaseYear("")}}
                       className="h-10 cursor-pointer rounded-full px-3 text-xs font-black uppercase tracking-[0.16em] text-rose-500 transition hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-300"
                     >
                       Clear
