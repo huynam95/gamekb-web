@@ -66,7 +66,7 @@ Do not commit or share `.env.local`. Supabase Row Level Security should still be
 
 - Home search now matches idea titles, idea descriptions, and game names.
 - Create Idea detects normalized duplicate YouTube links across footage and sources, including alternate YouTube URL formats.
-- **Pinned** in the sidebar (or `/?pinned=1`) shows only pinned ideas; it combines with search, game, year, type and collection filters.
+- All Ideas shows a collapsible **Pinned** row above the library; unpinning a card removes it from the row instantly.
 - Create Video Script supports both drag-to-reorder and removing an idea, which regenerates script content and footage assets.
 - Open a collection and use **Remove** on an idea card to remove only that collection membership. The idea, footage, project selections, and other memberships remain available. The list and collection count refresh after a successful removal.
 

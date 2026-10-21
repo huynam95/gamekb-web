@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { ACTIVE_VIDEO_THEME_STORAGE_KEY, DEFAULT_VIDEO_THEMES, VIDEO_THEMES_STORAGE_KEY, VIDEO_TOPICS_TABLE, getVideoThemeById, makeVideoThemeId, normalizeVideoTheme, parseVideoThemes, rowToVideoTheme, videoThemeToRow } from "@/lib/videoThemes";
 import type { VideoTheme } from "@/lib/videoThemes";
 import { PlayCircleIcon, StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
-import { ArrowDownIcon, ArrowPathIcon, ArrowUpIcon, CalendarDaysIcon, CheckIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, FilmIcon, MagnifyingGlassIcon, PencilSquareIcon, PlusIcon, PuzzlePieceIcon, Squares2X2Icon, StarIcon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { ArrowDownIcon, ArrowPathIcon, ArrowUpIcon, CalendarDaysIcon, CheckIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, FilmIcon, MagnifyingGlassIcon, PencilSquareIcon, PlusIcon, PuzzlePieceIcon, Squares2X2Icon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppPageHeader, appPageMainClass, appPageRootClass } from "@/components/AppPage";
 import { GameEditorModal, IdeaItem, QuickViewModal, ScriptEditorModal } from "@/components/IdeaCards";
@@ -25,6 +25,7 @@ import { fetchYoutubeMetadata, isYoutubeUrl } from "@/lib/youtube";
 /* ================= CONFIG ================= */
 
 const ITEMS_PER_PAGE = 24;
+const PINNED_COLLAPSED_STORAGE_KEY = "gamekb-pinned-collapsed";
 const TOPIC_DB_MIGRATION_STORAGE_KEY = "gamekb-video-themes-db-migrated";
 
 function applyIdeaTextSearch(query: any, rawTerm: string, games: Game[]) {
@@ -502,8 +503,6 @@ export default function Home() {
   const [groupId, setGroupId] = useState<number | "">("");
   const [type, setType] = useState<string | "">("");
   const [releaseYear, setReleaseYear] = useState<number | "" | "unknown">("");
-  const [pinnedOnly, setPinnedOnly] = useState(false);
-  const [pinnedCount, setPinnedCount] = useState<number | null>(null);
   const [selectedThemeId, setSelectedThemeId] = useState<string | "">("");
   const [videoThemes, setVideoThemes] = useState<VideoTheme[]>(DEFAULT_VIDEO_THEMES);
   const [themesLoaded, setThemesLoaded] = useState(false);
@@ -514,6 +513,10 @@ export default function Home() {
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [ideasRevision, setIdeasRevision] = useState(0);
+  const [pinnedIdeas, setPinnedIdeas] = useState<DetailRow[]>([]);
+  const [pinnedLoaded, setPinnedLoaded] = useState(false);
+  const [pinnedCollapsed, setPinnedCollapsed] = useState(false);
+  const pinnedRowRef = useRef<HTMLUListElement>(null);
   const [removingGroupItems, setRemovingGroupItems] = useState<Set<string>>(new Set());
   const pendingGroupRemovals = useRef(new Set<string>());
 
@@ -584,10 +587,8 @@ export default function Home() {
     Promise.all([
       supabase.from("games").select("*").order("title"),
       supabase.from("idea_groups").select("*").order("name"),
-      supabase.from("idea_group_items").select("group_id"),
-      supabase.from("details").select("id", { count: "exact", head: true }).eq("status", "idea").eq("pinned", true),
-    ]).then(([gs, grps, items, pinned]) => {
-      if (!pinned.error) setPinnedCount(pinned.count ?? 0);
+      supabase.from("idea_group_items").select("group_id")
+    ]).then(([gs, grps, items]) => {
       setGames((gs.data ?? []) as Game[]);
       setGroups((grps.data ?? []) as Group[]);
       const m = new Map<number, number>();
@@ -683,7 +684,6 @@ export default function Home() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("pinned") === "1") setPinnedOnly(true);
     const id = Number(params.get("longProject"));
     if (Number.isFinite(id) && id > 0) {
       setLongPickTarget({ id, title: params.get("longProjectTitle")?.trim() || "Long video project" });
@@ -704,7 +704,7 @@ export default function Home() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedQ, gameId, groupId, type, releaseYear, sortOrder, pinnedOnly]);
+  }, [debouncedQ, gameId, groupId, type, releaseYear, sortOrder]);
 
   useEffect(() => {
     let cancelled = false;
@@ -744,7 +744,6 @@ export default function Home() {
             nextQuery = nextQuery.in("game_id", yearGameIds.length > 0 ? yearGameIds : [-1]);
           }
           if (type) nextQuery = nextQuery.eq("detail_type", type);
-          if (pinnedOnly) nextQuery = nextQuery.eq("pinned", true);
           return applyIdeaTextSearch(nextQuery, debouncedQ, games);
         };
 
@@ -858,29 +857,7 @@ export default function Home() {
     }
     void load();
     return () => { cancelled = true; };
-  }, [debouncedQ, gameId, groupId, type, releaseYear, sortOrder, pinnedOnly, randomSeed, currentPage, games, groups, ideasRevision]);
-
-  /** Switch the pinned-only view and keep it in the URL so it can be bookmarked. */
-  const applyPinnedOnly = (next: boolean) => {
-    setPinnedOnly(next);
-    const url = new URL(window.location.href);
-    if (next) url.searchParams.set("pinned", "1");
-    else url.searchParams.delete("pinned");
-    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
-  };
-
-  const togglePin = async (id: number, current: boolean) => {
-    setIdeas((prev) => prev.map((idea) => (idea.id === id ? { ...idea, pinned: !current } : idea)));
-    setPinnedCount((count) => (count === null ? count : Math.max(0, count + (current ? -1 : 1))));
-    const { error } = await supabase.from("details").update({ pinned: !current, pinned_at: current ? null : new Date().toISOString() }).eq("id", id);
-    if (error) {
-      setIdeas((prev) => prev.map((idea) => (idea.id === id ? { ...idea, pinned: current } : idea)));
-      setPinnedCount((count) => (count === null ? count : Math.max(0, count + (current ? 1 : -1))));
-      notifyError(error.message, "Could not update pin");
-      return;
-    }
-    if (pinnedOnly && current) setIdeasRevision((revision) => revision + 1);
-  };
+  }, [debouncedQ, gameId, groupId, type, releaseYear, sortOrder, randomSeed, currentPage, games, groups, ideasRevision]);
 
   const toggleSelection = (idea: DetailRow) => {
     setSelectedIds(prev =>
@@ -1134,7 +1111,78 @@ export default function Home() {
   const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
   const currentIdeas = ideas;
   const selectedTheme = getVideoThemeById(videoThemes, selectedThemeId);
+  useEffect(() => {
+    try {
+      setPinnedCollapsed(window.localStorage.getItem(PINNED_COLLAPSED_STORAGE_KEY) === "1");
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadPinned() {
+      const { data, error } = await supabase
+        .from("details")
+        .select("*, footage(id, file_path, title, channel_name)")
+        .eq("status", "idea")
+        .eq("pinned", true)
+        .order("pinned_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
+        .limit(60);
+      if (cancelled) return;
+      if (error) {
+        setPinnedLoaded(true);
+        return;
+      }
+      const enriched = await attachGroupsToIdeas((data ?? []) as DetailRow[]);
+      if (cancelled) return;
+      setPinnedIdeas(enriched);
+      setPinnedLoaded(true);
+    }
+    void loadPinned();
+    return () => { cancelled = true; };
+    // attachGroupsToIdeas reads the latest groups; reload when they or the library change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groups, ideasRevision]);
+
+  const togglePinnedCollapsed = () => {
+    setPinnedCollapsed((current) => {
+      const next = !current;
+      try {
+        window.localStorage.setItem(PINNED_COLLAPSED_STORAGE_KEY, next ? "1" : "0");
+      } catch {}
+      return next;
+    });
+  };
+
+  const scrollPinned = (direction: 1 | -1) => {
+    const row = pinnedRowRef.current;
+    if (!row) return;
+    row.scrollBy({ left: direction * Math.max(row.clientWidth * 0.8, 280), behavior: "smooth" });
+  };
+
+  /** Pin or unpin from any card; keeps the Pinned row and the library in sync. */
+  const togglePin = async (id: number, current: boolean) => {
+    const nextPinned = !current;
+    const source = ideas.find((idea) => idea.id === id) ?? pinnedIdeas.find((idea) => idea.id === id);
+    const previousPinned = pinnedIdeas;
+    setIdeas((prev) => prev.map((idea) => (idea.id === id ? { ...idea, pinned: nextPinned } : idea)));
+    setPinnedIdeas((prev) => nextPinned
+      ? (source && !prev.some((idea) => idea.id === id) ? [{ ...source, pinned: true }, ...prev] : prev)
+      : prev.filter((idea) => idea.id !== id));
+    const { error } = await supabase
+      .from("details")
+      .update({ pinned: nextPinned, pinned_at: nextPinned ? new Date().toISOString() : null })
+      .eq("id", id);
+    if (error) {
+      setIdeas((prev) => prev.map((idea) => (idea.id === id ? { ...idea, pinned: current } : idea)));
+      setPinnedIdeas(previousPinned);
+      notifyError(error.message, "Could not update pin");
+    }
+  };
+
   const activeGroup = groups.find((group) => group.id === groupId);
+  const filtersActive = Boolean(debouncedQ.trim() || gameId || type || releaseYear !== "");
+  const showPinnedRow = !groupId && !filtersActive && pinnedLoaded && pinnedIdeas.length > 0;
   const goToPage = (p: number) => {
     setCurrentPage(p);
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -1287,7 +1335,7 @@ export default function Home() {
       )}
 
       <AppSidebar
-        activePage={pinnedOnly && !groupId ? "pinned" : "ideas"}
+        activePage="ideas"
         groups={groups}
         groupCounts={groupCounts}
         selectedGroupId={groupId}
@@ -1300,17 +1348,15 @@ export default function Home() {
         onDeleteGroup={deleteGroup}
         onRenameGroup={renameGroup}
         onSelectGroup={setGroupId}
-        onSelectAllIdeas={() => { setGroupId(""); setQ(""); applyPinnedOnly(false); }}
-        onSelectPinned={() => { setGroupId(""); applyPinnedOnly(true); }}
-        pinnedCount={pinnedCount}
+        onSelectAllIdeas={() => { setGroupId(""); setQ(""); }}
       />
 
       <main className={`${appPageMainClass} pb-32`}>
         <div className="app-container library-container">
           <AppPageHeader
-            title={pinnedOnly ? (activeGroup ? `${activeGroup.name} · Pinned` : "Pinned Ideas") : activeGroup?.name || "All Ideas"}
-            description={pinnedOnly ? "Ideas you starred. Unpin a card to take it off this list; it stays in your library." : activeGroup ? "Remove ideas that don't fit this collection. They stay in All Ideas." : isLongProjectPickMode ? `Browse and select ideas for ${longProjectTitle}.` : "Choose a topic, search your library, and build the next video from the ideas you already have."}
-            icon={pinnedOnly ? <StarSolidIcon className="h-5 w-5 text-amber-500" /> : <Squares2X2Icon className="h-5 w-5" />}
+            title={activeGroup?.name || "All Ideas"}
+            description={activeGroup ? "Remove ideas that don't fit this collection. They stay in All Ideas." : isLongProjectPickMode ? `Browse and select ideas for ${longProjectTitle}.` : "Choose a topic, search your library, and build the next video from the ideas you already have."}
+            icon={<Squares2X2Icon className="h-5 w-5" />}
             className="mb-4"
             action={
               <span className="inline-flex h-9 items-center rounded-full bg-surface-sunken px-3.5 text-sm font-semibold tabular-nums text-fg-2" aria-live="polite">
@@ -1377,7 +1423,7 @@ export default function Home() {
               <div className="library-type">
                 <TypeFilterDropdown value={type} onChange={setType} />
               </div>
-              <div className="library-sort flex min-w-0 flex-wrap items-center gap-2">
+              <div className="library-sort flex min-w-0 items-center justify-between gap-2">
                 <SortToggle
                   value={sortOrder}
                   onChange={(nextSort) => {
@@ -1390,24 +1436,10 @@ export default function Home() {
                     setSortOrder(nextSort);
                   }}
                 />
-                <button
-                  type="button"
-                  onClick={() => applyPinnedOnly(!pinnedOnly)}
-                  aria-pressed={pinnedOnly}
-                  title={pinnedOnly ? "Show all ideas" : "Show pinned ideas only"}
-                  className={`inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3.5 text-sm font-semibold shadow-sm transition active:scale-[0.98] ${
-                    pinnedOnly
-                      ? "border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-200"
-                      : "border-line bg-surface text-fg-3 hover:border-line-strong hover:bg-surface-hover hover:text-fg"
-                  }`}
-                >
-                  {pinnedOnly ? <StarSolidIcon className="h-4 w-4 text-amber-500" /> : <StarIcon className="h-4 w-4" />}
-                  Pinned
-                </button>
-                {(q||gameId||groupId||type||releaseYear!==""||pinnedOnly) && (
+                {(q||gameId||groupId||type||releaseYear!=="") && (
                   <button
                     type="button"
-                    onClick={()=>{setQ("");setGameId("");setGroupId("");setType("");setReleaseYear("");applyPinnedOnly(false)}}
+                    onClick={()=>{setQ("");setGameId("");setGroupId("");setType("");setReleaseYear("")}}
                     className="h-10 shrink-0 cursor-pointer rounded-full px-3 text-sm font-semibold text-rose-500 transition hover:bg-danger-soft hover:text-rose-600 dark:hover:text-rose-300"
                   >
                     Clear filters
@@ -1416,6 +1448,41 @@ export default function Home() {
               </div>
             </div>
           </div>
+
+          {showPinnedRow && (
+            <section className="mb-8" aria-labelledby="pinned-ideas-heading">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={togglePinnedCollapsed}
+                  aria-expanded={!pinnedCollapsed}
+                  aria-controls="pinned-ideas-row"
+                  className="group flex min-h-10 cursor-pointer items-center gap-2 rounded-xl pr-2 text-left"
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300">
+                    <StarSolidIcon className="h-4 w-4" />
+                  </span>
+                  <h2 id="pinned-ideas-heading" className="text-lg font-bold text-fg">Pinned</h2>
+                  <span className="rounded-full bg-surface-sunken px-2 py-0.5 text-xs font-semibold tabular-nums text-fg-3">{pinnedIdeas.length}</span>
+                  <ChevronDownIcon className={`h-4 w-4 text-fg-4 transition group-hover:text-fg ${pinnedCollapsed ? "-rotate-90" : ""}`} />
+                </button>
+                {!pinnedCollapsed && pinnedIdeas.length > 1 && (
+                  <div className="hidden items-center gap-1 sm:flex">
+                    <Button variant="secondary" size="icon-sm" onClick={() => scrollPinned(-1)} aria-label="Scroll pinned ideas left"><ChevronLeftIcon className="h-4 w-4" /></Button>
+                    <Button variant="secondary" size="icon-sm" onClick={() => scrollPinned(1)} aria-label="Scroll pinned ideas right"><ChevronRightIcon className="h-4 w-4" /></Button>
+                  </div>
+                )}
+              </div>
+              {!pinnedCollapsed && (
+                <ul id="pinned-ideas-row" ref={pinnedRowRef} className="pinned-row animate-in fade-in duration-150">
+                  {pinnedIdeas.map((r) => (
+                    <IdeaItem key={`pinned-${r.id}`} r={r} game={games.find(g => g.id === r.game_id)} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={togglePin} onEditGame={setEditingGame} onQuickView={setPreviewIdea} />
+                  ))}
+                </ul>
+              )}
+              <h2 className="mt-8 text-lg font-bold text-fg">All ideas</h2>
+            </section>
+          )}
 
           {loading && currentIdeas.length === 0 ? (
             <IdeaGridSkeleton />
@@ -1429,7 +1496,7 @@ export default function Home() {
 
           {!loading && currentIdeas.length === 0 && (
             <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm font-medium text-fg-3 dark:border-slate-700">
-              {pinnedOnly && !q && !gameId && !type && releaseYear === "" && !activeGroup ? "No pinned ideas yet. Hover a card and press the star to pin it." : activeGroup ? "No ideas in this collection match your filters." : "No ideas match your filters."}
+              {activeGroup ? "No ideas in this collection match your filters." : "No ideas match your filters."}
             </div>
           )}
 
