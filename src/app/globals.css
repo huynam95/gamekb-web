@@ -264,9 +264,6 @@ html {
   background: #020617;
 }
 
-.projects-table {
-  display: none;
-}
 
 /* A short landscape viewport needs the entire editor to scroll, including its
    header, rather than reserving almost all its height for fixed controls. */
@@ -277,9 +274,9 @@ html {
   :root { --app-sticky-top: 8px; }
 }
 
-.project-cards {
+.project-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 21rem), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
   gap: 16px;
 }
 
@@ -315,12 +312,6 @@ html {
 
 @media (min-width: 1280px) {
   :root { --app-sidebar-width: 256px; }
-}
-
-/* Keep the full table only when its content area can fit all seven columns. */
-@media (min-width: 1640px) {
-  .projects-table { display: block; }
-  .project-cards, .project-card-selection { display: none; }
 }
 
 @media (min-width: 1680px) {

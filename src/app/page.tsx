@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { ACTIVE_VIDEO_THEME_STORAGE_KEY, DEFAULT_VIDEO_THEMES, VIDEO_THEMES_STORAGE_KEY, VIDEO_TOPICS_TABLE, getVideoThemeById, makeVideoThemeId, normalizeVideoTheme, parseVideoThemes, rowToVideoTheme, videoThemeToRow } from "@/lib/videoThemes";
 import type { VideoTheme } from "@/lib/videoThemes";
-import { PlayCircleIcon } from "@heroicons/react/24/solid";
-import { ArrowDownIcon, ArrowPathIcon, ArrowUpIcon, CalendarDaysIcon, CheckIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, FilmIcon, MagnifyingGlassIcon, PencilSquareIcon, PlusIcon, PuzzlePieceIcon, Squares2X2Icon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { PlayCircleIcon, StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
+import { ArrowDownIcon, ArrowPathIcon, ArrowUpIcon, CalendarDaysIcon, CheckIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, FilmIcon, MagnifyingGlassIcon, PencilSquareIcon, PlusIcon, PuzzlePieceIcon, Squares2X2Icon, StarIcon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppPageHeader, appPageMainClass, appPageRootClass } from "@/components/AppPage";
 import { GameEditorModal, IdeaItem, QuickViewModal, ScriptEditorModal } from "@/components/IdeaCards";
@@ -502,6 +502,8 @@ export default function Home() {
   const [groupId, setGroupId] = useState<number | "">("");
   const [type, setType] = useState<string | "">("");
   const [releaseYear, setReleaseYear] = useState<number | "" | "unknown">("");
+  const [pinnedOnly, setPinnedOnly] = useState(false);
+  const [pinnedCount, setPinnedCount] = useState<number | null>(null);
   const [selectedThemeId, setSelectedThemeId] = useState<string | "">("");
   const [videoThemes, setVideoThemes] = useState<VideoTheme[]>(DEFAULT_VIDEO_THEMES);
   const [themesLoaded, setThemesLoaded] = useState(false);
@@ -582,8 +584,10 @@ export default function Home() {
     Promise.all([
       supabase.from("games").select("*").order("title"),
       supabase.from("idea_groups").select("*").order("name"),
-      supabase.from("idea_group_items").select("group_id")
-    ]).then(([gs, grps, items]) => {
+      supabase.from("idea_group_items").select("group_id"),
+      supabase.from("details").select("id", { count: "exact", head: true }).eq("status", "idea").eq("pinned", true),
+    ]).then(([gs, grps, items, pinned]) => {
+      if (!pinned.error) setPinnedCount(pinned.count ?? 0);
       setGames((gs.data ?? []) as Game[]);
       setGroups((grps.data ?? []) as Group[]);
       const m = new Map<number, number>();
@@ -679,6 +683,7 @@ export default function Home() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    if (params.get("pinned") === "1") setPinnedOnly(true);
     const id = Number(params.get("longProject"));
     if (Number.isFinite(id) && id > 0) {
       setLongPickTarget({ id, title: params.get("longProjectTitle")?.trim() || "Long video project" });
@@ -699,7 +704,7 @@ export default function Home() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedQ, gameId, groupId, type, releaseYear, sortOrder]);
+  }, [debouncedQ, gameId, groupId, type, releaseYear, sortOrder, pinnedOnly]);
 
   useEffect(() => {
     let cancelled = false;
@@ -739,6 +744,7 @@ export default function Home() {
             nextQuery = nextQuery.in("game_id", yearGameIds.length > 0 ? yearGameIds : [-1]);
           }
           if (type) nextQuery = nextQuery.eq("detail_type", type);
+          if (pinnedOnly) nextQuery = nextQuery.eq("pinned", true);
           return applyIdeaTextSearch(nextQuery, debouncedQ, games);
         };
 
@@ -852,7 +858,29 @@ export default function Home() {
     }
     void load();
     return () => { cancelled = true; };
-  }, [debouncedQ, gameId, groupId, type, releaseYear, sortOrder, randomSeed, currentPage, games, groups, ideasRevision]);
+  }, [debouncedQ, gameId, groupId, type, releaseYear, sortOrder, pinnedOnly, randomSeed, currentPage, games, groups, ideasRevision]);
+
+  /** Switch the pinned-only view and keep it in the URL so it can be bookmarked. */
+  const applyPinnedOnly = (next: boolean) => {
+    setPinnedOnly(next);
+    const url = new URL(window.location.href);
+    if (next) url.searchParams.set("pinned", "1");
+    else url.searchParams.delete("pinned");
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  };
+
+  const togglePin = async (id: number, current: boolean) => {
+    setIdeas((prev) => prev.map((idea) => (idea.id === id ? { ...idea, pinned: !current } : idea)));
+    setPinnedCount((count) => (count === null ? count : Math.max(0, count + (current ? -1 : 1))));
+    const { error } = await supabase.from("details").update({ pinned: !current, pinned_at: current ? null : new Date().toISOString() }).eq("id", id);
+    if (error) {
+      setIdeas((prev) => prev.map((idea) => (idea.id === id ? { ...idea, pinned: current } : idea)));
+      setPinnedCount((count) => (count === null ? count : Math.max(0, count + (current ? 1 : -1))));
+      notifyError(error.message, "Could not update pin");
+      return;
+    }
+    if (pinnedOnly && current) setIdeasRevision((revision) => revision + 1);
+  };
 
   const toggleSelection = (idea: DetailRow) => {
     setSelectedIds(prev =>
@@ -1259,7 +1287,7 @@ export default function Home() {
       )}
 
       <AppSidebar
-        activePage="ideas"
+        activePage={pinnedOnly && !groupId ? "pinned" : "ideas"}
         groups={groups}
         groupCounts={groupCounts}
         selectedGroupId={groupId}
@@ -1272,15 +1300,17 @@ export default function Home() {
         onDeleteGroup={deleteGroup}
         onRenameGroup={renameGroup}
         onSelectGroup={setGroupId}
-        onSelectAllIdeas={() => { setGroupId(""); setQ(""); }}
+        onSelectAllIdeas={() => { setGroupId(""); setQ(""); applyPinnedOnly(false); }}
+        onSelectPinned={() => { setGroupId(""); applyPinnedOnly(true); }}
+        pinnedCount={pinnedCount}
       />
 
       <main className={`${appPageMainClass} pb-32`}>
         <div className="app-container library-container">
           <AppPageHeader
-            title={activeGroup?.name || "All Ideas"}
-            description={activeGroup ? "Remove ideas that don't fit this collection. They stay in All Ideas." : isLongProjectPickMode ? `Browse and select ideas for ${longProjectTitle}.` : "Choose a topic, search your library, and build the next video from the ideas you already have."}
-            icon={<Squares2X2Icon className="h-5 w-5" />}
+            title={pinnedOnly ? (activeGroup ? `${activeGroup.name} · Pinned` : "Pinned Ideas") : activeGroup?.name || "All Ideas"}
+            description={pinnedOnly ? "Ideas you starred. Unpin a card to take it off this list; it stays in your library." : activeGroup ? "Remove ideas that don't fit this collection. They stay in All Ideas." : isLongProjectPickMode ? `Browse and select ideas for ${longProjectTitle}.` : "Choose a topic, search your library, and build the next video from the ideas you already have."}
+            icon={pinnedOnly ? <StarSolidIcon className="h-5 w-5 text-amber-500" /> : <Squares2X2Icon className="h-5 w-5" />}
             className="mb-4"
             action={
               <span className="inline-flex h-9 items-center rounded-full bg-surface-sunken px-3.5 text-sm font-semibold tabular-nums text-fg-2" aria-live="polite">
@@ -1347,7 +1377,7 @@ export default function Home() {
               <div className="library-type">
                 <TypeFilterDropdown value={type} onChange={setType} />
               </div>
-              <div className="library-sort flex min-w-0 items-center justify-between gap-2">
+              <div className="library-sort flex min-w-0 flex-wrap items-center gap-2">
                 <SortToggle
                   value={sortOrder}
                   onChange={(nextSort) => {
@@ -1360,10 +1390,24 @@ export default function Home() {
                     setSortOrder(nextSort);
                   }}
                 />
-                {(q||gameId||groupId||type||releaseYear!=="") && (
+                <button
+                  type="button"
+                  onClick={() => applyPinnedOnly(!pinnedOnly)}
+                  aria-pressed={pinnedOnly}
+                  title={pinnedOnly ? "Show all ideas" : "Show pinned ideas only"}
+                  className={`inline-flex h-10 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3.5 text-sm font-semibold shadow-sm transition active:scale-[0.98] ${
+                    pinnedOnly
+                      ? "border-amber-300 bg-amber-100 text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-200"
+                      : "border-line bg-surface text-fg-3 hover:border-line-strong hover:bg-surface-hover hover:text-fg"
+                  }`}
+                >
+                  {pinnedOnly ? <StarSolidIcon className="h-4 w-4 text-amber-500" /> : <StarIcon className="h-4 w-4" />}
+                  Pinned
+                </button>
+                {(q||gameId||groupId||type||releaseYear!==""||pinnedOnly) && (
                   <button
                     type="button"
-                    onClick={()=>{setQ("");setGameId("");setGroupId("");setType("");setReleaseYear("")}}
+                    onClick={()=>{setQ("");setGameId("");setGroupId("");setType("");setReleaseYear("");applyPinnedOnly(false)}}
                     className="h-10 shrink-0 cursor-pointer rounded-full px-3 text-sm font-semibold text-rose-500 transition hover:bg-danger-soft hover:text-rose-600 dark:hover:text-rose-300"
                   >
                     Clear filters
@@ -1378,14 +1422,14 @@ export default function Home() {
           ) : (
             <ul className={`idea-grid transition-opacity duration-150 ${loading ? "opacity-60" : ""}`} aria-busy={loading}>
               {currentIdeas.map(r => (
-                 <IdeaItem key={r.id} r={r} game={games.find(g => g.id === r.game_id)} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={async (id, current) => { setIdeas(prev => prev.map(i => i.id === id ? { ...i, pinned: !current } : i)); await supabase.from("details").update({ pinned: !current }).eq("id", id); }} onEditGame={setEditingGame} onQuickView={setPreviewIdea} onRemoveFromGroup={groupId && loadedGroupId === groupId ? removeIdeaFromGroup : undefined} groupName={activeGroup?.name} removingFromGroup={removingGroupItems.has(`${groupId}:${r.id}`)} />
+                 <IdeaItem key={r.id} r={r} game={games.find(g => g.id === r.game_id)} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={togglePin} onEditGame={setEditingGame} onQuickView={setPreviewIdea} onRemoveFromGroup={groupId && loadedGroupId === groupId ? removeIdeaFromGroup : undefined} groupName={activeGroup?.name} removingFromGroup={removingGroupItems.has(`${groupId}:${r.id}`)} />
               ))}
             </ul>
           )}
 
           {!loading && currentIdeas.length === 0 && (
             <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm font-medium text-fg-3 dark:border-slate-700">
-              {activeGroup ? "No ideas in this collection match your filters." : "No ideas match your filters."}
+              {pinnedOnly && !q && !gameId && !type && releaseYear === "" && !activeGroup ? "No pinned ideas yet. Hover a card and press the star to pin it." : activeGroup ? "No ideas in this collection match your filters." : "No ideas match your filters."}
             </div>
           )}
 

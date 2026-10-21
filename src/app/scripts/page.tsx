@@ -1,8 +1,11 @@
 "use client";
 
 import { Modal } from "@/components/ui/Modal";
+import { Button } from "@/components/ui/Button";
+import { Dropdown, type DropdownOption } from "@/components/ui/Dropdown";
+import { useDismiss } from "@/components/ui/useDismiss";
 import { getTopicVisual as getSharedTopicVisual } from "@/lib/topicVisuals";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppPageHeader, appPageMainClass, appPageRootClass } from "@/components/AppPage";
@@ -29,6 +32,7 @@ import {
   Bars3Icon,
   ArrowPathIcon,
   PlusIcon,
+  ChevronDownIcon,
 } from "@heroicons/react/24/outline";
 
 /* ================= TYPES & CONFIG ================= */
@@ -751,7 +755,9 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh, topics,
 export default function ScriptsPage() {
   const { success, error: notifyError, confirm } = useNotifications();
   const [scripts, setScripts] = useState<ScriptProject[]>([]);
-  const [filteredScripts, setFilteredScripts] = useState<ScriptProject[]>([]);
+  const [loadingScripts, setLoadingScripts] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<"All" | (typeof PROJECT_STATUSES)[number]>("All");
+  const [topicFilter, setTopicFilter] = useState<string>(ALL_TOPICS);
   const [searchQuery, setSearchQuery] = useState("");
   const [editingScript, setEditingScript] = useState<ScriptProject | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -767,14 +773,19 @@ export default function ScriptsPage() {
       const { data: sData } = await supabase.from("scripts").select("*").order("created_at", { ascending: false });
       const enrichedScripts = await enrichScriptsWithFootageChannels((sData || []) as ScriptProject[]);
       setScripts(enrichedScripts);
-      setFilteredScripts(enrichedScripts);
+      setLoadingScripts(false);
     }
     load();
   }, []);
 
-  useEffect(() => {
+  const filteredScripts = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    const result = scripts.filter((script) => {
+    return scripts.filter((script) => {
+      if (statusFilter !== "All" && (script.status || "Draft") !== statusFilter) return false;
+      const topicValue = getScriptTopicValue(script);
+      if (topicFilter === NO_TOPIC && topicValue) return false;
+      if (topicFilter !== ALL_TOPICS && topicFilter !== NO_TOPIC && topicValue !== topicFilter) return false;
+      if (!query) return true;
       const topic = getScriptTopic(script).toLowerCase();
       const channels = getScriptChannels(script).join(" ").toLowerCase();
       return (
@@ -784,8 +795,7 @@ export default function ScriptsPage() {
         channels.includes(query)
       );
     });
-    setFilteredScripts(result);
-  }, [searchQuery, scripts]);
+  }, [searchQuery, scripts, statusFilter, topicFilter]);
 
   const visibleIds = useMemo(() => filteredScripts.map((script) => script.id), [filteredScripts]);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
@@ -917,216 +927,262 @@ export default function ScriptsPage() {
     success("Selected projects deleted.", "Deleted");
   };
 
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = { All: scripts.length };
+    for (const status of PROJECT_STATUSES) counts[status] = 0;
+    for (const script of scripts) counts[script.status || "Draft"] = (counts[script.status || "Draft"] ?? 0) + 1;
+    return counts;
+  }, [scripts]);
+
+  const topicOptions = useMemo<DropdownOption<string>[]>(() => {
+    const titles = Array.from(new Set([
+      ...topics.map((topic) => topic.title.trim()).filter(Boolean),
+      ...scripts.map((script) => getScriptTopicValue(script)).filter(Boolean),
+    ]));
+    return [
+      { value: ALL_TOPICS, label: "All topics", Icon: Squares2X2Icon },
+      { value: NO_TOPIC, label: "No topic" },
+      ...titles.map((title) => ({ value: title, label: title, Icon: getTopicVisual(title).Icon })),
+    ];
+  }, [topics, scripts]);
+
+  const changeProjectStatus = async (script: ScriptProject, status: ScriptProject["status"]) => {
+    if ((script.status || "Draft") === status) return;
+    const previous = script.status;
+    setScripts((current) => current.map((item) => (item.id === script.id ? { ...item, status } : item)));
+    const { error } = await supabase.from("scripts").update({ status }).eq("id", script.id);
+    if (error) {
+      setScripts((current) => current.map((item) => (item.id === script.id ? { ...item, status: previous } : item)));
+      notifyError(error.message, "Could not change status");
+    }
+  };
+
+  const hasFilters = Boolean(searchQuery.trim()) || statusFilter !== "All" || topicFilter !== ALL_TOPICS;
+
   return (
     <div className={`${appPageRootClass} xl:flex`}>
       <ScriptEditorModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} script={editingScript} onSave={handleUpdate} onRefresh={refreshScriptProject} topics={topics} topicsLoading={topicsLoading} topicsError={topicsError} onRetryTopics={retryTopics} />
 
       <AppSidebar activePage="scripts" />
 
-      <main className={appPageMainClass}>
+      <main className={`${appPageMainClass} pb-32`}>
         <div className="app-container">
           <AppPageHeader
             title="Short Projects"
-            description="Organize scripts, source channels, assets, topics, and production status in one place."
+            description="Track every short from draft to published: topic, source channels, footage and status in one place."
             icon={<DocumentTextIcon className="h-5 w-5" />}
-            action={<button type="button" disabled={creatingProject} onClick={() => void createProject()} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"><PlusIcon className="h-5 w-5" />{creatingProject ? "Creating..." : "New Project"}</button>}
+            className="mb-4"
+            action={
+              <Button variant="accent" disabled={creatingProject} onClick={() => void createProject()}>
+                <PlusIcon className="h-5 w-5" />
+                {creatingProject ? "Creating..." : "New project"}
+              </Button>
+            }
           />
-          {topicsError && <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 text-sm text-rose-600"><span>{topicsError}</span><button type="button" onClick={retryTopics} className="min-h-11 cursor-pointer font-bold underline">Retry topics</button></div>}
-          <div className="mb-6 flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-            <div className="relative w-full max-w-2xl">
-              <MagnifyingGlassIcon className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-900 sm:left-6 sm:h-6 sm:w-6 dark:text-slate-200" />
+
+          {topicsError && (
+            <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl bg-danger-soft px-4 py-2 text-sm text-rose-600 dark:text-rose-300">
+              <span>{topicsError}</span>
+              <button type="button" onClick={retryTopics} className="min-h-9 cursor-pointer font-semibold underline">Retry topics</button>
+            </div>
+          )}
+
+          <div className="mb-4 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Filter by status">
+            {(["All", ...PROJECT_STATUSES] as const).map((status) => {
+              const active = statusFilter === status;
+              return (
+                <button
+                  key={status}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setStatusFilter(status)}
+                  className={`inline-flex h-10 shrink-0 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm font-semibold transition active:scale-[0.98] ${
+                    active
+                      ? "border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-950"
+                      : "border-line bg-surface text-fg-2 hover:border-line-strong hover:bg-surface-hover"
+                  }`}
+                >
+                  {status !== "All" && <span className={`h-2 w-2 rounded-full ${STATUS_META[status].dot}`} aria-hidden="true" />}
+                  {status === "All" ? "All projects" : status}
+                  <span className={`rounded-full px-1.5 text-xs tabular-nums ${active ? "bg-white/15 dark:bg-slate-950/10" : "bg-surface-sunken text-fg-3"}`}>
+                    {statusCounts[status] ?? 0}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mb-6 grid gap-2 rounded-3xl border border-line bg-surface p-2.5 shadow-sm sm:grid-cols-[minmax(0,1fr)_minmax(0,16rem)]">
+            <div className="relative min-w-0">
+              <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-fg-4" />
               <input
-                className="h-12 w-full rounded-[1.25rem] border-2 border-slate-200 bg-white pl-12 pr-4 text-base font-bold shadow-sm outline-none transition-all focus:border-slate-900 sm:h-16 sm:rounded-[1.5rem] sm:pl-16 sm:pr-12 sm:text-lg dark:border-slate-800 dark:bg-slate-900 dark:text-slate-50 dark:focus:border-blue-500"
-                placeholder="Search projects, topics, channels..."
+                className="h-10 w-full rounded-full border border-line bg-surface px-11 text-sm font-medium text-fg shadow-sm outline-none transition placeholder:text-fg-4 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10"
+                placeholder="Search titles, summaries, topics, channels..."
+                aria-label="Search projects"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
               />
+              {searchQuery && (
+                <button type="button" onClick={() => setSearchQuery("")} className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-fg-4 transition hover:bg-surface-sunken hover:text-fg" aria-label="Clear search">
+                  <XMarkIcon className="h-4 w-4" />
+                </button>
+              )}
             </div>
+            <Dropdown value={topicFilter} options={topicOptions} onChange={setTopicFilter} heading="Topic" ariaLabel="Filter by topic" />
+          </div>
 
-            {selectedIds.length > 0 && (
-              <div className="flex items-center gap-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 shadow-sm dark:border-blue-900/60 dark:bg-blue-950/40">
-                <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">{selectedIds.length} selected</span>
-                <button
-                  onClick={() => setSelectedIds([])}
-                  className="flex cursor-pointer items-center gap-1 rounded-xl px-3 py-2 text-xs font-medium text-slate-500 transition hover:bg-white dark:text-slate-300 dark:hover:bg-slate-900"
-                  type="button"
-                >
-                  <XMarkIcon className="h-4 w-4" /> Clear
-                </button>
-                <button
-                  onClick={handleBulkDelete}
-                  className="flex cursor-pointer items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-700 active:scale-[0.98]"
-                  type="button"
-                >
-                  <TrashIcon className="h-4 w-4" /> Delete Selected
-                </button>
+          {loadingScripts ? (
+            <div className="project-grid" aria-hidden="true">
+              {Array.from({ length: 6 }, (_, index) => (
+                <div key={index} className="h-56 animate-pulse rounded-3xl border border-line bg-surface-sunken" />
+              ))}
+            </div>
+          ) : filteredScripts.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-line-strong px-6 py-16 text-center">
+              <DocumentTextIcon className="mx-auto h-10 w-10 text-fg-4" aria-hidden="true" />
+              <p className="mt-3 text-base font-semibold text-fg">{scripts.length === 0 ? "No short projects yet" : "No projects match these filters"}</p>
+              <p className="mt-1 text-sm text-fg-3">
+                {scripts.length === 0 ? "Pick ideas on All Ideas and press Create Script, or start an empty project." : "Try another status, topic or search."}
+              </p>
+              <div className="mt-5 flex flex-wrap justify-center gap-2">
+                {hasFilters && <Button variant="secondary" size="sm" onClick={() => { setSearchQuery(""); setStatusFilter("All"); setTopicFilter(ALL_TOPICS); }}>Clear filters</Button>}
+                <Button variant="accent" size="sm" disabled={creatingProject} onClick={() => void createProject()}><PlusIcon className="h-4 w-4" /> New project</Button>
               </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <ul className="project-grid">
+              {filteredScripts.map((script) => {
+                const channels = getScriptChannels(script);
+                const status = (script.status || "Draft") as ScriptProject["status"];
+                const selected = selectedIds.includes(script.id);
+                const topic = getScriptTopic(script);
+                const topicVisual = getTopicVisual(topic);
+                const clipCount = analyzeAssetLinks(script.assets || []).uniqueLinkCount;
+                return (
+                  <li
+                    key={script.id}
+                    className={`group relative flex min-w-0 flex-col rounded-3xl border bg-surface p-4 shadow-sm transition hover:shadow-md ${selected ? "border-blue-400 ring-2 ring-blue-500/30" : "border-line hover:border-line-strong"}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="relative shrink-0">
+                        <span className={`flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br shadow-sm ${topicVisual.gradientClass}`} aria-hidden="true">
+                          <topicVisual.Icon className="h-5 w-5" />
+                        </span>
+                        <label className={`absolute -left-1.5 -top-1.5 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full border bg-surface shadow-sm transition ${selected || selectedIds.length > 0 ? "opacity-100" : "touch-reveal opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"} ${selected ? "border-blue-500" : "border-line-strong"}`}>
+                          <input type="checkbox" checked={selected} onChange={() => toggleSelected(script.id)} aria-label={`Select ${script.title}`} className="h-3.5 w-3.5 cursor-pointer accent-blue-600" />
+                        </label>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <button type="button" onClick={() => openProject(script)} className="block w-full cursor-pointer text-left">
+                          <h2 className="line-clamp-2 break-words text-base font-semibold leading-snug text-fg group-hover:text-accent">{script.title || "Untitled project"}</h2>
+                        </button>
+                        <p className="mt-1 text-xs text-fg-4">{new Date(script.created_at).toLocaleDateString("vi-VN")}</p>
+                      </div>
+                      <StatusMenu value={status} onChange={(next) => void changeProjectStatus(script, next)} label={script.title} />
+                    </div>
 
-          <label className="project-card-selection mb-4 flex min-h-11 w-fit cursor-pointer items-center gap-3 text-sm font-bold">
-            <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAllVisible} className="h-5 w-5 accent-blue-600" />
-            Select all visible projects
-          </label>
-          <div className="project-cards">
-            {filteredScripts.map((script) => {
-              const channels = getScriptChannels(script);
-              const status = script.status || "Draft";
-              const selected = selectedIds.includes(script.id);
-              return (
-                <article key={script.id} className={`flex min-w-0 flex-col rounded-2xl border p-4 shadow-sm ${selected ? "border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-950/30" : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"}`}>
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                    <label className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-medium text-fg-3">
-                      <input type="checkbox" checked={selected} onChange={() => toggleSelected(script.id)} aria-label={`Select ${script.title}`} className="h-5 w-5 accent-blue-600" />
-                      {new Date(script.created_at).toLocaleDateString("vi-VN")}
-                    </label>
-                    <span className={`rounded-xl border px-3 py-2 text-[11px] font-semibold uppercase tracking-wider ${STATUS_STYLE[status] || STATUS_STYLE.Draft}`}>{status}</span>
-                  </div>
-                  <button type="button" onClick={() => openProject(script)} className="min-w-0 cursor-pointer text-left">
-                    <h2 className="break-words text-lg font-bold text-slate-900 dark:text-white">{script.title}</h2>
-                  </button>
-                  <div className="mt-3"><ProjectTopicSelect label="Topic" ariaLabel={`Topic for ${script.title}`} value={getScriptTopicValue(script)} topics={topics} loading={topicsLoading} saving={savingTopicIds.has(script.id)} onChange={(topic) => void changeProjectTopic(script, topic)} /></div>
-                  <p className="mt-2 break-words text-xs font-medium text-fg-3">{channels.join(" · ") || "Unknown channel"}</p>
-                  <p className="mt-3 line-clamp-3 break-words text-sm leading-6 text-fg-3">{getScriptSummary(script)}</p>
-                  <div className="mt-auto flex items-center justify-end gap-2 pt-4">
-                    <button type="button" onClick={() => openProject(script)} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-bold dark:border-slate-700"><PencilSquareIcon className="h-4 w-4" /> Open</button>
-                    <button type="button" onClick={() => handleDelete(script.id)} aria-label={`Delete ${script.title}`} className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border border-slate-200 text-rose-500 dark:border-slate-700"><TrashIcon className="h-4 w-4" /></button>
-                  </div>
-                </article>
-              );
-            })}
-            {filteredScripts.length === 0 && <p className="col-span-full py-16 text-center font-bold text-fg-3">No video projects found. Try another search or create a new project from selected ideas.</p>}
-          </div>
+                    <p className="mt-3 line-clamp-2 break-words text-sm leading-6 text-fg-3">{getScriptSummary(script)}</p>
 
-          <div className="projects-table overflow-x-auto rounded-[1.75rem] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <table className="min-w-[1280px] table-fixed border-collapse text-left xl:w-full">
-              <thead className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/70">
-                <tr>
-                  <th className="w-[5%] px-3 py-7 text-center">
-                    <input
-                      type="checkbox"
-                      aria-label="Select all visible projects"
-                      checked={allVisibleSelected}
-                      onChange={toggleSelectAllVisible}
-                      className="h-5 w-5 cursor-pointer rounded border-line-strong accent-blue-600"
-                    />
-                  </th>
-                  <th className="w-[25%] px-4 py-7 text-[11px] font-semibold uppercase tracking-wider text-fg-3">Project</th>
-                  <th className="w-[20%] px-4 py-7 text-[11px] font-semibold uppercase tracking-wider text-fg-3">Topic</th>
-                  <th className="w-[17%] px-4 py-7 text-[11px] font-semibold uppercase tracking-wider text-fg-3">Channel</th>
-                  <th className="w-[10%] px-4 py-7 text-center text-[11px] font-semibold uppercase tracking-wider text-fg-3">Status</th>
-                  <th className="w-[10%] px-4 py-7 text-[11px] font-semibold uppercase tracking-wider text-fg-3">Summary</th>
-                  <th className="w-[13%] px-3 py-7 text-right text-[11px] font-semibold uppercase tracking-wider text-fg-3">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {filteredScripts.map((script) => {
-                  const topic = getScriptTopic(script);
-                  const topicVisual = getTopicVisual(topic);
-                  const summary = getScriptSummary(script);
-                  const channels = getScriptChannels(script);
-                  const selected = selectedIds.includes(script.id);
-                  const status = script.status || "Draft";
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs font-medium">
+                      <span className={`inline-flex min-w-0 max-w-full items-center gap-1 rounded-lg px-2 py-1 ${channels.length > 0 ? "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-200" : "bg-surface-sunken text-fg-4"}`} title={channels.join(" · ") || "No source channel saved"}>
+                        <VideoCameraIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        <span className="truncate">{channels[0] || "No channel"}</span>
+                        {channels.length > 1 && <span className="shrink-0 opacity-70">+{channels.length - 1}</span>}
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-surface-sunken px-2 py-1 text-fg-3">
+                        <LinkIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                        {clipCount} {clipCount === 1 ? "clip" : "clips"}
+                      </span>
+                    </div>
 
-                  return (
-                    <tr
-                      key={script.id}
-                      className={`group cursor-pointer transition-all ${selected ? "bg-blue-50/70 dark:bg-blue-950/30" : "hover:bg-slate-50/80 dark:hover:bg-slate-900/70"}`}
-                      onClick={() => {
-                        openProject(script);
-                      }}
-                    >
-                      <td className="px-3 py-9 text-center">
-                        <input
-                          type="checkbox"
-                          aria-label={`Select ${script.title}`}
-                          checked={selected}
-                          onClick={(event) => event.stopPropagation()}
-                          onChange={() => toggleSelected(script.id)}
-                          className="h-5 w-5 cursor-pointer rounded border-line-strong accent-blue-600"
-                        />
-                      </td>
-                      <td className="px-4 py-9">
-                        <div className="flex items-center gap-3 lg:gap-5">
-                          <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-2xl shadow-lg shadow-slate-200 transition-transform group-hover:scale-[1.03] dark:shadow-black/30 ${topicVisual.gradientClass}`}>
-                            <topicVisual.Icon className="h-7 w-7" aria-hidden="true" />
-                          </div>
-                          <div className="min-w-0 flex-1 overflow-hidden">
-                            <p title={script.title} className="block max-w-full truncate whitespace-nowrap text-base font-bold uppercase tracking-tight text-slate-900 dark:text-slate-50">{script.title}</p>
-                            <p className="mt-1 text-[11px] font-semibold uppercase text-fg-4">{new Date(script.created_at).toLocaleDateString("vi-VN")}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-9">
-                        <ProjectTopicSelect ariaLabel={`Topic for ${script.title}`} value={getScriptTopicValue(script)} topics={topics} loading={topicsLoading} saving={savingTopicIds.has(script.id)} onChange={(topic) => void changeProjectTopic(script, topic)} />
-                      </td>
-                      <td className="px-4 py-9">
-                        <div
-                          title={channels.length > 0 ? channels.join(" · ") : "No source channel saved"}
-                          className={`flex h-16 w-full items-center gap-3 rounded-[1.35rem] border px-4 shadow-sm ${
-                            channels.length > 0
-                              ? "border-rose-100 bg-rose-50 text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-100"
-                              : "border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500"
-                          }`}
-                        >
-                          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${channels.length > 0 ? "bg-rose-600 text-white" : "bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400"}`} aria-hidden="true">
-                            <VideoCameraIcon className="h-5 w-5" />
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate whitespace-nowrap text-sm font-semibold">{channels[0] || "Unknown channel"}</p>
-                            {channels.length > 1 && (
-                              <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide opacity-65">+{channels.length - 1} more</p>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-9 text-center">
-                        <span className={`rounded-xl border px-4 py-2 text-[11px] font-semibold uppercase tracking-wider shadow-sm ${STATUS_STYLE[status] || STATUS_STYLE.Draft}`}>{status}</span>
-                      </td>
-                      <td className="px-4 py-9 text-sm font-bold italic leading-relaxed text-slate-700 dark:text-slate-300">
-                        <p className="line-clamp-2 pr-6">{summary}</p>
-                      </td>
-                      <td className="px-3 py-9 text-right">
-                        <div className="touch-reveal flex items-center justify-end gap-3 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                          <button
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              openProject(script);
-                            }}
-                            className="cursor-pointer rounded-xl border-2 border-slate-100 bg-white p-3 text-slate-900 shadow-sm transition-all hover:bg-slate-900 hover:text-white dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-blue-600"
-                            type="button"
-                          >
-                            <PencilSquareIcon className="h-5 w-5" />
-                          </button>
-                          <button
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleDelete(script.id);
-                            }}
-                            className="cursor-pointer rounded-xl border-2 border-slate-100 bg-white p-3 text-fg-4 shadow-sm transition-all hover:text-rose-600 dark:border-slate-800 dark:bg-slate-950 dark:hover:text-rose-400"
-                            type="button"
-                          >
-                            <TrashIcon className="h-5 w-5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-
-                {filteredScripts.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-10 py-20 text-center">
-                      <p className="text-lg font-bold text-slate-500 dark:text-slate-400">No video projects found.</p>
-                      <p className="mt-2 text-sm font-medium text-fg-4">Try another search or create a new project from selected ideas.</p>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                    <div className="mt-auto flex items-end gap-2 pt-4">
+                      <div className="min-w-0 flex-1">
+                        <ProjectTopicSelect ariaLabel={`Topic for ${script.title}`} value={getScriptTopicValue(script)} topics={topics} loading={topicsLoading} saving={savingTopicIds.has(script.id)} onChange={(nextTopic) => void changeProjectTopic(script, nextTopic)} />
+                      </div>
+                      <Button variant="secondary" size="icon" onClick={() => openProject(script)} aria-label={`Open ${script.title}`} title="Open project">
+                        <PencilSquareIcon className="h-4 w-4" />
+                      </Button>
+                      <Button variant="secondary" size="icon" onClick={() => void handleDelete(script.id)} aria-label={`Delete ${script.title}`} title="Delete project" className="text-rose-500 hover:text-rose-600">
+                        <TrashIcon className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       </main>
+
+      {selectedIds.length > 0 && (
+        <div className="app-selection-bar fixed inset-x-0 bottom-0 z-[80] border-t border-line bg-surface/95 p-4 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] backdrop-blur animate-in fade-in slide-in-from-bottom-2 duration-150">
+          <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 min-w-9 items-center justify-center rounded-full bg-blue-600 px-2 text-sm font-semibold text-white">{selectedIds.length}</span>
+              <p className="text-sm font-semibold text-fg">project{selectedIds.length === 1 ? "" : "s"} selected</p>
+            </div>
+            <div className="selection-actions">
+              <Button variant="ghost" size="md" onClick={toggleSelectAllVisible}>{allVisibleSelected ? "Unselect visible" : "Select all visible"}</Button>
+              <Button variant="secondary" size="md" onClick={() => setSelectedIds([])}><XMarkIcon className="h-4 w-4" /> Clear</Button>
+              <Button size="md" onClick={() => void handleBulkDelete()} className="bg-rose-600 text-white hover:bg-rose-700"><TrashIcon className="h-4 w-4" /> Delete selected</Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const PROJECT_STATUSES = ["Draft", "Filming", "Edited", "Published"] as const;
+const ALL_TOPICS = "__all__";
+const NO_TOPIC = "__none__";
+
+const STATUS_META: Record<(typeof PROJECT_STATUSES)[number], { dot: string; pill: string }> = {
+  Draft: { dot: "bg-slate-400", pill: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
+  Filming: { dot: "bg-amber-500", pill: "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300" },
+  Edited: { dot: "bg-indigo-500", pill: "bg-indigo-100 text-indigo-800 dark:bg-indigo-500/15 dark:text-indigo-300" },
+  Published: { dot: "bg-emerald-500", pill: "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300" },
+};
+
+function StatusMenu({ value, onChange, label }: { value: ScriptProject["status"]; onChange: (status: ScriptProject["status"]) => void; label: string }) {
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(boxRef, open, close);
+  const meta = STATUS_META[value] ?? STATUS_META.Draft;
+
+  return (
+    <div ref={boxRef} className={`relative shrink-0 ${open ? "z-20" : ""}`}>
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={`Status for ${label}: ${value}. Change status`}
+        className={`inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full pl-2.5 pr-2 text-xs font-semibold transition hover:brightness-95 ${meta.pill}`}
+      >
+        <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} aria-hidden="true" />
+        {value}
+        <ChevronDownIcon className={`h-3.5 w-3.5 transition ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1.5 w-40 rounded-2xl border border-line bg-surface p-1.5 shadow-2xl ring-1 ring-black/5 animate-in fade-in slide-in-from-top-1 duration-150 dark:ring-white/10" role="listbox" aria-label="Project status">
+          {PROJECT_STATUSES.map((status) => (
+            <button
+              key={status}
+              type="button"
+              role="option"
+              aria-selected={status === value}
+              onClick={() => { onChange(status); setOpen(false); }}
+              className={`flex h-9 w-full cursor-pointer items-center justify-between rounded-xl px-2.5 text-left text-sm font-medium transition ${status === value ? "bg-surface-sunken text-fg" : "text-fg-2 hover:bg-surface-sunken"}`}
+            >
+              <span className="flex items-center gap-2"><span className={`h-2 w-2 rounded-full ${STATUS_META[status].dot}`} aria-hidden="true" />{status}</span>
+              {status === value && <CheckIcon className="h-4 w-4" />}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

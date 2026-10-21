@@ -6,7 +6,6 @@ import {
   Bars3Icon,
   ChartBarIcon,
   ChatBubbleLeftRightIcon,
-  CheckCircleIcon,
   CheckIcon,
   DocumentTextIcon,
   FilmIcon,
@@ -15,6 +14,7 @@ import {
   PlusIcon,
   PuzzlePieceIcon,
   Squares2X2Icon,
+  StarIcon,
   TrashIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
@@ -22,7 +22,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useDismiss } from "@/components/ui/useDismiss";
 import type { Group } from "@/types/gamekb";
 
-type ActivePage = "ideas" | "dashboard" | "scripts" | "audienceRequests" | "longVideos" | "addGame" | "addIdea" | "dailyGoal" | "migrate";
+type ActivePage = "ideas" | "pinned" | "dashboard" | "scripts" | "audienceRequests" | "longVideos" | "addGame" | "addIdea" | "migrate";
 
 type AppSidebarProps = {
   activePage: ActivePage;
@@ -39,6 +39,9 @@ type AppSidebarProps = {
   onRenameGroup?: (id: number, name: string) => void | Promise<void>;
   onSelectGroup?: (id: number) => void;
   onSelectAllIdeas?: () => void;
+  /** On the ideas page, switch to the pinned view without a page load. */
+  onSelectPinned?: () => void;
+  pinnedCount?: number | null;
   showThemeToggle?: boolean;
 };
 
@@ -46,8 +49,8 @@ type NavIconType = ComponentType<SVGProps<SVGSVGElement>>;
 
 const navItems: Array<{ key: ActivePage; href: string; Icon: NavIconType; label: string }> = [
   { key: "ideas", href: "/", Icon: Squares2X2Icon, label: "All Ideas" },
+  { key: "pinned", href: "/?pinned=1", Icon: StarIcon, label: "Pinned" },
   { key: "dashboard", href: "/dashboard", Icon: ChartBarIcon, label: "Dashboard" },
-  { key: "dailyGoal", href: "/daily-goal", Icon: CheckCircleIcon, label: "Daily To-Do" },
   { key: "addIdea", href: "/add", Icon: LightBulbIcon, label: "Add Idea" },
   { key: "addGame", href: "/games/new", Icon: PuzzlePieceIcon, label: "Add Game" },
   { key: "scripts", href: "/scripts", Icon: DocumentTextIcon, label: "Short Projects" },
@@ -62,7 +65,7 @@ function navClass(active: boolean, compact: boolean) {
   const state = active
     ? `bg-slate-900 text-white shadow-sm dark:bg-white dark:text-slate-950 ${compact ? "border-slate-900 dark:border-white" : ""}`
     : `text-fg-3 hover:bg-surface-sunken hover:text-fg ${compact ? "border-line bg-surface" : ""}`;
-  return `flex w-full min-w-0 cursor-pointer items-center gap-3 font-semibold transition ${shape} ${state}`;
+  return `flex w-full min-w-0 cursor-pointer items-center gap-3 text-left font-semibold transition ${shape} ${state}`;
 }
 
 function Logo({ className = "" }: { className?: string }) {
@@ -88,6 +91,8 @@ export function AppSidebar({
   onRenameGroup,
   onSelectGroup,
   onSelectAllIdeas,
+  onSelectPinned,
+  pinnedCount = null,
   showThemeToggle = true,
 }: AppSidebarProps) {
   const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
@@ -120,19 +125,25 @@ export function AppSidebar({
 
   const renderNavItem = (item: (typeof navItems)[number], compact = false) => {
     const isIdeasWithGroup = item.key === "ideas" && Boolean(onSelectAllIdeas);
+    const isPinnedInPage = item.key === "pinned" && Boolean(onSelectPinned);
     const active = activePage === item.key && (!isIdeasWithGroup || !selectedGroupId);
     const content = (
       <>
         <item.Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-        <span className="min-w-0 truncate leading-tight">{item.label}</span>
+        <span className="min-w-0 flex-1 truncate leading-tight">{item.label}</span>
+        {item.key === "pinned" && typeof pinnedCount === "number" && (
+          <span className={`ml-auto shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums ${active ? "bg-white/15 dark:bg-slate-950/10" : "bg-surface-sunken text-fg-3"}`}>
+            {pinnedCount}
+          </span>
+        )}
       </>
     );
 
-    if (isIdeasWithGroup) {
+    if (isIdeasWithGroup || isPinnedInPage) {
       return (
         <button
           key={item.key}
-          onClick={() => { onSelectAllIdeas?.(); setMenuOpen(false); }}
+          onClick={() => { (isPinnedInPage ? onSelectPinned : onSelectAllIdeas)?.(); setMenuOpen(false); }}
           aria-current={active ? "page" : undefined}
           className={navClass(active, compact)}
           type="button"

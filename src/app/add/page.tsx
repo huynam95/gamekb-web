@@ -1,14 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentType, SVGProps } from "react";
-import { CheckIcon, ChevronDownIcon, CloudArrowDownIcon, CubeTransparentIcon, ExclamationTriangleIcon, FaceSmileIcon, FilmIcon, FolderOpenIcon, MagnifyingGlassIcon, SparklesIcon, UserGroupIcon } from "@heroicons/react/24/outline";
+import { ArrowPathIcon, ArrowTopRightOnSquareIcon, ChatBubbleLeftRightIcon, CheckIcon, ChevronDownIcon, CloudArrowDownIcon, CubeTransparentIcon, ExclamationTriangleIcon, FaceSmileIcon, FilmIcon, FolderIcon, GlobeAltIcon, LightBulbIcon, MagnifyingGlassIcon, PlusIcon, PuzzlePieceIcon, SparklesIcon, UserGroupIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchYoutubeMetadata } from "@/lib/youtube";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppPageHeader, appPageMainClass, appPageRootClass } from "@/components/AppPage";
 import { useNotifications } from "@/components/NotificationCenter";
 import { normalizeGameTitle } from "@/lib/gameTitles";
+import { CoverBackdrop } from "@/components/CoverBackdrop";
+import { TypeLabel, TypePill } from "@/components/TypePill";
+import { Button } from "@/components/ui/Button";
+import { Field, FieldLabel, Input, Textarea } from "@/components/ui/Field";
+import { useDismiss } from "@/components/ui/useDismiss";
 
 /* ================= TYPES ================= */
 
@@ -17,6 +23,7 @@ type Game = {
   title: string;
   release_year: number | null;
   genres_text: string | null;
+  cover_url?: string | null;
 };
 type SimilarIdea = {
   id: number;
@@ -81,22 +88,10 @@ const DETAIL_TYPE_OPTIONS: SelectOption<string>[] = [
 
 /* ================= STYLES ================= */
 
-const inputClass =
-  "h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition shadow-sm focus:border-slate-400 focus:ring-4 focus:ring-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:ring-slate-800";
-const textareaClass =
-  "min-h-[140px] w-full resize-y rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition shadow-sm focus:border-slate-400 focus:ring-4 focus:ring-slate-100 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:ring-slate-800";
-const btnBase =
-  "inline-flex h-11 items-center justify-center gap-2 rounded-xl px-6 text-sm font-bold whitespace-nowrap cursor-pointer transition active:scale-[0.98]";
-const btnPrimary =
-  btnBase +
-  " bg-slate-900 text-white shadow-sm hover:bg-slate-800 disabled:opacity-70 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200";
-const btnGhost =
-  btnBase +
-  " border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-800";
-const cardClass =
-  "rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm sm:p-8 dark:border-slate-800 dark:bg-slate-900";
+const cardClass = "rounded-3xl border border-line bg-surface p-5 shadow-sm sm:p-6";
+const sectionTitleClass = "flex items-center gap-2 text-sm font-semibold text-fg";
 
-/* ================= HELPERS (Giữ nguyên) ================= */
+/* ================= HELPERS ================= */
 
 function renderLinkOrText(text: string) {
   const isUrl = text.startsWith("http://") || text.startsWith("https://");
@@ -116,199 +111,130 @@ function renderLinkOrText(text: string) {
   return <span className="break-all font-mono text-fg-3">{text}</span>;
 }
 
-/* ================= SUB-COMPONENTS (Giữ nguyên GameCombobox, GroupPicker) ================= */
-
-function ModernSelect<T extends string | number>({
-  label,
-  value,
-  options,
-  onChange,
-  compact = false,
-}: {
-  label: string;
-  value: T;
-  options: SelectOption<T>[];
-  onChange: (value: T) => void;
-  compact?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const boxRef = useRef<HTMLDivElement | null>(null);
-  const selected =
-    options.find((option) => option.value === value) ?? options[0];
-  const SelectedIcon = selected?.icon;
-
-  useEffect(() => {
-    function onDocClick(e: MouseEvent) {
-      if (boxRef.current && !boxRef.current.contains(e.target as Node))
-        setOpen(false);
-    }
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, []);
-
+function StepBadge({ n, done }: { n: number; done: boolean }) {
   return (
-    <div ref={boxRef} className="relative">
-      <span className="mb-2 block text-[11px] font-semibold uppercase tracking-wider text-fg-4">
-        {label}
-      </span>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className={`group flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 text-left shadow-sm transition hover:border-line-strong hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 ${compact ? "h-12" : "h-14"}`}
-      >
-        <span className="flex min-w-0 items-center gap-3">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700">
-            {SelectedIcon ? (
-              <SelectedIcon className="h-4 w-4" />
-            ) : (
-              <span className="h-1.5 w-1.5 rounded-full bg-current" />
-            )}
-          </span>
-          <span className="min-w-0">
-            <span className="block truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
-              {selected.label}
-            </span>
-            {selected.description && !compact && (
-              <span className="block truncate text-[11px] font-semibold uppercase tracking-wider text-fg-4">
-                {selected.description}
-              </span>
-            )}
-          </span>
-        </span>
-        <ChevronDownIcon
-          className={`h-4 w-4 shrink-0 text-fg-4 transition ${open ? "rotate-180" : ""}`}
-        />
-      </button>
-
-      {open && (
-        <div className="absolute left-0 right-0 z-30 mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl ring-1 ring-black/5 dark:border-slate-700 dark:bg-slate-950 dark:ring-white/10">
-          {options.map((option) => {
-            const Icon = option.icon;
-            const active = option.value === value;
-            return (
-              <button
-                key={String(option.value)}
-                type="button"
-                onClick={() => {
-                  onChange(option.value);
-                  setOpen(false);
-                }}
-                className={`flex w-full cursor-pointer items-center justify-between rounded-xl px-3 py-2.5 text-left transition ${active ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950" : "text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"}`}
-              >
-                <span className="flex min-w-0 items-center gap-3">
-                  <span
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${active ? "bg-white/15" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300"}`}
-                  >
-                    {Icon ? (
-                      <Icon className="h-4 w-4" />
-                    ) : (
-                      <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                    )}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold">
-                      {option.label}
-                    </span>
-                    {option.description && (
-                      <span
-                        className={`block truncate text-[11px] font-semibold uppercase tracking-wider ${active ? "text-white/60 dark:text-slate-600" : "text-fg-4"}`}
-                      >
-                        {option.description}
-                      </span>
-                    )}
-                  </span>
-                </span>
-                {active && <CheckIcon className="h-4 w-4 shrink-0" />}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
+    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${done ? "bg-emerald-500 text-white" : "bg-surface-sunken text-fg-3"}`}>
+      {done ? <CheckIcon className="h-3.5 w-3.5" /> : n}
+    </span>
   );
 }
 
-function GameCombobox({ games, selectedGameId, onSelect, onCreateGame }: any) {
+/* ================= SUB-COMPONENTS ================= */
+
+function GameCover({ src, className = "h-10 w-10 rounded-xl" }: { src?: string | null; className?: string }) {
+  return (
+    <span className={`relative flex shrink-0 items-center justify-center overflow-hidden bg-surface-sunken text-fg-4 ring-1 ring-black/5 dark:ring-white/10 ${className}`}>
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
+      ) : (
+        <PuzzlePieceIcon className="h-5 w-5" aria-hidden="true" />
+      )}
+    </span>
+  );
+}
+
+function GamePicker({
+  games,
+  selectedGameId,
+  onSelect,
+  onCreateGame,
+}: {
+  games: Game[];
+  selectedGameId: number | "";
+  onSelect: (game: Game) => void;
+  onCreateGame: (title: string) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const boxRef = useRef<HTMLDivElement | null>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(boxRef, open, close);
 
-  const selectedGame = useMemo(() => {
-    if (!selectedGameId) return null;
-    return games.find((g: any) => g.id === selectedGameId) ?? null;
-  }, [games, selectedGameId]);
-
+  const selectedGame = games.find((g) => g.id === selectedGameId) ?? null;
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return games.slice(0, 50);
-    return games
-      .filter((g: any) => g.title.toLowerCase().includes(q))
-      .slice(0, 50);
+    return (q ? games.filter((g) => g.title.toLowerCase().includes(q)) : games).slice(0, 50);
   }, [games, query]);
+  const exactMatch = games.some((g) => normalizeGameTitle(g.title) === normalizeGameTitle(query));
 
-  useEffect(() => {
-    function onDocClick(e: MouseEvent) {
-      if (boxRef.current && !boxRef.current.contains(e.target as Node))
-        setOpen(false);
-    }
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, []);
+  const choose = (game: Game) => {
+    onSelect(game);
+    setOpen(false);
+    setQuery("");
+  };
 
   return (
-    <div ref={boxRef} className="relative">
-      <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-fg-4">
-        Game Select *
-      </label>
+    <div ref={boxRef} className={`relative ${open ? "z-30" : ""}`}>
       <button
         type="button"
-        className={`flex w-full cursor-pointer items-center justify-between text-left ${inputClass} ${!selectedGame ? "text-fg-4" : "font-bold"}`}
+        className={`flex min-h-14 w-full cursor-pointer items-center justify-between gap-3 rounded-2xl border bg-surface px-2.5 py-2 text-left shadow-sm transition hover:border-line-strong focus:outline-none focus:ring-4 focus:ring-blue-500/10 ${selectedGame ? "border-line" : "border-dashed border-line-strong"}`}
         onClick={() => setOpen((v) => !v)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
       >
-        <span className="truncate">
-          {selectedGame ? selectedGame.title : "Search & Select Game..."}
+        <span className="flex min-w-0 items-center gap-3">
+          <GameCover src={selectedGame?.cover_url} />
+          <span className="min-w-0">
+            <span className={`block truncate text-sm font-semibold ${selectedGame ? "text-fg" : "text-fg-3"}`}>
+              {selectedGame ? selectedGame.title : "Choose a game"}
+            </span>
+            <span className="block truncate text-xs text-fg-4">
+              {selectedGame ? (selectedGame.release_year ? `Released ${selectedGame.release_year}` : "Release year unknown") : "Search your library or add a new game"}
+            </span>
+          </span>
         </span>
-        <ChevronDownIcon
-          className={`h-4 w-4 shrink-0 text-slate-300 transition ${open ? "rotate-180" : ""}`}
-        />
+        <ChevronDownIcon className={`h-4 w-4 shrink-0 text-fg-4 transition ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="absolute z-30 mt-2 w-full rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl ring-1 ring-black/5 dark:border-slate-700 dark:bg-slate-950 dark:ring-white/10">
-          <input
-            className={inputClass}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Type game name..."
-            autoFocus
-          />
-          <div className="max-h-60 overflow-auto mt-2 space-y-1">
-            {filtered.length === 0 ? (
-              <button
-                type="button"
-                className="w-full cursor-pointer rounded-xl bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 hover:bg-surface-sunken dark:bg-slate-800 dark:text-slate-100"
-                onClick={() => {
-                  setOpen(false);
-                  onCreateGame(query.trim());
-                }}
-              >
-                + Create "{query}"
-              </button>
-            ) : (
-              filtered.map((g: any) => (
+        <div className="absolute z-30 mt-2 w-full rounded-2xl border border-line bg-surface p-2 shadow-2xl ring-1 ring-black/5 animate-in fade-in slide-in-from-top-1 duration-150 dark:ring-white/10">
+          <label className="relative block">
+            <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-4" />
+            <input
+              className="h-10 w-full rounded-xl border border-line bg-surface-muted pl-9 pr-3 text-sm font-medium text-fg outline-none placeholder:text-fg-4 focus:border-blue-400"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                if (filtered[0]) choose(filtered[0]);
+                else if (query.trim()) { onCreateGame(query.trim()); setOpen(false); }
+              }}
+              placeholder="Type a game name..."
+              aria-label="Search games"
+              autoFocus
+            />
+          </label>
+          <div className="mt-2 max-h-72 space-y-0.5 overflow-auto" role="listbox" aria-label="Games">
+            {filtered.map((g) => {
+              const active = g.id === selectedGameId;
+              return (
                 <button
                   key={g.id}
                   type="button"
-                  className="w-full cursor-pointer rounded-xl px-4 py-2.5 text-left text-sm font-medium text-slate-700 transition hover:bg-blue-50 hover:text-blue-700 dark:text-slate-300 dark:hover:bg-slate-800"
-                  onClick={() => {
-                    onSelect(g);
-                    setOpen(false);
-                    setQuery("");
-                  }}
+                  role="option"
+                  aria-selected={active}
+                  className={`flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl px-2 py-1.5 text-left text-sm font-medium transition ${active ? "bg-slate-900 text-white dark:bg-slate-700" : "text-fg-2 hover:bg-surface-sunken hover:text-fg"}`}
+                  onClick={() => choose(g)}
                 >
-                  {g.title}
+                  <span className="flex min-w-0 items-center gap-3">
+                    <GameCover src={g.cover_url} className="h-8 w-8 rounded-lg" />
+                    <span className="truncate">{g.title}</span>
+                  </span>
+                  {g.release_year && <span className={`shrink-0 text-xs tabular-nums ${active ? "text-white/70" : "text-fg-4"}`}>{g.release_year}</span>}
                 </button>
-              ))
+              );
+            })}
+            {query.trim() && !exactMatch && (
+              <button
+                type="button"
+                className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-accent transition hover:bg-accent-soft"
+                onClick={() => { onCreateGame(query.trim()); setOpen(false); setQuery(""); }}
+              >
+                <PlusIcon className="h-4 w-4" /> Add “{query.trim()}” as a new game
+              </button>
             )}
+            {!query.trim() && filtered.length === 0 && <p className="px-3 py-4 text-center text-sm text-fg-4">No games yet. Type a name to add one.</p>}
           </div>
         </div>
       )}
@@ -316,105 +242,156 @@ function GameCombobox({ games, selectedGameId, onSelect, onCreateGame }: any) {
   );
 }
 
-function GroupPicker({ groups, selectedIds, onToggle, onCreateGroup }: any) {
-  const [open, setOpen] = useState(false);
-  const [q, setQ] = useState("");
-  const boxRef = useRef<HTMLDivElement | null>(null);
+function TypeChips({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Detail type">
+      {DETAIL_TYPE_OPTIONS.map((option) => {
+        const Icon = option.icon;
+        const active = option.value === value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(option.value)}
+            className={`flex min-h-14 cursor-pointer items-center gap-2.5 rounded-2xl border px-3 py-2 text-left transition active:scale-[0.98] ${
+              active
+                ? "border-slate-900 bg-slate-900 text-white shadow-sm dark:border-white dark:bg-white dark:text-slate-950"
+                : "border-line bg-surface text-fg-2 hover:border-line-strong hover:bg-surface-hover"
+            }`}
+          >
+            {Icon && (
+              <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${active ? "bg-white/15 dark:bg-slate-950/10" : "bg-surface-sunken text-fg-3"}`}>
+                <Icon className="h-4 w-4" />
+              </span>
+            )}
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold">{option.label}</span>
+              {option.description && <span className={`block truncate text-xs ${active ? "opacity-70" : "text-fg-4"}`}>{option.description}</span>}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
-  const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    if (!s) return groups.slice(0, 50);
-    return groups
-      .filter((g: any) => g.name.toLowerCase().includes(s))
-      .slice(0, 50);
-  }, [groups, q]);
-
-  useEffect(() => {
-    function onDocClick(e: MouseEvent) {
-      if (boxRef.current && !boxRef.current.contains(e.target as Node))
-        setOpen(false);
-    }
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, []);
+function CollectionPicker({
+  groups,
+  selectedIds,
+  onToggle,
+  onCreateGroup,
+}: {
+  groups: IdeaGroup[];
+  selectedIds: number[];
+  onToggle: (id: number) => void;
+  onCreateGroup: (name: string) => void | Promise<void>;
+}) {
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const visible = q ? groups.filter((g) => g.name.toLowerCase().includes(q)) : groups;
+  const exact = groups.some((g) => g.name.trim().toLowerCase() === q);
+  const create = () => {
+    const name = query.trim();
+    if (!name || exact) return;
+    void onCreateGroup(name);
+    setQuery("");
+  };
 
   return (
-    <div ref={boxRef} className="relative">
-      <div className="mb-3 flex items-center justify-between">
-        <label className="text-xs font-semibold uppercase tracking-wider text-fg-4">
-          Add to Collection
+    <div>
+      {groups.length > 8 && (
+        <label className="relative mb-3 block">
+          <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-4" />
+          <input
+            className="h-9 w-full rounded-xl border border-line bg-surface-muted pl-9 pr-3 text-sm text-fg outline-none placeholder:text-fg-4 focus:border-blue-400"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Find a collection..."
+            aria-label="Find a collection"
+          />
         </label>
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          className="cursor-pointer text-xs font-bold text-accent hover:underline"
-        >
-          {open ? "Close" : "+ Add"}
-        </button>
-      </div>
-      <div className="flex flex-wrap gap-2 min-h-[40px]">
-        {selectedIds.length === 0 && !open && (
-          <span className="text-xs text-fg-4 italic font-medium">
-            Not assigned to any collection.
-          </span>
-        )}
-        {selectedIds.map((id: number) => {
-          const g = groups.find((x: any) => x.id === id);
+      )}
+      <div className="flex flex-wrap gap-1.5">
+        {visible.map((g) => {
+          const active = selectedIds.includes(g.id);
           return (
-            g && (
-              <span
-                key={id}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-blue-100 bg-accent-soft px-3 py-1.5 text-xs font-bold text-accent"
-              >
-                {g.name}{" "}
-                <button
-                  type="button"
-                  onClick={() => onToggle(id)}
-                  className="cursor-pointer text-lg leading-none hover:text-blue-900"
-                >
-                  ×
-                </button>
-              </span>
-            )
+            <button
+              key={g.id}
+              type="button"
+              aria-pressed={active}
+              onClick={() => onToggle(g.id)}
+              className={`inline-flex h-8 max-w-full cursor-pointer items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition ${
+                active ? "border-blue-500 bg-blue-600 text-white" : "border-line bg-surface text-fg-2 hover:border-line-strong hover:bg-surface-hover"
+              }`}
+            >
+              {active ? <CheckIcon className="h-3.5 w-3.5 shrink-0" /> : <FolderIcon className="h-3.5 w-3.5 shrink-0 text-fg-4" />}
+              <span className="truncate">{g.name}</span>
+            </button>
           );
         })}
+        {groups.length === 0 && <p className="text-xs text-fg-4">No collections yet.</p>}
       </div>
-      {open && (
-        <div className="absolute right-0 top-full z-30 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl ring-1 ring-black/5 dark:border-slate-700 dark:bg-slate-950 dark:ring-white/10">
+      <div className="mt-3 flex gap-2">
+        {groups.length <= 8 && (
           <input
-            className={inputClass}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search groups..."
-            autoFocus
+            className="h-9 min-w-0 flex-1 rounded-xl border border-line bg-surface-muted px-3 text-sm text-fg outline-none placeholder:text-fg-4 focus:border-blue-400"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              e.preventDefault();
+              create();
+            }}
+            placeholder="New collection name"
+            aria-label="New collection name"
           />
-          <div className="max-h-48 overflow-auto mt-2 space-y-1">
-            {filtered.length === 0 ? (
-              <button
-                type="button"
-                className="w-full cursor-pointer rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-900 hover:bg-surface-sunken dark:bg-slate-800 dark:text-slate-100"
-                onClick={() => {
-                  if (q.trim()) onCreateGroup(q.trim());
-                  setQ("");
-                }}
-              >
-                + Create "{q}"
-              </button>
-            ) : (
-              filtered.map((g: any) => (
-                <button
-                  key={g.id}
-                  type="button"
-                  className={`flex w-full cursor-pointer items-center justify-between rounded-xl px-3 py-2 text-left text-xs font-bold transition ${selectedIds.includes(g.id) ? "bg-accent-soft text-accent" : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"}`}
-                  onClick={() => onToggle(g.id)}
-                >
-                  <span>{g.name}</span> {selectedIds.includes(g.id) && <CheckIcon className="h-4 w-4 shrink-0" aria-hidden="true" />}
-                </button>
-              ))
-            )}
-          </div>
+        )}
+        {(groups.length <= 8 || (q && !exact)) && (
+          <Button variant="secondary" size="sm" onClick={create} disabled={!q || exact} className={groups.length > 8 ? "w-full" : ""}>
+            <PlusIcon className="h-4 w-4" /> {groups.length > 8 ? `Create “${query.trim()}”` : "Add"}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function IdeaPreview({
+  game,
+  title,
+  detailType,
+  pinned,
+  collectionName,
+  extraCollections,
+}: {
+  game: Game | null;
+  title: string;
+  detailType: string;
+  pinned: boolean;
+  collectionName?: string;
+  extraCollections: number;
+}) {
+  return (
+    <div className="relative h-56 overflow-hidden rounded-2xl border border-line bg-slate-900 shadow-sm">
+      <CoverBackdrop src={game?.cover_url} alt="" imageClassName="opacity-60" />
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/60 to-transparent" />
+      <div className="absolute inset-0 flex flex-col justify-end p-5">
+        <p className="mb-1 truncate text-[11px] font-semibold uppercase tracking-wide text-white/65">{game?.title || "Game"}</p>
+        <h3 className={`mb-2 line-clamp-2 text-base font-bold leading-snug ${title.trim() ? "text-white" : "text-white/40"}`}>{title.trim() || "Your idea title"}</h3>
+        {collectionName && (
+          <span className="mb-2 inline-flex max-w-[70%] items-center gap-1 self-start rounded-md border border-white/10 bg-white/10 px-1.5 py-1 text-[11px] font-medium text-white/85">
+            <FolderIcon className="h-3 w-3 shrink-0 text-sky-300" />
+            <span className="truncate">{collectionName}</span>
+            {extraCollections > 0 && <span className="shrink-0 text-white/55">+{extraCollections}</span>}
+          </span>
+        )}
+        <div className="flex items-center gap-2">
+          <TypePill typeKey={detailType} />
+          {pinned && <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-300"><StarSolidIcon className="h-3 w-3" /> Pinned</span>}
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -453,6 +430,8 @@ export default function AddIdeaPage() {
 
   const [savingIdea, setSavingIdea] = useState(false);
   const [audienceRequestId, setAudienceRequestId] = useState<number | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const titleRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -698,178 +677,199 @@ export default function AddIdeaPage() {
     setStagedSources([]);
     setSimilar([]);
     setPinned(false);
+    titleRef.current?.focus();
   }
+
+  const selectedGame = games.find((g) => g.id === gameId) ?? null;
+  const selectedGroups = selectedGroupIds
+    .map((id) => groups.find((g) => g.id === id))
+    .filter((g): g is IdeaGroup => Boolean(g));
+  const checks = [
+    { label: "Game", done: Boolean(gameId) },
+    { label: "Title", done: Boolean(title.trim()) },
+    { label: "Description", done: Boolean(description.trim()) },
+  ];
+  const canSave = checks.every((check) => check.done) && !savingIdea;
+
+  const saveButton = (className = "") => (
+    <Button type="submit" variant="primary" size="lg" disabled={!canSave} className={className}>
+      {savingIdea ? "Saving idea..." : "Save idea"}
+    </Button>
+  );
 
   return (
     <div className={`${appPageRootClass} xl:flex`}>
       <AppSidebar activePage="addIdea" />
 
-      {/* MAIN CONTENT */}
-      <main className={`${appPageMainClass} pb-32`}>
-        <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
+      <main className={`${appPageMainClass} pb-40 lg:pb-24`}>
+        <div className="app-container max-w-6xl">
           <AppPageHeader
-            title="Create Idea"
-            description="Capture a game detail, mechanic, secret, or video idea in your library."
-            icon={<SparklesIcon className="h-5 w-5" />}
+            title="Add Idea"
+            description="Capture a game detail, secret or mechanic. Game, title and description are required; everything else is optional."
+            icon={<LightBulbIcon className="h-5 w-5" />}
+            className="mb-4"
+            action={audienceRequestId ? (
+              <span className="inline-flex h-9 items-center gap-1.5 rounded-full bg-fuchsia-50 px-3 text-sm font-semibold text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-200">
+                <ChatBubbleLeftRightIcon className="h-4 w-4" /> From an audience request
+              </span>
+            ) : undefined}
           />
 
-
           <form
+            ref={formRef}
             onSubmit={saveIdea}
-            className="grid gap-8 lg:grid-cols-3 items-start"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                formRef.current?.requestSubmit();
+              }
+            }}
+            className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]"
           >
-            {/* LEFT COLUMN: CONTENT */}
-            <div className="space-y-8 lg:col-span-2">
-              <div className={cardClass}>
-                <div className="space-y-6">
-                  <GameCombobox
-                    games={games}
-                    selectedGameId={gameId}
-                    onSelect={(g: any) => setGameId(g.id)}
-                    onCreateGame={(t: any) => {
-                      setNewGameTitle(t);
-                      setShowCreateGame(true);
-                    }}
-                  />
-                  {showCreateGame && (
-                    <div className="rounded-2xl border-2 border-blue-100 bg-blue-50/50 p-6 animate-in zoom-in-95">
-                      <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-blue-800">
-                        New Game Entry
-                      </h4>
-                      <div className="flex gap-3">
-                        <input
-                          className={inputClass}
-                          value={newGameTitle}
-                          onChange={(e) => setNewGameTitle(e.target.value)}
-                          placeholder="Enter Game Title..."
-                        />
-                        <button
-                          type="button"
-                          onClick={createGameInline}
-                          disabled={savingGame}
-                          className={btnPrimary}
-                        >
-                          {savingGame ? "..." : "Create"}
-                        </button>
-                      </div>
+            <div className="min-w-0 space-y-5">
+              {/* 1. Game */}
+              <section className={cardClass} aria-labelledby="add-step-game">
+                <h2 id="add-step-game" className={`${sectionTitleClass} mb-3`}><StepBadge n={1} done={Boolean(gameId)} /> Game</h2>
+                <GamePicker
+                  games={games}
+                  selectedGameId={gameId}
+                  onSelect={(g) => setGameId(g.id)}
+                  onCreateGame={(t) => {
+                    setNewGameTitle(t);
+                    setShowCreateGame(true);
+                  }}
+                />
+                {showCreateGame && (
+                  <div className="mt-3 rounded-2xl border border-accent-line bg-accent-soft p-3 animate-in fade-in slide-in-from-top-1 duration-150">
+                    <p className="mb-2 text-xs font-semibold text-accent">New game</p>
+                    <div className="flex gap-2">
+                      <Input
+                        value={newGameTitle}
+                        onChange={(e) => setNewGameTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void createGameInline();
+                          }
+                        }}
+                        placeholder="Game title"
+                        aria-label="New game title"
+                        autoFocus
+                      />
+                      <Button variant="accent" onClick={() => void createGameInline()} disabled={savingGame || !newGameTitle.trim()}>
+                        {savingGame ? "Adding..." : "Add game"}
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => setShowCreateGame(false)} aria-label="Cancel new game">
+                        <XMarkIcon className="h-4 w-4" />
+                      </Button>
                     </div>
-                  )}
-                  <label className="block">
-                    <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-fg-4">
-                      Idea Title *
-                    </span>
-                    <input
-                      className={inputClass}
+                  </div>
+                )}
+              </section>
+
+              {/* 2. Idea */}
+              <section className={cardClass} aria-labelledby="add-step-idea">
+                <h2 id="add-step-idea" className={`${sectionTitleClass} mb-4`}><StepBadge n={2} done={Boolean(title.trim() && description.trim())} /> The idea</h2>
+                <div className="space-y-5">
+                  <Field label="Title">
+                    <Input
+                      ref={titleRef}
+                      className="h-12 text-base font-semibold"
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
-                      placeholder="e.g. Unique NPC death animations"
+                      placeholder="e.g. NPCs remember if you robbed their store"
                     />
-                  </label>
+                  </Field>
+
                   {!loadingSimilar && similar.length > 0 && (
-                    <div className="rounded-2xl border-2 border-amber-100 bg-amber-50 p-5">
-                      <div className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-amber-700">
-                        Similarity Warning
-                      </div>
-                      <ul className="space-y-2">
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/30 dark:bg-amber-500/10" role="status">
+                      <p className="flex items-center gap-1.5 text-sm font-semibold text-amber-800 dark:text-amber-200">
+                        <ExclamationTriangleIcon className="h-4 w-4" /> You may already have this idea
+                      </p>
+                      <ul className="mt-2 space-y-1">
                         {similar.map((s) => (
-                          <li
-                            key={s.id}
-                            className="text-xs font-bold text-amber-900"
-                          >
-                            •{" "}
-                            <a
-                              href={`/idea/${s.id}`}
-                              target="_blank"
-                              className="underline"
-                            >
-                              {s.title}
+                          <li key={s.id}>
+                            <a href={`/idea/${s.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-amber-900 underline-offset-2 hover:underline dark:text-amber-100">
+                              <TypeLabel typeKey={s.detail_type} className="text-amber-700 dark:text-amber-300" />
+                              <span className="text-amber-500">·</span> {s.title}
+                              <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5 opacity-60" />
                             </a>
                           </li>
                         ))}
                       </ul>
                     </div>
                   )}
-                  <label className="block">
-                    <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-fg-4">
-                      Detailed Description *
-                    </span>
-                    <textarea
-                      className={textareaClass}
+
+                  <div>
+                    <FieldLabel>Type</FieldLabel>
+                    <TypeChips value={detailType} onChange={setDetailType} />
+                  </div>
+
+                  <Field label="Description">
+                    <Textarea
+                      className="min-h-[160px] resize-y"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Provide context, how to trigger, and why it's interesting..."
+                      placeholder="How do you trigger it, what happens, and why is it interesting?"
                     />
-                  </label>
+                    <span className="mt-1 block text-right text-xs tabular-nums text-fg-4">{description.trim().length} characters</span>
+                  </Field>
                 </div>
-              </div>
+              </section>
 
-              <div className={cardClass}>
-                <h3 className="mb-6 text-sm font-semibold uppercase tracking-wider text-fg flex items-center gap-2">
-                  <FolderOpenIcon className="h-4 w-4" aria-hidden="true" /> Attachments & Media
-                </h3>
-                <div className="grid gap-8 md:grid-cols-2">
-                  <div className="space-y-4">
-                    <div className="text-[11px] font-semibold uppercase tracking-wider text-fg-4">
-                      Footage / Clips
-                    </div>
+              {/* 3. Media */}
+              <section className={cardClass} aria-labelledby="add-step-media">
+                <h2 id="add-step-media" className={`${sectionTitleClass} mb-4`}>
+                  <StepBadge n={3} done={stagedFootage.length + stagedSources.length > 0} /> Footage & sources
+                  <span className="text-xs font-normal text-fg-4">Optional</span>
+                </h2>
+                <div className="grid gap-6 md:grid-cols-2">
+                  <div className="min-w-0">
+                    <FieldLabel>Footage / clips</FieldLabel>
                     <div className="flex gap-2">
-                      <input
-                        className={inputClass}
-                        placeholder="Link or file path..."
+                      <Input
+                        placeholder="YouTube link or file path"
                         value={fp}
                         onChange={(e) => setFp(e.target.value)}
                         disabled={fetchingTitle}
-                        onKeyDown={(e) =>
-                          e.key === "Enter" &&
-                          (e.preventDefault(), handleAddFootage())
-                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void handleAddFootage();
+                          }
+                        }}
+                        aria-label="Footage link or file path"
                       />
-                      <button
-                        type="button"
-                        className={btnGhost}
-                        onClick={handleAddFootage}
-                        disabled={fetchingTitle}
-                      >
-                        {fetchingTitle ? "..." : "+"}
-                      </button>
+                      <Button variant="secondary" size="icon" onClick={() => void handleAddFootage()} disabled={fetchingTitle || !fp.trim()} aria-label="Add footage">
+                        {fetchingTitle ? <ArrowPathIcon className="h-4 w-4 animate-spin" /> : <PlusIcon className="h-4 w-4" />}
+                      </Button>
                     </div>
-                    <ul className="space-y-3">
+                    <ul className="mt-3 space-y-2">
                       {stagedFootage.map((f, i) => (
-                        <li
-                          key={i}
-                          className="rounded-2xl bg-surface-muted p-4 border border-line-soft group"
-                        >
-                          <div className="flex justify-between items-start mb-2">
-                            <div className="min-w-0 pr-4">
-                              {f.title && (
-                                <div className="font-bold text-xs text-fg line-clamp-1 mb-1">
-                                  <FilmIcon className="mr-1 inline h-3.5 w-3.5 align-[-2px]" aria-hidden="true" />{f.title}
-                                </div>
-                              )}
-                              <div className="truncate text-[11px] font-mono font-medium text-fg-4">
-                                {renderLinkOrText(f.file_path)}
-                              </div>
+                        <li key={`${f.file_path}-${i}`} className="rounded-2xl border border-line-soft bg-surface-muted p-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-fg">
+                                <FilmIcon className="h-4 w-4 shrink-0 text-fg-4" aria-hidden="true" />
+                                <span className="truncate">{f.title || "Clip"}</span>
+                              </p>
+                              {f.channel_name && <p className="mt-0.5 truncate text-xs text-rose-600 dark:text-rose-300">{f.channel_name}</p>}
+                              <div className="mt-1 truncate text-xs text-fg-4">{renderLinkOrText(f.file_path)}</div>
                             </div>
                             <button
                               type="button"
-                              onClick={() =>
-                                setStagedFootage(
-                                  stagedFootage.filter((_, idx) => idx !== i),
-                                )
-                              }
-                              className="cursor-pointer text-lg text-slate-300 transition-colors hover:text-rose-500"
+                              onClick={() => setStagedFootage(stagedFootage.filter((_, idx) => idx !== i))}
+                              className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-fg-4 transition hover:bg-danger-soft hover:text-rose-500"
+                              aria-label="Remove clip"
                             >
-                              ×
+                              <XMarkIcon className="h-4 w-4" />
                             </button>
                           </div>
                           <button
                             type="button"
-                            onClick={() => {
-                              const n = [...stagedFootage];
-                              n[i].downloaded = !n[i].downloaded;
-                              setStagedFootage(n);
-                            }}
-                            className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition shadow-sm ${f.downloaded ? "bg-emerald-100 text-emerald-700" : "bg-surface-strong text-fg-3"}`}
+                            onClick={() => setStagedFootage(stagedFootage.map((item, idx) => (idx === i ? { ...item, downloaded: !item.downloaded } : item)))}
+                            aria-pressed={f.downloaded}
+                            className={`mt-2 inline-flex h-7 cursor-pointer items-center gap-1 rounded-lg px-2.5 text-xs font-semibold transition ${f.downloaded ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-surface-strong text-fg-3 hover:text-fg"}`}
                           >
                             {f.downloaded ? <><CheckIcon className="h-3.5 w-3.5" aria-hidden="true" /> Downloaded</> : <><CloudArrowDownIcon className="h-3.5 w-3.5" aria-hidden="true" /> Need download</>}
                           </button>
@@ -878,14 +878,11 @@ export default function AddIdeaPage() {
                     </ul>
                   </div>
 
-                  <div className="space-y-4">
-                    <div className="text-[11px] font-semibold uppercase tracking-wider text-fg-4">
-                      Sources / References
-                    </div>
+                  <div className="min-w-0">
+                    <FieldLabel>Sources / references</FieldLabel>
                     <div className="flex gap-2">
-                      <input
-                        className={inputClass}
-                        placeholder="URL..."
+                      <Input
+                        placeholder="Article, wiki or Reddit URL"
                         value={srcUrl}
                         onChange={(e) => setSrcUrl(e.target.value)}
                         onKeyDown={(e) => {
@@ -894,93 +891,87 @@ export default function AddIdeaPage() {
                             handleAddSource();
                           }
                         }}
+                        aria-label="Source URL"
                       />
-                      <button
-                        type="button"
-                        className={btnGhost}
-                        onClick={handleAddSource}
-                      >
-                        +
-                      </button>
+                      <Button variant="secondary" size="icon" onClick={handleAddSource} disabled={!srcUrl.trim()} aria-label="Add source">
+                        <PlusIcon className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <ul className="space-y-2">
+                    <ul className="mt-3 space-y-2">
                       {stagedSources.map((s, i) => (
-                        <li
-                          key={i}
-                          className="flex items-center justify-between rounded-xl bg-surface-muted px-4 py-3 text-xs border border-line-soft"
-                        >
-                          <span className="truncate font-bold text-fg-3">
-                            {renderLinkOrText(s.url)}
+                        <li key={`${s.url}-${i}`} className="flex items-center justify-between gap-2 rounded-xl border border-line-soft bg-surface-muted py-2 pl-3 pr-1.5 text-sm">
+                          <span className="flex min-w-0 items-center gap-2">
+                            <GlobeAltIcon className="h-4 w-4 shrink-0 text-fg-4" aria-hidden="true" />
+                            <span className="truncate">{renderLinkOrText(s.url)}</span>
                           </span>
                           <button
                             type="button"
-                            onClick={() =>
-                              setStagedSources(
-                                stagedSources.filter((_, idx) => idx !== i),
-                              )
-                            }
-                            className="cursor-pointer text-slate-300 hover:text-rose-500"
+                            onClick={() => setStagedSources(stagedSources.filter((_, idx) => idx !== i))}
+                            className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-fg-4 transition hover:bg-danger-soft hover:text-rose-500"
+                            aria-label="Remove source"
                           >
-                            ×
+                            <XMarkIcon className="h-4 w-4" />
                           </button>
                         </li>
                       ))}
                     </ul>
                   </div>
                 </div>
-              </div>
+              </section>
             </div>
 
-            {/* RIGHT COLUMN */}
-            <div className="space-y-6">
-              <div className={cardClass}>
-                <button
-                  type="submit"
-                  disabled={!gameId || !title || savingIdea}
-                  className={`${btnPrimary} w-full h-14 text-base tracking-tight`}
-                >
-                  {savingIdea ? "Publishing Idea..." : "Publish Idea"}
-                </button>
-              </div>
+            {/* RIGHT: preview, organise, save */}
+            <aside className="space-y-5 lg:sticky lg:top-6">
+              <section className={cardClass} aria-label="Preview">
+                <p className="mb-3 text-xs font-semibold text-fg-3">Preview in your library</p>
+                <IdeaPreview
+                  game={selectedGame}
+                  title={title}
+                  detailType={detailType}
+                  pinned={pinned}
+                  collectionName={selectedGroups[0]?.name}
+                  extraCollections={Math.max(0, selectedGroups.length - 1)}
+                />
+              </section>
 
-              <div className={cardClass}>
-                <GroupPicker
+              <section className={cardClass} aria-labelledby="add-organise">
+                <h2 id="add-organise" className={`${sectionTitleClass} mb-3`}>Collections</h2>
+                <CollectionPicker
                   groups={groups}
                   selectedIds={selectedGroupIds}
-                  onToggle={(id: any) =>
-                    setSelectedGroupIds((prev) =>
-                      prev.includes(id)
-                        ? prev.filter((x) => x !== id)
-                        : [...prev, id],
-                    )
-                  }
+                  onToggle={(id) => setSelectedGroupIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))}
                   onCreateGroup={createGroupInline}
                 />
-              </div>
+                <label className="mt-4 flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-line-soft bg-surface-muted px-4 py-3">
+                  <span className="flex items-center gap-2 text-sm font-semibold text-fg">
+                    <StarSolidIcon className={`h-4 w-4 ${pinned ? "text-amber-500" : "text-fg-4"}`} /> Pin this idea
+                  </span>
+                  <input type="checkbox" role="switch" checked={pinned} onChange={(e) => setPinned(e.target.checked)} className="peer sr-only" />
+                  <span className="relative h-6 w-11 shrink-0 rounded-full bg-surface-strong transition peer-checked:bg-amber-500 peer-focus-visible:ring-4 peer-focus-visible:ring-amber-500/30 after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-5" aria-hidden="true" />
+                </label>
+              </section>
 
-              <div className={cardClass}>
-                <h3 className="mb-6 text-xs font-semibold uppercase tracking-wider text-fg-4">
-                  Settings
-                </h3>
-                <div className="space-y-5">
-                  <ModernSelect
-                    label="Detail Type"
-                    value={detailType}
-                    options={DETAIL_TYPE_OPTIONS}
-                    onChange={setDetailType}
-                  />
-                  <label className="flex cursor-pointer items-center gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-4 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800">
-                    <input
-                      type="checkbox"
-                      checked={pinned}
-                      onChange={(e) => setPinned(e.target.checked)}
-                      className="h-5 w-5 rounded-lg border-line-strong text-fg focus:ring-0"
-                    />
-                    <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
-                      Pin this idea
-                    </span>
-                  </label>
-                </div>
+              <section className={`${cardClass} hidden lg:block`} aria-label="Save">
+                <ul className="mb-4 space-y-1.5">
+                  {checks.map((check) => (
+                    <li key={check.label} className={`flex items-center gap-2 text-sm ${check.done ? "text-fg-2" : "text-fg-4"}`}>
+                      {check.done ? <CheckIcon className="h-4 w-4 text-emerald-500" /> : <span className="mx-1 h-2 w-2 rounded-full border border-line-strong" />}
+                      {check.label}
+                    </li>
+                  ))}
+                </ul>
+                {saveButton("w-full")}
+                <p className="mt-2 text-center text-xs text-fg-4">Ctrl + Enter to save. The game stays selected for the next idea.</p>
+              </section>
+            </aside>
+
+            {/* Phone/tablet save bar */}
+            <div className="app-selection-bar fixed inset-x-0 bottom-0 z-[60] border-t border-line bg-surface/95 p-3 backdrop-blur lg:hidden">
+              <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
+                <p className="min-w-0 truncate text-sm text-fg-3">
+                  {canSave ? "Ready to save" : `Missing: ${checks.filter((c) => !c.done).map((c) => c.label.toLowerCase()).join(", ")}`}
+                </p>
+                {saveButton("shrink-0")}
               </div>
             </div>
           </form>
