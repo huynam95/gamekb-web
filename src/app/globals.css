@@ -188,19 +188,52 @@ html {
 
 .topic-strip {
   scrollbar-width: none;
-  scroll-snap-type: x proximity;
-  /* Fade the trailing edge so it is clear the strip scrolls sideways. */
-  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
-  mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
-  padding-right: 24px;
+  scroll-padding-inline: 44px;
+  --fade-start: 0px;
+  --fade-end: 0px;
+  /* Fade only the edges that have more topics behind them. */
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-start), #000 calc(100% - var(--fade-end)), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, #000 var(--fade-start), #000 calc(100% - var(--fade-end)), transparent 100%);
 }
+
+.topic-strip.fade-start { --fade-start: 48px; }
+.topic-strip.fade-end { --fade-end: 48px; }
 
 .topic-strip::-webkit-scrollbar {
   display: none;
 }
 
-.topic-strip > * {
-  scroll-snap-align: start;
+
+.topic-strip-arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  display: flex;
+  height: 2rem;
+  width: 2rem;
+  transform: translateY(-50%);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--fg-2);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+  transition: background-color 150ms, color 150ms;
+}
+
+.topic-strip-arrow:hover {
+  background: var(--surface-sunken);
+  color: var(--fg);
+}
+
+/* Touch screens swipe the strip and snap to a topic; the arrows are for mouse
+   users. Snapping stays off for mice so wheel and drag scrolling move smoothly. */
+@media (hover: none) and (pointer: coarse) {
+  .topic-strip { scroll-snap-type: x proximity; }
+  .topic-strip > * { scroll-snap-align: start; }
+  .topic-strip-arrow { display: none; }
 }
 
 .app-selection-bar {

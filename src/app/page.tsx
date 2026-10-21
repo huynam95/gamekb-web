@@ -18,6 +18,7 @@ import { Dropdown, menuItemClass, menuPanelClass, pillTriggerClass, type Dropdow
 import { Field, Input, Textarea } from "@/components/ui/Field";
 import { Modal, ModalBody, ModalFooter, ModalHeader } from "@/components/ui/Modal";
 import { useDismiss } from "@/components/ui/useDismiss";
+import { useHorizontalScroll } from "@/components/ui/useHorizontalScroll";
 import { TYPE_CONFIG } from "@/lib/detailTypes";
 import { getTopicVisual } from "@/lib/topicVisuals";
 import type { DetailRow, FootageItem, Game, Group, ScriptProject } from "@/types/gamekb";
@@ -210,6 +211,8 @@ function VideoThemeBoard({
   const [draft, setDraft] = useState<TopicDraft>(EMPTY_TOPIC_DRAFT);
   const [draggedTopicId, setDraggedTopicId] = useState<string | null>(null);
   const [dragOverTopicId, setDragOverTopicId] = useState<string | null>(null);
+  const topicStripRef = useRef<HTMLDivElement>(null);
+  const topicScroll = useHorizontalScroll(topicStripRef);
 
   const openCreate = () => {
     setDraft(EMPTY_TOPIC_DRAFT);
@@ -280,7 +283,23 @@ function VideoThemeBoard({
         {themes.length === 0 ? (
           <p className="min-w-0 flex-1 text-sm font-medium text-fg-4">No topics yet. Add one to start planning.</p>
         ) : (
-          <div className="topic-strip -my-1 flex min-w-0 flex-1 gap-2 overflow-x-auto py-1">
+          <div className="relative flex min-w-0 flex-1 items-center">
+          {topicScroll.canScrollLeft && (
+            <button
+              type="button"
+              onClick={() => topicScroll.scrollByPage(-1)}
+              className="topic-strip-arrow left-0"
+              aria-label="Scroll topics left"
+              title="Previous topics"
+            >
+              <ChevronLeftIcon className="h-4 w-4" />
+            </button>
+          )}
+          <div
+            ref={topicStripRef}
+            onDragOver={topicScroll.onDragOverEdge}
+            className={`topic-strip -my-1 flex min-w-0 flex-1 gap-2 overflow-x-auto py-1 ${topicScroll.canScrollLeft ? "fade-start" : ""} ${topicScroll.canScrollRight ? "fade-end" : ""}`}
+          >
             {themes.map((theme, index) => {
               const active = value === theme.id;
               const visual = getTopicVisual(theme.id, index);
@@ -333,6 +352,18 @@ function VideoThemeBoard({
                 </button>
               );
             })}
+          </div>
+          {topicScroll.canScrollRight && (
+            <button
+              type="button"
+              onClick={() => topicScroll.scrollByPage(1)}
+              className="topic-strip-arrow right-0"
+              aria-label="Scroll topics right"
+              title="More topics"
+            >
+              <ChevronRightIcon className="h-4 w-4" />
+            </button>
+          )}
           </div>
         )}
 
