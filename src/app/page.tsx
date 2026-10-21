@@ -695,6 +695,7 @@ export default function Home() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupCounts, setGroupCounts] = useState<Map<number, number>>(new Map());
   const [ideas, setIdeas] = useState<DetailRow[]>([]);
+  const [loadedGroupId, setLoadedGroupId] = useState<number | "" | null>(null);
   const [totalCount, setTotalCount] = useState(0);
   
   const [isSelectMode, setIsSelectMode] = useState(false);
@@ -723,6 +724,9 @@ export default function Home() {
 
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
+  const [ideasRevision, setIdeasRevision] = useState(0);
+  const [removingGroupItems, setRemovingGroupItems] = useState<Set<string>>(new Set());
+  const pendingGroupRemovals = useRef(new Set<string>());
 
   async function attachGroupsToIdeas(rows: DetailRow[]): Promise<DetailRow[]> {
     if (rows.length === 0) return rows;
@@ -911,6 +915,7 @@ export default function Home() {
   }, [debouncedQ, gameId, groupId, type, releaseYear, sortOrder]);
 
   useEffect(() => {
+    let cancelled = false;
     async function load() {
       setLoading(true);
       const from = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -923,6 +928,7 @@ export default function Home() {
             .from("idea_group_items")
             .select("detail_id")
             .eq("group_id", groupId);
+          if (cancelled) return;
           if (groupError) throw new Error(groupError.message);
           groupDetailIds = (items ?? [])
             .map((item: any) => Number(item.detail_id))
@@ -930,6 +936,7 @@ export default function Home() {
           if (groupDetailIds.length === 0) {
             setIdeas([]);
             setTotalCount(0);
+            setCurrentPage(1);
             return;
           }
         }
@@ -963,6 +970,7 @@ export default function Home() {
             const { data: idRows, count, error: idError } = await idQuery
               .order("id", { ascending: true })
               .range(offset, offset + chunkSize - 1);
+            if (cancelled) return;
             if (idError) throw new Error(idError.message);
 
             if (offset === 0) exactCount = count ?? 0;
@@ -978,6 +986,11 @@ export default function Home() {
           const shuffledIds = seededShuffle(allIds, randomSeed);
           const pageIds = shuffledIds.slice(from, to + 1);
           setTotalCount(exactCount || allIds.length);
+          const lastPage = Math.max(1, Math.ceil((exactCount || allIds.length) / ITEMS_PER_PAGE));
+          if (currentPage > lastPage) {
+            setCurrentPage(lastPage);
+            return;
+          }
 
           if (pageIds.length === 0) {
             setIdeas([]);
@@ -988,6 +1001,7 @@ export default function Home() {
             .from("details")
             .select("*, footage(id, file_path, title, channel_name)")
             .in("id", pageIds);
+          if (cancelled) return;
           if (error) throw new Error(error.message);
 
           const rowById = new Map(((data ?? []) as DetailRow[]).map((row) => [row.id, row]));
@@ -995,6 +1009,8 @@ export default function Home() {
             .map((id) => rowById.get(id))
             .filter((row): row is DetailRow => Boolean(row));
           const enrichedIdeas = await attachGroupsToIdeas(orderedRows);
+          if (cancelled) return;
+          setLoadedGroupId(groupId);
           setIdeas(enrichedIdeas);
           void backfillYoutubeChannels(enrichedIdeas);
           return;
@@ -1008,22 +1024,48 @@ export default function Home() {
         const { data, count, error } = await query
           .order("created_at", { ascending: sortOrder === "oldest" })
           .range(from, to);
+        if (cancelled) return;
+        // PostgREST can return 416 when removal makes the last page disappear.
+        // Recount without a range so the user lands on the new last page.
+        if (error?.code === "PGRST103" && currentPage > 1) {
+          const countQuery = supabase.from("details").select("id", { count: "exact", head: true }).eq("status", "idea");
+          const { count: remainingCount, error: countError } = await applyFilters(countQuery);
+          if (cancelled) return;
+          if (countError) throw new Error(countError.message);
+          const lastPage = Math.max(1, Math.ceil((remainingCount ?? 0) / ITEMS_PER_PAGE));
+          if (lastPage < currentPage) {
+            setTotalCount(remainingCount ?? 0);
+            setCurrentPage(lastPage);
+            return;
+          }
+        }
         if (error) throw new Error(error.message);
 
+        const lastPage = Math.max(1, Math.ceil((count ?? 0) / ITEMS_PER_PAGE));
+        if (currentPage > lastPage) {
+          setTotalCount(count ?? 0);
+          setCurrentPage(lastPage);
+          return;
+        }
+
         const enrichedIdeas = await attachGroupsToIdeas((data ?? []) as DetailRow[]);
+        if (cancelled) return;
+        setLoadedGroupId(groupId);
         setIdeas(enrichedIdeas);
         setTotalCount(count ?? 0);
         void backfillYoutubeChannels(enrichedIdeas);
       } catch (err) {
+        if (cancelled) return;
         notifyError(err instanceof Error ? err.message : "Could not load ideas", "Could not load ideas");
         setIdeas([]);
         setTotalCount(0);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
     void load();
-  }, [debouncedQ, gameId, groupId, type, releaseYear, sortOrder, randomSeed, currentPage, games, groups]);
+    return () => { cancelled = true; };
+  }, [debouncedQ, gameId, groupId, type, releaseYear, sortOrder, randomSeed, currentPage, games, groups, ideasRevision]);
 
   const toggleSelection = (idea: DetailRow) => {
     setSelectedIds(prev =>
@@ -1211,6 +1253,44 @@ export default function Home() {
     success("Collection renamed.", "Saved");
   }
 
+  async function removeIdeaFromGroup(idea: DetailRow) {
+    if (!groupId || loadedGroupId !== groupId) return;
+    const targetGroupId = groupId;
+    const targetGroupName = groups.find((group) => group.id === targetGroupId)?.name || "this collection";
+    const key = `${targetGroupId}:${idea.id}`;
+    if (pendingGroupRemovals.current.has(key)) return;
+    pendingGroupRemovals.current.add(key);
+    setRemovingGroupItems((current) => new Set(current).add(key));
+
+    try {
+      const response = await fetch(`/api/groups/${targetGroupId}/ideas/${idea.id}`, { method: "DELETE", redirect: "error" });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        if (response.status === 404) setIdeasRevision((current) => current + 1);
+        throw new Error(result.error || "Could not remove idea from collection");
+      }
+
+      setGroupCounts((current) => new Map(current).set(targetGroupId, Math.max(0, (current.get(targetGroupId) ?? 0) - 1)));
+      const updateMemberships = (item: DetailRow) => item.id === idea.id
+        ? { ...item, groups: item.groups?.filter((group) => group.id !== targetGroupId) }
+        : item;
+      // Keep selected ideas in the project tray; only their collection badge changes.
+      setSelectedIdeas((current) => current.map(updateMemberships));
+      setProjectIdeas((current) => current.map(updateMemberships));
+      setIdeasRevision((current) => current + 1);
+      success(`Removed from ${targetGroupName}. The idea stays in All Ideas.`, "Removed from collection");
+    } catch (err) {
+      notifyError(err instanceof Error ? err.message : "Could not remove idea from collection", "Could not remove idea");
+    } finally {
+      pendingGroupRemovals.current.delete(key);
+      setRemovingGroupItems((current) => {
+        const next = new Set(current);
+        next.delete(key);
+        return next;
+      });
+    }
+  }
+
   async function deleteGroup(id: number) {
     const shouldDelete = await confirmNotice({
       kind: "warning",
@@ -1239,6 +1319,7 @@ export default function Home() {
   const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
   const currentIdeas = ideas;
   const selectedTheme = getVideoThemeById(videoThemes, selectedThemeId);
+  const activeGroup = groups.find((group) => group.id === groupId);
   const goToPage = (p: number) => {
     setCurrentPage(p);
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -1411,8 +1492,8 @@ export default function Home() {
       <main className={`${appPageMainClass} pb-32`}>
         <div className="app-container library-container">
           <AppPageHeader
-            title="All Ideas"
-            description={isLongProjectPickMode ? `Browse and select ideas for ${longProjectTitle}.` : "Choose a topic, search your library, and build the next video from the ideas you already have."}
+            title={activeGroup?.name || "All Ideas"}
+            description={activeGroup ? "Remove ideas that don't fit this collection. They stay in All Ideas." : isLongProjectPickMode ? `Browse and select ideas for ${longProjectTitle}.` : "Choose a topic, search your library, and build the next video from the ideas you already have."}
             icon={<Squares2X2Icon className="h-5 w-5" />}
           />
           <header className="relative z-40 mb-8 space-y-4">
@@ -1498,9 +1579,15 @@ export default function Home() {
 
           <ul className="idea-grid">
             {currentIdeas.map(r => (
-               <IdeaItem key={r.id} r={r} game={games.find(g => g.id === r.game_id)} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={async (id, current) => { setIdeas(prev => prev.map(i => i.id === id ? { ...i, pinned: !current } : i)); await supabase.from("details").update({ pinned: !current }).eq("id", id); }} onEditGame={setEditingGame} onQuickView={setPreviewIdea} />
+               <IdeaItem key={r.id} r={r} game={games.find(g => g.id === r.game_id)} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={async (id, current) => { setIdeas(prev => prev.map(i => i.id === id ? { ...i, pinned: !current } : i)); await supabase.from("details").update({ pinned: !current }).eq("id", id); }} onEditGame={setEditingGame} onQuickView={setPreviewIdea} onRemoveFromGroup={groupId && loadedGroupId === groupId ? removeIdeaFromGroup : undefined} groupName={activeGroup?.name} removingFromGroup={removingGroupItems.has(`${groupId}:${r.id}`)} />
             ))}
           </ul>
+
+          {!loading && currentIdeas.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm font-bold text-slate-500 dark:border-slate-700">
+              {activeGroup ? "No ideas in this collection match your filters." : "No ideas match your filters."}
+            </div>
+          )}
 
           {!loading && totalPages > 1 && (
             <nav className="mt-12 flex flex-wrap items-center justify-center gap-2 pb-10" aria-label="Pagination">
