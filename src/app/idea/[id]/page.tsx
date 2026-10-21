@@ -597,10 +597,10 @@ export default function IdeaDetailPage() {
          <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/80 to-slate-900" />
 
          {/* Navigation Top */}
-         <div className="absolute top-0 left-0 w-full p-6 flex justify-between items-start z-30">
+         <div className="detail-hero-nav absolute top-0 left-0 w-full p-6 flex justify-between items-start z-30">
             <Link href="/" className={btnGlass}>← Home</Link>
             
-            <div className="flex gap-2">
+            <div className="detail-hero-actions flex gap-2">
               {!editingCore && (
                 <>
                   <button onClick={() => setShowScriptModal(true)} className={btnGlass}>
@@ -632,7 +632,7 @@ export default function IdeaDetailPage() {
          </div>
 
          {/* Hero Content Container */}
-         <div className="relative z-20 mx-auto max-w-6xl px-6 pt-24 pb-12 md:pt-32">
+         <div className="detail-hero-content relative z-20 mx-auto max-w-6xl px-6 pt-24 pb-12 md:pt-32">
             <div className="flex flex-col gap-8 md:flex-row md:items-end">
                
                {/* 1. POSTER IMAGE (Điểm nhấn chính) */}
@@ -649,8 +649,8 @@ export default function IdeaDetailPage() {
                </div>
 
                {/* 2. TEXT CONTENT */}
-               <div className="flex-1 pb-2">
-                  <div className="mb-3 flex items-center gap-3 text-sm font-bold uppercase tracking-widest text-blue-300">
+               <div className="min-w-0 flex-1 pb-2">
+                  <div className="mb-3 flex flex-wrap items-center gap-3 text-sm font-bold uppercase tracking-widest text-blue-300">
                      <span>{game?.title}</span>
                      <span className="text-slate-500">•</span>
                      <span>{game?.release_year || "N/A"}</span>
@@ -700,7 +700,7 @@ export default function IdeaDetailPage() {
               {editingCore ? (
                  <textarea className={textareaClass} value={draftDesc} onChange={e => setDraftDesc(e.target.value)} />
               ) : (
-                <div className="whitespace-pre-wrap text-base leading-relaxed text-slate-800">
+                <div className="whitespace-pre-wrap break-words text-base leading-relaxed text-slate-800">
                    {detail.description || <span className="italic text-slate-400">No description provided.</span>}
                 </div>
               )}

@@ -376,7 +376,7 @@ export default function DailyGoalPage() {
                             <button
                               type="button"
                               onClick={() => beginEdit(item)}
-                              className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-400 opacity-100 transition hover:bg-violet-50 hover:text-violet-600 sm:opacity-0 sm:group-hover:opacity-100 dark:hover:bg-violet-950/30 dark:hover:text-violet-300"
+                              className="touch-reveal flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-400 opacity-100 transition hover:bg-violet-50 hover:text-violet-600 sm:opacity-0 sm:group-hover:opacity-100 group-focus-within:opacity-100 dark:hover:bg-violet-950/30 dark:hover:text-violet-300"
                               aria-label="Edit task"
                             >
                               <PencilSquareIcon className="h-4 w-4" />
@@ -386,7 +386,7 @@ export default function DailyGoalPage() {
                           <button
                             type="button"
                             onClick={() => deleteTask(item.id)}
-                            className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-400 opacity-100 transition hover:bg-rose-50 hover:text-rose-600 sm:opacity-0 sm:group-hover:opacity-100 dark:hover:bg-rose-950/30 dark:hover:text-rose-300"
+                            className="touch-reveal flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-400 opacity-100 transition hover:bg-rose-50 hover:text-rose-600 sm:opacity-0 sm:group-hover:opacity-100 group-focus-within:opacity-100 dark:hover:bg-rose-950/30 dark:hover:text-rose-300"
                             aria-label="Delete task"
                           >
                             <TrashIcon className="h-4 w-4" />

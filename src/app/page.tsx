@@ -185,7 +185,7 @@ function TypeFilterDropdown({ value, onChange }: { value: string | ""; onChange:
   }, []);
 
   return (
-    <div ref={boxRef} className="relative z-[120] w-full sm:w-[220px]">
+    <div ref={boxRef} className="relative z-[120] w-full">
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
@@ -262,7 +262,7 @@ function YearFilterDropdown({ value, years, onChange }: { value: number | "" | "
   ];
 
   return (
-    <div ref={boxRef} className="relative z-[120] w-full sm:w-[150px]">
+    <div ref={boxRef} className="relative z-[120] w-full">
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
@@ -456,7 +456,7 @@ function VideoThemeBoard({
           No topics yet. Add one to start planning.
         </div>
       ) : (
-        <div className="grid items-stretch gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="topic-grid items-stretch">
           {themes.map((theme, index) => {
             const active = value === theme.id;
             const visual = getTopicVisual(theme, index);
@@ -509,12 +509,12 @@ function VideoThemeBoard({
                 title="Click to select. Drag to reorder."
                 aria-pressed={active}
               >
-                <div className="flex min-w-0 items-start justify-between gap-2">
+                <div className="topic-card-heading flex min-w-0 items-start justify-between gap-2">
                   <div className="flex min-w-0 flex-1 items-center gap-2.5">
                     <span className={`flex h-10 min-w-10 items-center justify-center rounded-2xl text-lg shadow-sm ring-1 ${visual.iconClass}`}>{visual.emoji}</span>
                     <h4 className="line-clamp-2 min-w-0 text-[15px] font-black leading-5 tracking-tight">{theme.title}</h4>
                   </div>
-                  <span className="flex h-8 shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">
+                  <span className="touch-reveal flex h-8 shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100 group-focus-visible:opacity-100">
                     <span
                       className={`flex h-8 w-8 cursor-grab items-center justify-center rounded-full transition active:cursor-grabbing ${active ? "bg-white/10 text-white/80" : "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500"}`}
                       title="Drag to reorder"
@@ -1348,7 +1348,7 @@ export default function Home() {
       )}
 
       {isSelectMode && (
-        <div className="fixed inset-x-0 bottom-0 z-[80] border-t border-slate-200 bg-white/95 p-4 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
+        <div className="app-selection-bar fixed inset-x-0 bottom-0 z-[80] border-t border-slate-200 bg-white/95 p-4 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
           <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-4">
               <span className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-black text-white ${isLongProjectPickMode ? "bg-violet-600" : "bg-slate-900 dark:bg-slate-800"}`}>{selectedIds.length}</span>
@@ -1357,7 +1357,7 @@ export default function Home() {
                 <p className="truncate text-xs font-bold text-slate-400 dark:text-slate-500">{isLongProjectPickMode ? longProjectTitle : selectedTheme ? `Topic: ${selectedTheme.title}` : "Select ideas for your script"}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="selection-actions">
               <button
                 type="button"
                 disabled={selectedIds.length === 0}
@@ -1409,7 +1409,7 @@ export default function Home() {
       />
 
       <main className={`${appPageMainClass} pb-32`}>
-        <div className="mx-auto max-w-[1900px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <div className="app-container library-container">
           <AppPageHeader
             title="All Ideas"
             description={isLongProjectPickMode ? `Browse and select ideas for ${longProjectTitle}.` : "Choose a topic, search your library, and build the next video from the ideas you already have."}
@@ -1441,9 +1441,9 @@ export default function Home() {
                   onReorder={handleReorderThemes}
                 />
               )}
-              <div className="relative z-50 flex flex-col gap-3 overflow-visible rounded-[1.6rem] border border-slate-200 bg-white/80 p-2.5 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 xl:flex-row xl:items-center xl:justify-between">
-                <div className="flex min-w-0 flex-1 flex-col gap-3 lg:flex-row lg:items-center">
-                  <div className="relative min-w-0 flex-1">
+              <div className="library-toolbar relative z-50 flex flex-col gap-3 overflow-visible rounded-[1.6rem] border border-slate-200 bg-white/80 p-2.5 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
+                <div className="library-filter-fields">
+                  <div className="library-search relative min-w-0">
                     <MagnifyingGlassIcon className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                     <input
                       className="h-10 w-full rounded-full border border-slate-200 bg-white px-11 text-sm font-bold text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-slate-300 focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-slate-600 dark:focus:ring-slate-800"
@@ -1452,7 +1452,7 @@ export default function Home() {
                       onChange={e=>setQ(e.target.value)}
                     />
                   </div>
-                  <div className="w-full lg:w-[240px]">
+                  <div className="library-game">
                     <ComboBox placeholder="Game" items={games.map(g=>({id:g.id, name:g.title, coverUrl:g.cover_url}))} selectedId={gameId} onChange={setGameId} />
                   </div>
                   <YearFilterDropdown
@@ -1471,7 +1471,7 @@ export default function Home() {
                     </button>
                   )}
                 </div>
-                <div className="flex flex-wrap items-center justify-start gap-2 xl:justify-end">
+                <div className="library-filter-actions">
                   <SortToggle
                     value={sortOrder}
                     onChange={(nextSort) => {
@@ -1496,7 +1496,7 @@ export default function Home() {
             </div>
           </div>
 
-          <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          <ul className="idea-grid">
             {currentIdeas.map(r => (
                <IdeaItem key={r.id} r={r} game={games.find(g => g.id === r.game_id)} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={async (id, current) => { setIdeas(prev => prev.map(i => i.id === id ? { ...i, pinned: !current } : i)); await supabase.from("details").update({ pinned: !current }).eq("id", id); }} onEditGame={setEditingGame} onQuickView={setPreviewIdea} />
             ))}

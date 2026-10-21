@@ -38,8 +38,8 @@ export function RandomIdeaModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[150] flex flex-col items-center justify-center bg-slate-950/95 p-5 backdrop-blur-sm" onClick={onClose}>
-      <div className="mb-6 flex w-full max-w-[1400px] items-center justify-between gap-3" onClick={(event) => event.stopPropagation()}>
+    <div className="random-picker modal-overlay fixed inset-0 z-[150] bg-slate-950/95 p-5 backdrop-blur-sm" onClick={onClose}>
+      <div className="random-picker-header mb-6 flex w-full max-w-[1400px] items-center justify-between gap-3" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-white shadow-lg backdrop-blur-md">
           <span className="text-2xl leading-none" aria-hidden="true">✦</span>
           <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-white px-2 text-xs font-black text-slate-950 dark:bg-white dark:text-slate-950">{items.length}</span>

@@ -16,13 +16,13 @@ export function QuickViewModal({ idea, isOpen, onClose }: { idea: DetailRow | nu
   if (!isOpen || !idea) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in" onClick={onClose}>
-      <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95" onClick={(event) => event.stopPropagation()}>
+    <div className="modal-overlay fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in" onClick={onClose}>
+      <div className="scroll-dialog bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95" onClick={(event) => event.stopPropagation()}>
         <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
           <h3 className="font-bold text-slate-900 truncate pr-4">{idea.title}</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600" type="button">✕</button>
         </div>
-        <div className="p-6 space-y-4 text-sm leading-relaxed text-slate-600 whitespace-pre-wrap max-h-[60vh] overflow-y-auto">
+        <div className="p-6 space-y-4 text-sm leading-relaxed text-slate-600 whitespace-pre-wrap break-words max-h-[60dvh] overflow-y-auto">
           {idea.description || "No description available."}
         </div>
         <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
@@ -63,8 +63,8 @@ export function GameEditorModal({ game, isOpen, onClose, onUpdate }: { game: Gam
   if (!isOpen || !game) return null;
 
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95">
+    <div className="modal-overlay fixed inset-0 z-[110] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
+      <div className="scroll-dialog w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95">
         <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
           <h3 className="font-bold text-gray-900 text-sm">Edit Game Info</h3>
           <button onClick={onClose} className="text-gray-400" type="button">✕</button>
@@ -253,8 +253,8 @@ export function ScriptEditorModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/70 p-2 sm:p-4 backdrop-blur-sm animate-in fade-in" onClick={onClose}>
-      <div className="flex h-[94vh] w-full max-w-[min(80rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-2xl animate-in zoom-in-95 sm:rounded-3xl lg:h-[92vh] dark:border-slate-800 dark:bg-slate-950" onClick={(event) => event.stopPropagation()}>
+    <div className="modal-overlay fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/70 p-2 sm:p-4 backdrop-blur-sm animate-in fade-in" onClick={onClose}>
+      <div className="editor-dialog flex w-full max-w-[min(80rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-2xl animate-in zoom-in-95 sm:rounded-3xl dark:border-slate-800 dark:bg-slate-950" onClick={(event) => event.stopPropagation()}>
         <div className="flex flex-col gap-3 border-b border-slate-100 bg-white px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8 lg:py-5 dark:border-slate-800 dark:bg-slate-950">
           <div>
             <h2 className="text-xl font-black text-slate-900 sm:text-2xl dark:text-slate-50">Create Video Script</h2>
@@ -527,7 +527,7 @@ export function IdeaItem({
         <>
           <button
             onClick={(event) => { event.stopPropagation(); onQuickView(r); }}
-            className="absolute left-3 top-3 z-30 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur-md transition hover:bg-emerald-500 hover:border-emerald-400 active:scale-95"
+            className="touch-target absolute left-3 top-3 z-30 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur-md transition hover:bg-emerald-500 hover:border-emerald-400 active:scale-95"
             title="Preview idea"
             aria-label={`Preview idea: ${r.title}`}
             type="button"
@@ -546,7 +546,7 @@ export function IdeaItem({
           <div className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 z-20 relative">
             <span className="truncate max-w-[80%]">{game?.title}</span>
             {!isSelectMode && game && (
-              <button onClick={(event) => { event.stopPropagation(); onEditGame(game); }} className="cursor-pointer rounded p-1 text-slate-500 opacity-0 transition-opacity hover:bg-white/20 hover:text-white group-hover:opacity-100" type="button">
+              <button onClick={(event) => { event.stopPropagation(); onEditGame(game); }} className="touch-reveal cursor-pointer rounded p-1 text-slate-500 opacity-0 transition-opacity hover:bg-white/20 hover:text-white group-hover:opacity-100 group-focus-within:opacity-100" type="button">
                 <PencilSquareIcon className="h-3 w-3" />
               </button>
             )}
@@ -577,11 +577,11 @@ export function IdeaItem({
         </div>
       </div>
       {!isSelectMode && (
-        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-20 flex flex-col gap-2">
-          <button onClick={(event) => { event.stopPropagation(); onTogglePin(r.id, !!r.pinned); }} className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-full shadow-lg backdrop-blur-md transition-colors duration-150 ${r.pinned ? "bg-amber-400 text-white" : "bg-white/10 text-white hover:bg-white/20"}`} type="button">
+        <div className="touch-reveal absolute top-3 right-3 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity z-20 flex flex-col gap-2">
+          <button onClick={(event) => { event.stopPropagation(); onTogglePin(r.id, !!r.pinned); }} className={`touch-target flex h-8 w-8 cursor-pointer items-center justify-center rounded-full shadow-lg backdrop-blur-md transition-colors duration-150 ${r.pinned ? "bg-amber-400 text-white" : "bg-white/10 text-white hover:bg-white/20"}`} type="button">
             {r.pinned ? "★" : "☆"}
           </button>
-          <button onClick={(event) => { event.stopPropagation(); onQuickView(r); }} className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white shadow-lg backdrop-blur-md transition-colors duration-150 hover:bg-emerald-500" title="Quick Preview" type="button">
+          <button onClick={(event) => { event.stopPropagation(); onQuickView(r); }} className="touch-target flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white shadow-lg backdrop-blur-md transition-colors duration-150 hover:bg-emerald-500" title="Quick Preview" type="button">
             <EyeIcon className="h-4 w-4" />
           </button>
         </div>

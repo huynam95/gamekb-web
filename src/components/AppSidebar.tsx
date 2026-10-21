@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
-import { CheckIcon, PencilSquareIcon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { Bars3Icon, CheckIcon, PencilSquareIcon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import type { Group } from "@/types/gamekb";
 
@@ -68,6 +68,7 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
   const [editingGroupName, setEditingGroupName] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const startRenameGroup = (group: Group) => {
     setEditingGroupId(group.id);
@@ -90,7 +91,7 @@ export function AppSidebar({
   const renderNavItem = (item: (typeof navItems)[number], compact = false) => {
     const active = activePage === item.key;
     const className = compact
-      ? `flex shrink-0 cursor-pointer items-center gap-2 rounded-2xl px-3 py-2 text-xs font-black transition ${
+      ? `flex min-h-11 shrink-0 cursor-pointer items-center gap-2 rounded-2xl px-3 py-2 text-xs font-black transition ${
           active
             ? "bg-slate-900 text-white shadow-sm dark:bg-white dark:text-slate-950"
             : "bg-white text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:bg-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
@@ -100,7 +101,7 @@ export function AppSidebar({
     const content = (
       <>
         <NavIcon>{item.icon}</NavIcon>
-        <span className="whitespace-nowrap leading-none">{item.label}</span>
+        <span className="min-w-0 truncate leading-none">{item.label}</span>
       </>
     );
 
@@ -108,7 +109,8 @@ export function AppSidebar({
       return (
         <button
           key={item.key}
-          onClick={onSelectAllIdeas}
+          onClick={() => { onSelectAllIdeas(); setMenuOpen(false); }}
+          aria-current={active && !selectedGroupId ? "page" : undefined}
           className={compact ? className : navClass(active && !selectedGroupId)}
           type="button"
         >
@@ -118,7 +120,7 @@ export function AppSidebar({
     }
 
     return (
-      <Link key={item.key} href={item.href} className={className}>
+      <Link key={item.key} href={item.href} className={className} aria-current={active ? "page" : undefined} onClick={() => setMenuOpen(false)}>
         {content}
       </Link>
     );
@@ -208,7 +210,7 @@ export function AppSidebar({
                         event.stopPropagation();
                         startRenameGroup(group);
                       }}
-                      className="hidden h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition hover:bg-blue-50 hover:text-blue-600 group-hover/item:flex dark:hover:bg-blue-500/10 dark:hover:text-blue-300"
+                      className="collection-action hidden h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-slate-400 transition hover:bg-blue-50 hover:text-blue-600 group-hover/item:flex group-focus-within/item:flex dark:hover:bg-blue-500/10 dark:hover:text-blue-300"
                       type="button"
                       aria-label={`Rename ${group.name}`}
                     >
@@ -220,7 +222,7 @@ export function AppSidebar({
                       event.stopPropagation();
                       onDeleteGroup?.(group.id);
                     }}
-                    className="hidden h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-rose-500 transition hover:bg-rose-50 hover:text-rose-700 group-hover/item:flex dark:hover:bg-rose-950/30"
+                    className="collection-action hidden h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-rose-500 transition hover:bg-rose-50 hover:text-rose-700 group-hover/item:flex group-focus-within/item:flex dark:hover:bg-rose-950/30"
                     type="button"
                     aria-label={`Delete ${group.name}`}
                   >
@@ -237,26 +239,41 @@ export function AppSidebar({
 
   return (
     <>
-      <div className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur xl:hidden dark:border-slate-800 dark:bg-slate-950/95">
+      <div className="app-mobile-nav sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-950/95" onKeyDown={(event) => { if (event.key === "Escape") { setMenuOpen(false); document.getElementById("navigation-toggle")?.focus(); } }}>
         <div className="flex items-center justify-between gap-3 px-3 py-3">
           <Link href="/" className="shrink-0 text-xl font-black tracking-tighter text-slate-900 dark:text-slate-100">
             GameKB<span className="text-blue-500">.</span>
           </Link>
-          {showThemeToggle && <ThemeToggle variant="compact" />}
+          <div className="flex min-w-0 items-center gap-2">
+            {showThemeToggle && <ThemeToggle variant="compact" />}
+            <button
+              id="navigation-toggle"
+              type="button"
+              className="flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-3 text-sm font-bold dark:border-slate-700 md:hidden"
+              aria-expanded={menuOpen}
+              aria-controls="compact-navigation"
+              onClick={() => setMenuOpen((current) => !current)}
+            >
+              {menuOpen ? <XMarkIcon className="h-5 w-5" /> : <Bars3Icon className="h-5 w-5" />}
+              Menu
+            </button>
+          </div>
         </div>
-        <nav className="flex gap-2 overflow-x-auto px-3 pb-3">
-          {navItems.map((item) => renderNavItem(item, true))}
-        </nav>
+        <div id="compact-navigation" className={`${menuOpen ? "block" : "hidden"} max-h-[65dvh] overflow-y-auto md:block`}>
+          <nav aria-label="Main navigation" className="grid grid-cols-2 gap-2 px-3 pb-3 md:flex md:overflow-x-auto">
+            {navItems.map((item) => renderNavItem(item, true))}
+          </nav>
+        </div>
         {collectionsBlock(true)}
       </div>
 
-      <aside className="fixed inset-y-0 left-0 z-20 hidden w-72 flex-col border-r border-slate-200 bg-white xl:flex dark:border-slate-800 dark:bg-slate-950">
-        <div className="flex h-20 items-center px-8 text-2xl font-black tracking-tighter text-slate-900 dark:text-slate-100">
+      <aside className="app-sidebar fixed inset-y-0 left-0 z-20 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+        <div className="flex h-20 shrink-0 items-center px-5 text-2xl font-black tracking-tighter text-slate-900 dark:text-slate-100">
           GameKB<span className="text-blue-500">.</span>
         </div>
 
         <div className="flex-1 space-y-6 overflow-y-auto px-4 py-4">
-          <nav className="space-y-2">
+          <nav className="space-y-2" aria-label="Main navigation">
             {navItems.map((item) => renderNavItem(item))}
           </nav>
 

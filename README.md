@@ -68,3 +68,19 @@ Do not commit or share `.env.local`. Supabase Row Level Security should still be
 - Create Idea detects normalized duplicate YouTube links across footage and sources, including alternate YouTube URL formats.
 - Daily Goal is available from the sidebar and resets progress for each new day while keeping the goal settings.
 - Create Video Script supports both drag-to-reorder and removing an idea, which regenerates script content and footage assets.
+
+## Responsive layout
+
+The shared shell and library grids use the available CSS viewport, rather than device detection. Browser zoom and OS display scaling can change the column count.
+
+| Representative viewport | Navigation | Idea columns |
+| --- | --- | --- |
+| iPhone 16 Pro Max, 440px portrait | Collapsible menu | 1 |
+| iPad Pro 11-inch, 834px portrait | Compact header | 2 |
+| iPad Pro 11-inch, 1194px landscape | 224px sidebar | 3 |
+| MacBook Air M2, 1470px | 256px sidebar | 3 |
+| Ultrawide, 2560px or 3440px | 256px sidebar | 7 |
+
+Short Projects uses cards below 1640px and a table above that width. Both views share selection, open/edit, and delete actions. Coarse-pointer devices reveal hover actions; inputs have a minimum 16px font to avoid iOS focus zoom. Editors use dynamic viewport heights and safe-area insets, with whole-dialog scrolling on short landscape viewports.
+
+For visual acceptance, check portrait/landscape, light/dark mode, the mobile menu, collection rename, filters, project selection, and editor scrolling with the keyboard open. These viewport targets do not replace testing on physical devices.

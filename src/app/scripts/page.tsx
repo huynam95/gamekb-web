@@ -470,11 +470,11 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh }: any) 
 
   return (
     <div
-      className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/70 p-2 sm:p-4 lg:p-6 backdrop-blur-md"
+      className="modal-overlay fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/70 p-2 sm:p-4 lg:p-6 backdrop-blur-md"
       onClick={() => void closeWithSave()}
     >
       <div
-        className="flex h-[94vh] w-full max-w-[min(1300px,calc(100vw-1rem))] flex-col overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-2xl sm:rounded-[2rem] lg:h-[90vh] lg:rounded-[2.5rem] dark:border-slate-800 dark:bg-slate-950"
+        className="editor-dialog flex w-full max-w-[min(1300px,calc(100vw-1rem))] flex-col overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-2xl sm:rounded-[2rem] lg:rounded-[2.5rem] dark:border-slate-800 dark:bg-slate-950"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex flex-col gap-4 border-b border-slate-100 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-10 lg:py-7 dark:border-slate-800">
@@ -877,7 +877,7 @@ export default function ScriptsPage() {
       <AppSidebar activePage="scripts" />
 
       <main className={appPageMainClass}>
-        <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <div className="app-container">
           <AppPageHeader
             title="Short Projects"
             description="Organize scripts, source channels, assets, topics, and production status in one place."
@@ -915,11 +915,46 @@ export default function ScriptsPage() {
             )}
           </div>
 
-          <div className="overflow-x-auto rounded-[1.75rem] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <label className="project-card-selection mb-4 flex min-h-11 w-fit cursor-pointer items-center gap-3 text-sm font-bold">
+            <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAllVisible} className="h-5 w-5 accent-blue-600" />
+            Select all visible projects
+          </label>
+          <div className="project-cards">
+            {filteredScripts.map((script) => {
+              const topic = getScriptTopic(script);
+              const channels = getScriptChannels(script);
+              const status = script.status || "Draft";
+              const selected = selectedIds.includes(script.id);
+              return (
+                <article key={script.id} className={`flex min-w-0 flex-col rounded-2xl border p-4 shadow-sm ${selected ? "border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-950/30" : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"}`}>
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                    <label className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-bold text-slate-500">
+                      <input type="checkbox" checked={selected} onChange={() => toggleSelected(script.id)} aria-label={`Select ${script.title}`} className="h-5 w-5 accent-blue-600" />
+                      {new Date(script.created_at).toLocaleDateString("vi-VN")}
+                    </label>
+                    <span className={`rounded-xl border px-3 py-2 text-[10px] font-black uppercase tracking-widest ${STATUS_STYLE[status] || STATUS_STYLE.Draft}`}>{status}</span>
+                  </div>
+                  <button type="button" onClick={() => { setEditingScript(script); setIsModalOpen(true); }} className="min-w-0 cursor-pointer text-left">
+                    <h2 className="break-words text-lg font-black text-slate-900 dark:text-white">{script.title}</h2>
+                    <p className="mt-2 break-words text-sm font-bold text-violet-700 dark:text-violet-300">{topic}</p>
+                    <p className="mt-2 break-words text-xs font-bold text-slate-500">{channels.join(" · ") || "Unknown channel"}</p>
+                    <p className="mt-3 line-clamp-3 break-words text-sm leading-6 text-slate-500">{getScriptSummary(script)}</p>
+                  </button>
+                  <div className="mt-auto flex items-center justify-end gap-2 pt-4">
+                    <button type="button" onClick={() => { setEditingScript(script); setIsModalOpen(true); }} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-bold dark:border-slate-700"><PencilSquareIcon className="h-4 w-4" /> Open</button>
+                    <button type="button" onClick={() => handleDelete(script.id)} aria-label={`Delete ${script.title}`} className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border border-slate-200 text-rose-500 dark:border-slate-700"><TrashIcon className="h-4 w-4" /></button>
+                  </div>
+                </article>
+              );
+            })}
+            {filteredScripts.length === 0 && <p className="col-span-full py-16 text-center font-bold text-slate-500">No video projects found. Try another search or create a new project from selected ideas.</p>}
+          </div>
+
+          <div className="projects-table overflow-x-auto rounded-[1.75rem] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <table className="min-w-[1280px] table-fixed border-collapse text-left xl:w-full">
               <thead className="border-b border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/70">
                 <tr>
-                  <th className="w-[4%] px-6 py-7 text-center">
+                  <th className="w-[5%] px-3 py-7 text-center">
                     <input
                       type="checkbox"
                       aria-label="Select all visible projects"
@@ -928,12 +963,12 @@ export default function ScriptsPage() {
                       className="h-5 w-5 cursor-pointer rounded border-slate-300 accent-blue-600"
                     />
                   </th>
-                  <th className="w-[27%] px-4 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Project</th>
-                  <th className="w-[24%] px-4 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Topic</th>
-                  <th className="w-[18%] px-4 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Channel</th>
+                  <th className="w-[25%] px-4 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Project</th>
+                  <th className="w-[20%] px-4 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Topic</th>
+                  <th className="w-[17%] px-4 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Channel</th>
                   <th className="w-[10%] px-4 py-7 text-center text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Status</th>
-                  <th className="w-[9%] px-4 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Summary</th>
-                  <th className="w-[8%] px-6 py-7 text-right text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Action</th>
+                  <th className="w-[10%] px-4 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Summary</th>
+                  <th className="w-[13%] px-3 py-7 text-right text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -954,7 +989,7 @@ export default function ScriptsPage() {
                         setIsModalOpen(true);
                       }}
                     >
-                      <td className="px-6 py-9 text-center">
+                      <td className="px-3 py-9 text-center">
                         <input
                           type="checkbox"
                           aria-label={`Select ${script.title}`}
@@ -1016,8 +1051,8 @@ export default function ScriptsPage() {
                       <td className="px-4 py-9 text-sm font-bold italic leading-relaxed text-slate-700 dark:text-slate-300">
                         <p className="line-clamp-2 pr-6">{summary}</p>
                       </td>
-                      <td className="px-6 py-9 text-right">
-                        <div className="flex items-center justify-end gap-3 opacity-0 transition-opacity group-hover:opacity-100">
+                      <td className="px-3 py-9 text-right">
+                        <div className="touch-reveal flex items-center justify-end gap-3 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
                           <button
                             onClick={(event) => {
                               event.stopPropagation();

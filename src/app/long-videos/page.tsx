@@ -105,7 +105,7 @@ export default function LongVideosPage() {
     <div className={appPageRootClass}>
       <AppSidebar activePage="longVideos" />
       <main className={appPageMainClass}>
-        <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <div className="app-container">
           <AppPageHeader
             title="Long Video Projects"
             description="Create a project, collect ideas from All Ideas, then use the project as your recording checklist."
@@ -165,7 +165,7 @@ export default function LongVideosPage() {
                       <button
                         type="button"
                         onClick={(event) => { event.stopPropagation(); void remove(project); }}
-                        className="absolute right-3 top-3 flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl bg-black/35 text-white/70 opacity-0 backdrop-blur transition hover:bg-rose-500 hover:text-white group-hover:opacity-100"
+                        className="touch-reveal absolute right-3 top-3 flex h-8 w-8 cursor-pointer items-center justify-center rounded-xl bg-black/35 text-white/70 opacity-0 backdrop-blur transition hover:bg-rose-500 hover:text-white group-hover:opacity-100 group-focus-within:opacity-100"
                         aria-label={`Delete ${project.title}`}
                       >
                         <TrashIcon className="h-4 w-4" />
@@ -195,7 +195,7 @@ export default function LongVideosPage() {
       </main>
 
       {showCreate && (
-        <div className="fixed inset-0 z-[99990] flex items-center justify-center overflow-y-auto bg-slate-950/65 p-4 backdrop-blur-sm" onMouseDown={() => setShowCreate(false)}>
+        <div className="modal-overlay fixed inset-0 z-[99990] flex items-center justify-center overflow-y-auto bg-slate-950/65 p-4 backdrop-blur-sm" onMouseDown={() => setShowCreate(false)}>
           <form onSubmit={createProject} onMouseDown={(event) => event.stopPropagation()} className="my-auto w-full max-w-xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
             <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5 dark:border-slate-800">
               <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-500">New project</p><h2 className="mt-1 text-2xl font-black">Create long video project</h2></div>

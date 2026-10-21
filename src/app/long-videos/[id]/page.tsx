@@ -321,7 +321,7 @@ export default function LongVideoProjectPage() {
     <div className={appPageRootClass}>
       <AppSidebar activePage="longVideos" />
       <main className={`${appPageMainClass} pb-28`}>
-        <div className="mx-auto w-full max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <div className="app-container">
           <AppPageHeader
             title={workspace.project.title}
             description="Your recording checklist. Add ideas from All Ideas, then track what still needs to be captured."
@@ -397,7 +397,7 @@ export default function LongVideoProjectPage() {
               </div>
 
               <div className="min-w-0">
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_180px_220px]">
+                <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.6fr)_minmax(0,0.7fr)]">
                   <label className="block"><span className="mb-1.5 block text-xs font-black text-slate-500">Project title</span><input value={workspace.project.title} onChange={(event) => updateProject("title", event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-black outline-none focus:border-violet-400 dark:border-slate-700 dark:bg-slate-950" /></label>
                   <label className="block"><span className="mb-1.5 block text-xs font-black text-slate-500">Status</span><select value={workspace.project.status} onChange={(event) => updateProject("status", event.target.value as LongVideoProject["status"])} className="h-11 w-full cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold outline-none dark:border-slate-700 dark:bg-slate-950">{PROJECT_STATUS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
                   <label className="block"><span className="mb-1.5 block text-xs font-black text-slate-500">Target duration</span><div className="relative"><input type="number" min={1} value={workspace.project.target_duration_minutes} onChange={(event) => updateProject("target_duration_minutes", Number(event.target.value))} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 pr-12 text-sm font-bold outline-none dark:border-slate-700 dark:bg-slate-950" /><span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">min</span></div></label>

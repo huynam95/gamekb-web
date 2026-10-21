@@ -359,7 +359,7 @@ export default function AudienceRequestsPage() {
     <div className={appPageRootClass}>
       <AppSidebar activePage="audienceRequests" />
       <main className={appPageMainClass}>
-        <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <div className="app-container">
           <AppPageHeader
             title="Audience Requests"
             description="Save useful comments and viewer requests so promising ideas do not disappear in the feed."
@@ -465,7 +465,7 @@ export default function AudienceRequestsPage() {
 
       {modalOpen && (
         <div
-          className="fixed inset-0 z-[99990] flex items-center justify-center overflow-y-auto bg-slate-950/65 p-4 backdrop-blur-sm"
+          className="modal-overlay fixed inset-0 z-[99990] flex items-center justify-center overflow-y-auto bg-slate-950/65 p-4 backdrop-blur-sm"
           onMouseDown={() => setModalOpen(false)}
         >
           <form
@@ -487,7 +487,7 @@ export default function AudienceRequestsPage() {
               </button>
             </div>
 
-            <div className="grid max-h-[70vh] gap-4 overflow-y-auto p-6 sm:grid-cols-2">
+            <div className="grid max-h-[70dvh] gap-4 overflow-y-auto p-6 sm:grid-cols-2">
               <label className="sm:col-span-2">
                 <span className="mb-1.5 block text-xs font-black text-slate-500">Comment *</span>
                 <textarea

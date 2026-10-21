@@ -98,8 +98,8 @@ export default function Dashboard() {
 
       {/* SELECTION BAR */}
       {isSelectMode && (
-         <div className="fixed bottom-0 inset-x-0 z-[80] border-t border-slate-200 bg-white/95 p-4 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] backdrop-blur xl:pl-72 dark:border-slate-800 dark:bg-slate-950/95">
-            <div className="mx-auto max-w-4xl flex items-center justify-between">
+         <div className="app-selection-bar fixed bottom-0 inset-x-0 z-[80] border-t border-slate-200 bg-white/95 p-4 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
+            <div className="mx-auto max-w-4xl flex flex-wrap items-center justify-between gap-3">
                <div className="flex items-center gap-4"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-white font-bold text-sm">{selectedIds.length}</span><span className="text-sm font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">Ideas Selected</span></div>
                <button disabled={selectedIds.length === 0} onClick={() => setShowEditor(true)} className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-white font-bold shadow-lg hover:bg-blue-700 active:scale-95 transition disabled:opacity-50"><PlayCircleIcon className="h-5 w-5" /> Create Script</button>
             </div>
@@ -128,7 +128,7 @@ export default function Dashboard() {
                <h3 className="mb-6 flex items-center gap-2 text-lg font-black text-slate-800 dark:text-slate-100">
                  <span className="text-amber-500">★</span> Pinned Ideas
                </h3>
-               <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+               <ul className="idea-grid">
                   {pinnedIdeas.map(r => (
                      <IdeaItem key={r.id} r={r} game={r.game} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={async (id, current) => { await supabase.from("details").update({ pinned: !current }).eq("id", id); window.location.reload(); }} onEditGame={(g) => setEditingGame(g)} onQuickView={(idea) => setPreviewIdea(idea)} />
                   ))}
@@ -138,7 +138,7 @@ export default function Dashboard() {
 
            <div>
              <h3 className="mb-6 flex items-center gap-2 text-lg font-black text-slate-800 dark:text-slate-100">✨ Recently Added</h3>
-             <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+             <ul className="idea-grid">
                 {recentIdeas.map(r => (
                    <IdeaItem key={r.id} r={r} game={r.game} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={async (id, current) => { await supabase.from("details").update({ pinned: !current }).eq("id", id); window.location.reload(); }} onEditGame={(g) => setEditingGame(g)} onQuickView={(idea) => setPreviewIdea(idea)} />
                 ))}

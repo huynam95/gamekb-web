@@ -149,7 +149,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       {children}
 
       {notice && noticeStyle && NoticeIcon && (
-        <div className="pointer-events-none fixed right-4 top-4 z-[100000] w-[calc(100%-2rem)] max-w-sm sm:right-6 sm:top-6 sm:w-full">
+        <div className="notification-toast pointer-events-none fixed right-4 top-4 z-[100000] w-[calc(100%-2rem)] max-w-sm sm:right-6 sm:top-6 sm:w-full">
           <div className="pointer-events-auto overflow-hidden rounded-[1.35rem] border border-white/70 bg-white/95 shadow-2xl shadow-slate-900/15 ring-1 ring-slate-900/5 backdrop-blur dark:border-slate-700 dark:bg-slate-950/95 dark:shadow-black/40 dark:ring-white/10">
             <div className="flex items-start gap-3 p-4">
               <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-white shadow-lg ${noticeStyle.accent}`}>
@@ -173,8 +173,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       )}
 
       {confirmState && confirmStyle && ConfirmIcon && (
-        <div className="fixed inset-0 z-[100001] flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm" onClick={() => settleConfirm(false)}>
-          <div className="w-full max-w-lg overflow-hidden rounded-[2rem] border border-white/70 bg-white shadow-2xl shadow-slate-950/20 dark:border-slate-700 dark:bg-slate-950" onClick={(event) => event.stopPropagation()}>
+        <div className="modal-overlay fixed inset-0 z-[100001] flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm" onClick={() => settleConfirm(false)}>
+          <div className="scroll-dialog w-full max-w-lg overflow-hidden rounded-[2rem] border border-white/70 bg-white shadow-2xl shadow-slate-950/20 dark:border-slate-700 dark:bg-slate-950" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start gap-4 p-6">
               <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-white shadow-lg ${confirmStyle.accent}`}>
                 <ConfirmIcon className="h-7 w-7" />
