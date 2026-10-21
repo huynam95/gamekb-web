@@ -1,5 +1,6 @@
 "use client";
 
+import { CoverImage } from "@/components/CoverImage";
 import Link from "next/link";
 import { CheckIcon, MagnifyingGlassIcon, SparklesIcon } from "@heroicons/react/24/outline";
 import type { DetailRow, Game } from "@/types/gamekb";
@@ -108,7 +109,7 @@ export function RandomIdeaModal({
                   aria-label={`Open idea detail: ${idea.title}`}
                 >
                   {hasCover ? (
-                    <div className="absolute inset-0 bg-cover bg-center opacity-60 transition-opacity duration-150 group-hover:opacity-45" style={{ backgroundImage: `url(${game.cover_url})` }} />
+                    <div className="absolute inset-0 opacity-60 transition-opacity duration-150 group-hover:opacity-45"><CoverImage src={game?.cover_url} sizes="(min-width: 1024px) 420px, (min-width: 640px) 50vw, 100vw" /></div>
                   ) : (
                     <div className="absolute inset-0 bg-slate-800" />
                   )}

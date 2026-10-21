@@ -1,5 +1,6 @@
 "use client";
 
+import { CoverImage } from "@/components/CoverImage";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CameraIcon, ClockIcon, FilmIcon, PlusIcon, TrashIcon, VideoCameraIcon } from "@heroicons/react/24/outline";
@@ -149,10 +150,9 @@ export default function LongVideosPage() {
                   >
                     <div className="relative aspect-video overflow-hidden bg-slate-900">
                       {cover ? (
-                        <div
-                          className={`absolute inset-0 bg-cover bg-center transition duration-300 group-hover:scale-[1.02] ${hasProjectThumbnail ? "opacity-100" : "opacity-80"}`}
-                          style={{ backgroundImage: `url(${cover})` }}
-                        />
+                        <div className={`absolute inset-0 transition duration-300 group-hover:scale-[1.02] ${hasProjectThumbnail ? "opacity-100" : "opacity-80"}`}>
+                          <CoverImage src={cover} sizes="(min-width: 1024px) 480px, (min-width: 640px) 50vw, 100vw" />
+                        </div>
                       ) : (
                         <div className="absolute inset-0 bg-gradient-to-br from-violet-600 via-fuchsia-600 to-slate-950" />
                       )}

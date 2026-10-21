@@ -1,5 +1,6 @@
 "use client";
 
+import { CoverImage } from "@/components/CoverImage";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -356,7 +357,7 @@ export default function LongVideoProjectPage() {
                 </div>
                 <div className="group relative aspect-video overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 dark:border-slate-700">
                   {workspace.project.thumbnail_url ? (
-                    <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${workspace.project.thumbnail_url})` }} />
+                    <CoverImage src={workspace.project.thumbnail_url} alt="Thumbnail" sizes="(min-width: 1024px) 480px, 100vw" />
                   ) : (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-violet-600 via-fuchsia-600 to-slate-950 text-white">
                       <PhotoIcon className="h-9 w-9 text-white/75" />

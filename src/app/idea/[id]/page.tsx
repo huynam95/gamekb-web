@@ -1,5 +1,6 @@
 "use client";
 
+import { CoverImage } from "@/components/CoverImage";
 import { TypeLabel } from "@/components/TypePill";
 import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -580,7 +581,7 @@ export default function IdeaDetailPage() {
          
          {/* Background Layer (Blur) */}
          {game?.cover_url ? (
-            <div className="absolute inset-0 bg-cover bg-center opacity-40 blur-xl scale-110" style={{ backgroundImage: `url(${game.cover_url})` }} />
+            <div className="absolute inset-0 scale-110 opacity-40 blur-xl"><CoverImage src={game.cover_url} sizes="256px" priority /></div>
          ) : (
             <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20" />
          )}
@@ -630,7 +631,7 @@ export default function IdeaDetailPage() {
                <div className="shrink-0">
                   <div className="relative h-64 w-44 md:h-80 md:w-56 overflow-hidden rounded-xl border border-white/10 shadow-2xl shadow-black/50 rotate-[-2deg] transition hover:rotate-0">
                      {game?.cover_url ? (
-                        <img src={game.cover_url} alt="Cover" className="h-full w-full object-cover" />
+                        <CoverImage src={game.cover_url} alt={`${game.title} cover`} sizes="(min-width: 768px) 224px, 176px" priority />
                      ) : (
                         <div className="flex h-full w-full items-center justify-center bg-slate-800 text-fg-3"><PuzzlePieceIcon className="h-12 w-12" aria-hidden="true" /></div>
                      )}

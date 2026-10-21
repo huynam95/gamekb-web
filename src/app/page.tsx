@@ -1,5 +1,6 @@
 "use client";
 
+import { CoverImage } from "@/components/CoverImage";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -48,8 +49,7 @@ function GameThumb({ src, size = "sm" }: { src?: string | null; size?: "sm" | "m
   return (
     <span className={`relative flex shrink-0 items-center justify-center overflow-hidden bg-surface-sunken text-fg-4 ring-1 ring-black/5 dark:ring-white/10 ${box}`}>
       {src ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
+        <CoverImage src={src} sizes={size === "sm" ? "28px" : "36px"} />
       ) : (
         <PuzzlePieceIcon className="h-4 w-4" aria-hidden="true" />
       )}
@@ -1412,8 +1412,8 @@ export default function Home() {
             <IdeaGridSkeleton />
           ) : (
             <ul className={`idea-grid transition-opacity duration-150 ${loading ? "opacity-60" : ""}`} aria-busy={loading}>
-              {currentIdeas.map(r => (
-                 <IdeaItem key={r.id} r={r} game={games.find(g => g.id === r.game_id)} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={togglePin} onEditGame={setEditingGame} onQuickView={setPreviewIdea} onRemoveFromGroup={groupId && loadedGroupId === groupId ? removeIdeaFromGroup : undefined} groupName={activeGroup?.name} removingFromGroup={removingGroupItems.has(`${groupId}:${r.id}`)} />
+              {currentIdeas.map((r, index) => (
+                 <IdeaItem key={r.id} priority={index < 6} r={r} game={games.find(g => g.id === r.game_id)} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={togglePin} onEditGame={setEditingGame} onQuickView={setPreviewIdea} onRemoveFromGroup={groupId && loadedGroupId === groupId ? removeIdeaFromGroup : undefined} groupName={activeGroup?.name} removingFromGroup={removingGroupItems.has(`${groupId}:${r.id}`)} />
               ))}
             </ul>
           )}

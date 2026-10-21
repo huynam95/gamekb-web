@@ -1,5 +1,6 @@
 "use client";
 
+import { CoverImage } from "@/components/CoverImage";
 import {
   useEffect,
   useMemo,
@@ -135,7 +136,7 @@ function GameSearchPicker({
         <span className="flex min-w-0 items-center gap-3">
           <span className="relative h-8 w-8 shrink-0 overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
             {selected?.cover_url ? (
-              <span className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${selected.cover_url})` }} />
+              <CoverImage src={selected.cover_url} sizes="32px" />
             ) : (
               <span className="flex h-full w-full items-center justify-center text-fg-4"><PuzzlePieceIcon className="h-4 w-4" aria-hidden="true" /></span>
             )}
@@ -216,7 +217,7 @@ function GameSearchPicker({
                     <span className="flex min-w-0 items-center gap-3">
                       <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-black/5 dark:bg-slate-800 dark:ring-white/10">
                         {game.cover_url ? (
-                          <span className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${game.cover_url})` }} />
+                          <CoverImage src={game.cover_url} sizes="36px" />
                         ) : (
                           <span className="flex h-full w-full items-center justify-center text-fg-4"><PuzzlePieceIcon className="h-3.5 w-3.5" aria-hidden="true" /></span>
                         )}
@@ -393,10 +394,9 @@ export default function AudienceRequestsPage() {
                     className="group relative h-[220px] overflow-hidden rounded-[1.5rem] border border-slate-800 bg-slate-900 shadow-sm transition-shadow duration-150 hover:shadow-lg"
                   >
                     {item.game?.cover_url ? (
-                      <div
-                        className="absolute inset-0 bg-cover bg-center opacity-60 transition-opacity duration-150 group-hover:opacity-48"
-                        style={{ backgroundImage: `url(${item.game.cover_url})` }}
-                      />
+                      <div className="absolute inset-0 opacity-60 transition-opacity duration-150 group-hover:opacity-50">
+                        <CoverImage src={item.game.cover_url} sizes="(min-width: 1024px) 420px, (min-width: 640px) 50vw, 100vw" />
+                      </div>
                     ) : (
                       <div className="absolute inset-0 bg-gradient-to-br from-fuchsia-600 via-violet-700 to-slate-950 opacity-80" />
                     )}

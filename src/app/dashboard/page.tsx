@@ -130,8 +130,8 @@ export default function Dashboard() {
                  <StarSolidIcon className="h-5 w-5 text-amber-500" aria-hidden="true" /> Pinned Ideas
                </h3>
                <ul className="idea-grid">
-                  {pinnedIdeas.map(r => (
-                     <IdeaItem key={r.id} r={r} game={r.game} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={async (id, current) => { await supabase.from("details").update({ pinned: !current }).eq("id", id); window.location.reload(); }} onEditGame={(g) => setEditingGame(g)} onQuickView={(idea) => setPreviewIdea(idea)} />
+                  {pinnedIdeas.map((r, index) => (
+                     <IdeaItem key={r.id} priority={index < 3} r={r} game={r.game} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={async (id, current) => { await supabase.from("details").update({ pinned: !current }).eq("id", id); window.location.reload(); }} onEditGame={(g) => setEditingGame(g)} onQuickView={(idea) => setPreviewIdea(idea)} />
                   ))}
                </ul>
              </div>

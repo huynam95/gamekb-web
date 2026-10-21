@@ -1,14 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CoverImage } from "@/components/CoverImage";
 
 type CoverBackdropProps = {
   src?: string | null;
   alt?: string;
   imageClassName?: string;
   fallbackClassName?: string;
-  loading?: "eager" | "lazy";
+  /** Rendered width hint for the optimiser. Defaults to an idea card. */
+  sizes?: string;
+  priority?: boolean;
 };
+
+/** Library-card width: full width on phones, ~360px in the grid. */
+export const IDEA_CARD_SIZES = "(min-width: 1024px) 400px, (min-width: 640px) 50vw, 100vw";
 
 const fallbackStyle = {
   background:
@@ -20,7 +26,8 @@ export function CoverBackdrop({
   alt = "Game cover",
   imageClassName = "opacity-60",
   fallbackClassName = "opacity-100",
-  loading = "lazy",
+  sizes = IDEA_CARD_SIZES,
+  priority = false,
 }: CoverBackdropProps) {
   const [loaded, setLoaded] = useState(false);
 
@@ -35,18 +42,15 @@ export function CoverBackdrop({
         className={`absolute inset-0 transition-opacity duration-200 ${loaded ? "opacity-0" : fallbackClassName}`}
         style={fallbackStyle}
       />
-      {src && (
-        <img
-          src={src}
-          alt={alt}
-          loading={loading}
-          decoding="async"
-          draggable={false}
-          onLoad={() => setLoaded(true)}
-          onError={() => setLoaded(true)}
-          className={`absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-200 ${loaded ? imageClassName : "opacity-0"}`}
-        />
-      )}
+      <CoverImage
+        src={src}
+        alt={alt}
+        sizes={sizes}
+        priority={priority}
+        onLoad={() => setLoaded(true)}
+        onError={() => setLoaded(true)}
+        className={`transition-opacity duration-200 ${loaded ? imageClassName : "opacity-0"}`}
+      />
     </div>
   );
 }

@@ -17,6 +17,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!login|api/auth|_next/static|_next/image|favicon.ico).*)",
+    // _next/image is deliberately NOT excluded: only signed-in users may use the image optimiser.
+    "/((?!login|api/auth|_next/static|favicon.ico).*)",
   ],
 };

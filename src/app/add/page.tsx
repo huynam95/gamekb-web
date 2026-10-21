@@ -1,5 +1,6 @@
 "use client";
 
+import { CoverImage } from "@/components/CoverImage";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentType, SVGProps } from "react";
 import { ArrowPathIcon, ArrowTopRightOnSquareIcon, ChatBubbleLeftRightIcon, CheckIcon, ChevronDownIcon, CloudArrowDownIcon, CubeTransparentIcon, ExclamationTriangleIcon, FaceSmileIcon, FilmIcon, FolderIcon, GlobeAltIcon, LightBulbIcon, MagnifyingGlassIcon, PlusIcon, PuzzlePieceIcon, SparklesIcon, UserGroupIcon, XMarkIcon } from "@heroicons/react/24/outline";
@@ -125,8 +126,7 @@ function GameCover({ src, className = "h-10 w-10 rounded-xl" }: { src?: string |
   return (
     <span className={`relative flex shrink-0 items-center justify-center overflow-hidden bg-surface-sunken text-fg-4 ring-1 ring-black/5 dark:ring-white/10 ${className}`}>
       {src ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
+        <CoverImage src={src} sizes="40px" />
       ) : (
         <PuzzlePieceIcon className="h-5 w-5" aria-hidden="true" />
       )}

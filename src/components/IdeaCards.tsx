@@ -507,6 +507,7 @@ export function IdeaItem({
   onRemoveFromGroup,
   groupName,
   removingFromGroup = false,
+  priority = false,
 }: {
   r: DetailRow;
   game?: Game;
@@ -519,6 +520,8 @@ export function IdeaItem({
   onRemoveFromGroup?: (idea: DetailRow) => void;
   groupName?: string;
   removingFromGroup?: boolean;
+  /** Cards in the first visible row load their cover immediately. */
+  priority?: boolean;
 }) {
   const ideaGroups = r.groups ?? [];
   const channelNames = [...new Set((r.footage ?? []).map((item) => item.channel_name?.trim()).filter(Boolean) as string[])];
@@ -528,7 +531,7 @@ export function IdeaItem({
   return (
     <li onClick={() => isSelectMode && onToggleSelect(r)} className={`group relative h-64 w-full overflow-hidden rounded-2xl border bg-slate-900 shadow-sm transition-shadow duration-150 ${isSelectMode ? "cursor-pointer active:scale-[0.99]" : "hover:shadow-xl"} ${isSelected ? "border-blue-500 ring-2 ring-blue-500 ring-offset-2 ring-offset-background" : "border-line"}`}>
       <div className={`absolute inset-0 transition-opacity duration-150 ${isSelectMode ? "" : "group-hover:opacity-75"}`}>
-        <CoverBackdrop src={game?.cover_url} alt="" imageClassName="opacity-60" />
+        <CoverBackdrop src={game?.cover_url} alt="" imageClassName="opacity-60" priority={priority} />
       </div>
       <div className={`absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/60 to-transparent ${isSelected ? "opacity-90 bg-blue-900/20" : ""}`} />
       {isSelectMode && (
