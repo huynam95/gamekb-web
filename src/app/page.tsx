@@ -25,7 +25,6 @@ import { fetchYoutubeMetadata, isYoutubeUrl } from "@/lib/youtube";
 /* ================= CONFIG ================= */
 
 const ITEMS_PER_PAGE = 24;
-const PINNED_COLLAPSED_STORAGE_KEY = "gamekb-pinned-collapsed";
 const TOPIC_DB_MIGRATION_STORAGE_KEY = "gamekb-video-themes-db-migrated";
 
 function applyIdeaTextSearch(query: any, rawTerm: string, games: Game[]) {
@@ -513,10 +512,9 @@ export default function Home() {
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [ideasRevision, setIdeasRevision] = useState(0);
-  const [pinnedIdeas, setPinnedIdeas] = useState<DetailRow[]>([]);
-  const [pinnedLoaded, setPinnedLoaded] = useState(false);
-  const [pinnedCollapsed, setPinnedCollapsed] = useState(false);
-  const pinnedRowRef = useRef<HTMLUListElement>(null);
+  /** "Pinned" behaves like a built-in collection in the sidebar. */
+  const [pinnedOnly, setPinnedOnly] = useState(false);
+  const [pinnedCount, setPinnedCount] = useState<number | null>(null);
   const [removingGroupItems, setRemovingGroupItems] = useState<Set<string>>(new Set());
   const pendingGroupRemovals = useRef(new Set<string>());
 
@@ -587,8 +585,10 @@ export default function Home() {
     Promise.all([
       supabase.from("games").select("*").order("title"),
       supabase.from("idea_groups").select("*").order("name"),
-      supabase.from("idea_group_items").select("group_id")
-    ]).then(([gs, grps, items]) => {
+      supabase.from("idea_group_items").select("group_id"),
+      supabase.from("details").select("id", { count: "exact", head: true }).eq("status", "idea").eq("pinned", true),
+    ]).then(([gs, grps, items, pinned]) => {
+      if (!pinned.error) setPinnedCount(pinned.count ?? 0);
       setGames((gs.data ?? []) as Game[]);
       setGroups((grps.data ?? []) as Group[]);
       const m = new Map<number, number>();
@@ -704,7 +704,7 @@ export default function Home() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedQ, gameId, groupId, type, releaseYear, sortOrder]);
+  }, [debouncedQ, gameId, groupId, type, releaseYear, sortOrder, pinnedOnly]);
 
   useEffect(() => {
     let cancelled = false;
@@ -744,6 +744,7 @@ export default function Home() {
             nextQuery = nextQuery.in("game_id", yearGameIds.length > 0 ? yearGameIds : [-1]);
           }
           if (type) nextQuery = nextQuery.eq("detail_type", type);
+          if (pinnedOnly) nextQuery = nextQuery.eq("pinned", true);
           return applyIdeaTextSearch(nextQuery, debouncedQ, games);
         };
 
@@ -857,7 +858,7 @@ export default function Home() {
     }
     void load();
     return () => { cancelled = true; };
-  }, [debouncedQ, gameId, groupId, type, releaseYear, sortOrder, randomSeed, currentPage, games, groups, ideasRevision]);
+  }, [debouncedQ, gameId, groupId, type, releaseYear, sortOrder, pinnedOnly, randomSeed, currentPage, games, groups, ideasRevision]);
 
   const toggleSelection = (idea: DetailRow) => {
     setSelectedIds(prev =>
@@ -1111,78 +1112,33 @@ export default function Home() {
   const totalPages = Math.max(1, Math.ceil(totalCount / ITEMS_PER_PAGE));
   const currentIdeas = ideas;
   const selectedTheme = getVideoThemeById(videoThemes, selectedThemeId);
-  useEffect(() => {
-    try {
-      setPinnedCollapsed(window.localStorage.getItem(PINNED_COLLAPSED_STORAGE_KEY) === "1");
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function loadPinned() {
-      const { data, error } = await supabase
-        .from("details")
-        .select("*, footage(id, file_path, title, channel_name)")
-        .eq("status", "idea")
-        .eq("pinned", true)
-        .order("pinned_at", { ascending: false, nullsFirst: false })
-        .order("created_at", { ascending: false })
-        .limit(60);
-      if (cancelled) return;
-      if (error) {
-        setPinnedLoaded(true);
-        return;
-      }
-      const enriched = await attachGroupsToIdeas((data ?? []) as DetailRow[]);
-      if (cancelled) return;
-      setPinnedIdeas(enriched);
-      setPinnedLoaded(true);
-    }
-    void loadPinned();
-    return () => { cancelled = true; };
-    // attachGroupsToIdeas reads the latest groups; reload when they or the library change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groups, ideasRevision]);
-
-  const togglePinnedCollapsed = () => {
-    setPinnedCollapsed((current) => {
-      const next = !current;
-      try {
-        window.localStorage.setItem(PINNED_COLLAPSED_STORAGE_KEY, next ? "1" : "0");
-      } catch {}
-      return next;
-    });
-  };
-
-  const scrollPinned = (direction: 1 | -1) => {
-    const row = pinnedRowRef.current;
-    if (!row) return;
-    row.scrollBy({ left: direction * Math.max(row.clientWidth * 0.8, 280), behavior: "smooth" });
-  };
-
-  /** Pin or unpin from any card; keeps the Pinned row and the library in sync. */
+  /** Pin or unpin from any card; keeps the Pinned collection count in sync. */
   const togglePin = async (id: number, current: boolean) => {
     const nextPinned = !current;
-    const source = ideas.find((idea) => idea.id === id) ?? pinnedIdeas.find((idea) => idea.id === id);
-    const previousPinned = pinnedIdeas;
+    const delta = nextPinned ? 1 : -1;
     setIdeas((prev) => prev.map((idea) => (idea.id === id ? { ...idea, pinned: nextPinned } : idea)));
-    setPinnedIdeas((prev) => nextPinned
-      ? (source && !prev.some((idea) => idea.id === id) ? [{ ...source, pinned: true }, ...prev] : prev)
-      : prev.filter((idea) => idea.id !== id));
+    setPinnedCount((count) => (count === null ? count : Math.max(0, count + delta)));
     const { error } = await supabase
       .from("details")
       .update({ pinned: nextPinned, pinned_at: nextPinned ? new Date().toISOString() : null })
       .eq("id", id);
     if (error) {
       setIdeas((prev) => prev.map((idea) => (idea.id === id ? { ...idea, pinned: current } : idea)));
-      setPinnedIdeas(previousPinned);
+      setPinnedCount((count) => (count === null ? count : Math.max(0, count - delta)));
       notifyError(error.message, "Could not update pin");
+      return;
     }
+    // In the Pinned collection an unpinned idea leaves the list, like removing it from a collection.
+    if (pinnedOnly && current) setIdeasRevision((revision) => revision + 1);
+  };
+
+  const selectPinned = () => {
+    setGroupId("");
+    setPinnedOnly(true);
   };
 
   const activeGroup = groups.find((group) => group.id === groupId);
-  const filtersActive = Boolean(debouncedQ.trim() || gameId || type || releaseYear !== "");
-  const showPinnedRow = !groupId && !filtersActive && pinnedLoaded && pinnedIdeas.length > 0;
+
   const goToPage = (p: number) => {
     setCurrentPage(p);
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -1347,16 +1303,19 @@ export default function Home() {
         onCreateGroup={createGroup}
         onDeleteGroup={deleteGroup}
         onRenameGroup={renameGroup}
-        onSelectGroup={setGroupId}
-        onSelectAllIdeas={() => { setGroupId(""); setQ(""); }}
+        onSelectGroup={(id) => { setPinnedOnly(false); setGroupId(id); }}
+        onSelectAllIdeas={() => { setGroupId(""); setPinnedOnly(false); setQ(""); }}
+        pinnedSelected={pinnedOnly}
+        pinnedCount={pinnedCount}
+        onSelectPinned={selectPinned}
       />
 
       <main className={`${appPageMainClass} pb-32`}>
         <div className="app-container library-container">
           <AppPageHeader
-            title={activeGroup?.name || "All Ideas"}
-            description={activeGroup ? "Remove ideas that don't fit this collection. They stay in All Ideas." : isLongProjectPickMode ? `Browse and select ideas for ${longProjectTitle}.` : "Choose a topic, search your library, and build the next video from the ideas you already have."}
-            icon={<Squares2X2Icon className="h-5 w-5" />}
+            title={pinnedOnly ? "Pinned" : activeGroup?.name || "All Ideas"}
+            description={pinnedOnly ? (isSelectMode ? "Pick from your pinned ideas. Ideas you already selected stay selected." : "Every idea you starred. Unpin a card to take it out of this list.") : activeGroup ? "Remove ideas that don't fit this collection. They stay in All Ideas." : isLongProjectPickMode ? `Browse and select ideas for ${longProjectTitle}.` : "Choose a topic, search your library, and build the next video from the ideas you already have."}
+            icon={pinnedOnly ? <StarSolidIcon className="h-5 w-5 text-amber-500" /> : <Squares2X2Icon className="h-5 w-5" />}
             className="mb-4"
             action={
               <span className="inline-flex h-9 items-center rounded-full bg-surface-sunken px-3.5 text-sm font-semibold tabular-nums text-fg-2" aria-live="polite">
@@ -1436,10 +1395,10 @@ export default function Home() {
                     setSortOrder(nextSort);
                   }}
                 />
-                {(q||gameId||groupId||type||releaseYear!=="") && (
+                {(q||gameId||groupId||type||releaseYear!==""||pinnedOnly) && (
                   <button
                     type="button"
-                    onClick={()=>{setQ("");setGameId("");setGroupId("");setType("");setReleaseYear("")}}
+                    onClick={()=>{setQ("");setGameId("");setGroupId("");setType("");setReleaseYear("");setPinnedOnly(false)}}
                     className="h-10 shrink-0 cursor-pointer rounded-full px-3 text-sm font-semibold text-rose-500 transition hover:bg-danger-soft hover:text-rose-600 dark:hover:text-rose-300"
                   >
                     Clear filters
@@ -1448,41 +1407,6 @@ export default function Home() {
               </div>
             </div>
           </div>
-
-          {showPinnedRow && (
-            <section className="mb-8" aria-labelledby="pinned-ideas-heading">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={togglePinnedCollapsed}
-                  aria-expanded={!pinnedCollapsed}
-                  aria-controls="pinned-ideas-row"
-                  className="group flex min-h-10 cursor-pointer items-center gap-2 rounded-xl pr-2 text-left"
-                >
-                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300">
-                    <StarSolidIcon className="h-4 w-4" />
-                  </span>
-                  <h2 id="pinned-ideas-heading" className="text-lg font-bold text-fg">Pinned</h2>
-                  <span className="rounded-full bg-surface-sunken px-2 py-0.5 text-xs font-semibold tabular-nums text-fg-3">{pinnedIdeas.length}</span>
-                  <ChevronDownIcon className={`h-4 w-4 text-fg-4 transition group-hover:text-fg ${pinnedCollapsed ? "-rotate-90" : ""}`} />
-                </button>
-                {!pinnedCollapsed && pinnedIdeas.length > 1 && (
-                  <div className="hidden items-center gap-1 sm:flex">
-                    <Button variant="secondary" size="icon-sm" onClick={() => scrollPinned(-1)} aria-label="Scroll pinned ideas left"><ChevronLeftIcon className="h-4 w-4" /></Button>
-                    <Button variant="secondary" size="icon-sm" onClick={() => scrollPinned(1)} aria-label="Scroll pinned ideas right"><ChevronRightIcon className="h-4 w-4" /></Button>
-                  </div>
-                )}
-              </div>
-              {!pinnedCollapsed && (
-                <ul id="pinned-ideas-row" ref={pinnedRowRef} className="pinned-row animate-in fade-in duration-150">
-                  {pinnedIdeas.map((r) => (
-                    <IdeaItem key={`pinned-${r.id}`} r={r} game={games.find(g => g.id === r.game_id)} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={togglePin} onEditGame={setEditingGame} onQuickView={setPreviewIdea} />
-                  ))}
-                </ul>
-              )}
-              <h2 className="mt-8 text-lg font-bold text-fg">All ideas</h2>
-            </section>
-          )}
 
           {loading && currentIdeas.length === 0 ? (
             <IdeaGridSkeleton />
@@ -1496,7 +1420,7 @@ export default function Home() {
 
           {!loading && currentIdeas.length === 0 && (
             <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm font-medium text-fg-3 dark:border-slate-700">
-              {activeGroup ? "No ideas in this collection match your filters." : "No ideas match your filters."}
+              {pinnedOnly ? (pinnedCount === 0 ? "No pinned ideas yet. Hover a card and press the star to pin it." : "No pinned ideas match your filters.") : activeGroup ? "No ideas in this collection match your filters." : "No ideas match your filters."}
             </div>
           )}
 

@@ -17,6 +17,7 @@ import {
   TrashIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
+import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useDismiss } from "@/components/ui/useDismiss";
 import type { Group } from "@/types/gamekb";
@@ -38,6 +39,10 @@ type AppSidebarProps = {
   onRenameGroup?: (id: number, name: string) => void | Promise<void>;
   onSelectGroup?: (id: number) => void;
   onSelectAllIdeas?: () => void;
+  /** Built-in "Pinned" entry at the top of Collections (ideas page only). */
+  onSelectPinned?: () => void;
+  pinnedSelected?: boolean;
+  pinnedCount?: number | null;
   showThemeToggle?: boolean;
 };
 
@@ -86,6 +91,9 @@ export function AppSidebar({
   onRenameGroup,
   onSelectGroup,
   onSelectAllIdeas,
+  onSelectPinned,
+  pinnedSelected = false,
+  pinnedCount = null,
   showThemeToggle = true,
 }: AppSidebarProps) {
   const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
@@ -118,7 +126,7 @@ export function AppSidebar({
 
   const renderNavItem = (item: (typeof navItems)[number], compact = false) => {
     const isIdeasWithGroup = item.key === "ideas" && Boolean(onSelectAllIdeas);
-    const active = activePage === item.key && (!isIdeasWithGroup || !selectedGroupId);
+    const active = activePage === item.key && (!isIdeasWithGroup || (!selectedGroupId && !pinnedSelected));
     const content = (
       <>
         <item.Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
@@ -178,6 +186,22 @@ export function AppSidebar({
         )}
 
         <div className={compact ? "grid grid-cols-1 gap-1 sm:grid-cols-2 md:grid-cols-3" : "space-y-0.5"}>
+          {onSelectPinned && (
+            <div className={`relative flex w-full min-w-0 items-center justify-between rounded-lg px-2 transition ${pinnedSelected ? "bg-amber-50 dark:bg-amber-500/10" : "hover:bg-surface-hover"}`}>
+              <button
+                type="button"
+                onClick={() => { onSelectPinned(); setMenuOpen(false); }}
+                aria-current={pinnedSelected ? "true" : undefined}
+                className={`flex min-h-9 min-w-0 flex-1 cursor-pointer items-center gap-2 py-2 text-left text-sm ${pinnedSelected ? "font-semibold text-amber-700 dark:text-amber-300" : "font-medium text-fg-3 hover:text-fg"}`}
+              >
+                <StarSolidIcon className={`h-4 w-4 shrink-0 ${pinnedSelected ? "text-amber-500" : "text-amber-400"}`} aria-hidden="true" />
+                <span className="truncate">Pinned</span>
+              </button>
+              {typeof pinnedCount === "number" && (
+                <span className={`mr-1 tabular-nums text-[11px] font-semibold leading-none ${pinnedSelected ? "text-amber-700 dark:text-amber-300" : "text-fg-4"}`}>{pinnedCount}</span>
+              )}
+            </div>
+          )}
           {groups.map((group) => {
             const selected = selectedGroupId === group.id;
             return (
@@ -259,7 +283,7 @@ export function AppSidebar({
     )
   );
 
-  const currentLabel = activeGroup?.name || activeItem?.label;
+  const currentLabel = pinnedSelected ? "Pinned" : activeGroup?.name || activeItem?.label;
 
   return (
     <>
