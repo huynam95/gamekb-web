@@ -554,10 +554,10 @@ export function IdeaItem({
           onClick={(event) => { event.stopPropagation(); onRemoveFromGroup(r); }}
           aria-label={`Remove ${r.title} from ${groupName || "this collection"}`}
           title={`Remove from ${groupName || "this collection"}. The idea stays in All Ideas.`}
-          className={`absolute top-3 z-30 inline-flex min-h-11 max-w-[calc(100%-7rem)] cursor-pointer items-center gap-1.5 rounded-xl border border-white/25 bg-slate-950/70 px-3 text-xs font-bold text-white shadow-sm backdrop-blur transition hover:border-rose-300 hover:bg-rose-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-wait disabled:opacity-60 ${isSelectMode ? "left-16" : "left-3"}`}
+          aria-busy={removingFromGroup}
+          className={`absolute top-3 z-30 inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border border-white/25 bg-slate-950/70 text-white shadow-sm backdrop-blur transition hover:border-rose-300 hover:bg-rose-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-wait disabled:opacity-60 ${isSelectMode ? "left-16" : "left-3"}`}
         >
           <XMarkIcon className="h-4 w-4 shrink-0" />
-          {removingFromGroup ? "Removing..." : "Remove"}
         </button>
       )}
       <div className="absolute inset-0 flex flex-col justify-end p-5">
