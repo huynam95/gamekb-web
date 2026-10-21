@@ -1,6 +1,6 @@
 "use client";
 
-import { CoverImage } from "@/components/CoverImage";
+import { CoverImage, warmCoverImages } from "@/components/CoverImage";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -26,6 +26,13 @@ import { fetchYoutubeMetadata, isYoutubeUrl } from "@/lib/youtube";
 /* ================= CONFIG ================= */
 
 const ITEMS_PER_PAGE = 24;
+/** How long a loaded page may be reused before it is fetched again. */
+const PAGE_CACHE_TTL_MS = 2 * 60 * 1000;
+
+type IdeasPageResult =
+  | { kind: "ok"; rows: DetailRow[]; total: number; groupId: number | "" }
+  | { kind: "redirect"; page: number; total: number }
+  | { kind: "empty" };
 const TOPIC_DB_MIGRATION_STORAGE_KEY = "gamekb-video-themes-db-migrated";
 
 function applyIdeaTextSearch(query: any, rawTerm: string, games: Game[]) {
@@ -571,13 +578,15 @@ export default function Home() {
       const updates = results.filter(Boolean) as Array<{ footageId: number; channelName: string; title: string | null }>;
       if (updates.length === 0) continue;
       const updateById = new Map(updates.map((item) => [item.footageId, item]));
-      setIdeas((current) => current.map((idea) => ({
+      const applyChannelUpdates = (idea: DetailRow): DetailRow => ({
         ...idea,
         footage: idea.footage?.map((footage) => {
           const update = footage.id ? updateById.get(footage.id) : undefined;
           return update ? { ...footage, channel_name: update.channelName, title: update.title } : footage;
         }),
-      })));
+      });
+      setIdeas((current) => current.map(applyChannelUpdates));
+      patchCachedRows(applyChannelUpdates);
     }
   }
 
@@ -706,147 +715,181 @@ export default function Home() {
     setCurrentPage(1);
   }, [debouncedQ, gameId, groupId, type, releaseYear, sortOrder, pinnedOnly]);
 
+  /*
+   * Page loading. Every loaded page is kept for a short while and the next page
+   * (data and cover images) is fetched in the background, so Next/Previous is
+   * usually instant. The shuffled id list for Random is kept too instead of
+   * being re-downloaded on every page change.
+   */
+  const pageCacheRef = useRef(new Map<string, { result: IdeasPageResult; at: number }>());
+  const idListCacheRef = useRef(new Map<string, { ids: number[]; total: number; at: number }>());
+  const filterKey = JSON.stringify({
+    q: debouncedQ, gameId, groupId, type, releaseYear, sortOrder, pinnedOnly,
+    seed: sortOrder === "random" ? randomSeed : 0,
+    rev: ideasRevision,
+    games: games.length,
+    groups: groups.map((group) => `${group.id}:${group.name}`).join("|"),
+  });
+
+  /** Apply a change to rows already held in the page cache (pins, channel backfill). */
+  const patchCachedRows = (update: (row: DetailRow) => DetailRow) => {
+    for (const entry of pageCacheRef.current.values()) {
+      if (entry.result.kind === "ok") entry.result = { ...entry.result, rows: entry.result.rows.map(update) };
+    }
+  };
+
+  const fetchIdeasPage = async (page: number): Promise<IdeasPageResult> => {
+    const from = (page - 1) * ITEMS_PER_PAGE;
+    const to = from + ITEMS_PER_PAGE - 1;
+
+    let groupDetailIds: number[] | null = null;
+    if (groupId) {
+      const { data: items, error: groupError } = await supabase
+        .from("idea_group_items")
+        .select("detail_id")
+        .eq("group_id", groupId);
+      if (groupError) throw new Error(groupError.message);
+      groupDetailIds = (items ?? [])
+        .map((item: { detail_id: number }) => Number(item.detail_id))
+        .filter((id: number) => Number.isFinite(id));
+      if (groupDetailIds.length === 0) return { kind: "empty" };
+    }
+
+    const applyFilters = (query: any) => {
+      let nextQuery = query;
+      if (groupDetailIds) nextQuery = nextQuery.in("id", groupDetailIds);
+      if (gameId) nextQuery = nextQuery.eq("game_id", gameId);
+      if (releaseYear !== "") {
+        const yearGameIds = games
+          .filter((game) => releaseYear === "unknown" ? game.release_year == null : game.release_year === releaseYear)
+          .map((game) => game.id);
+        nextQuery = nextQuery.in("game_id", yearGameIds.length > 0 ? yearGameIds : [-1]);
+      }
+      if (type) nextQuery = nextQuery.eq("detail_type", type);
+      if (pinnedOnly) nextQuery = nextQuery.eq("pinned", true);
+      return applyIdeaTextSearch(nextQuery, debouncedQ, games);
+    };
+
+    if (sortOrder === "random") {
+      let idList = idListCacheRef.current.get(filterKey);
+      if (!idList || Date.now() - idList.at > PAGE_CACHE_TTL_MS) {
+        const allIds: number[] = [];
+        const chunkSize = 1000;
+        let offset = 0;
+        let exactCount = 0;
+        while (true) {
+          let idQuery = supabase.from("details").select("id", { count: "exact" }).eq("status", "idea");
+          idQuery = applyFilters(idQuery);
+          const { data: idRows, count, error: idError } = await idQuery
+            .order("id", { ascending: true })
+            .range(offset, offset + chunkSize - 1);
+          if (idError) throw new Error(idError.message);
+          if (offset === 0) exactCount = count ?? 0;
+          const chunkIds = (idRows ?? [])
+            .map((row: { id: number }) => Number(row.id))
+            .filter((id: number) => Number.isFinite(id));
+          allIds.push(...chunkIds);
+          if (chunkIds.length < chunkSize || allIds.length >= exactCount) break;
+          offset += chunkSize;
+        }
+        idList = { ids: seededShuffle(allIds, randomSeed), total: exactCount || allIds.length, at: Date.now() };
+        idListCacheRef.current.set(filterKey, idList);
+      }
+
+      const lastPage = Math.max(1, Math.ceil(idList.total / ITEMS_PER_PAGE));
+      if (page > lastPage) return { kind: "redirect", page: lastPage, total: idList.total };
+      const pageIds = idList.ids.slice(from, to + 1);
+      if (pageIds.length === 0) return { kind: "ok", rows: [], total: idList.total, groupId };
+
+      const { data, error } = await supabase
+        .from("details")
+        .select("*, footage(id, file_path, title, channel_name)")
+        .in("id", pageIds);
+      if (error) throw new Error(error.message);
+      const rowById = new Map(((data ?? []) as DetailRow[]).map((row) => [row.id, row]));
+      const orderedRows = pageIds.map((id) => rowById.get(id)).filter((row): row is DetailRow => Boolean(row));
+      return { kind: "ok", rows: await attachGroupsToIdeas(orderedRows), total: idList.total, groupId };
+    }
+
+    let query = supabase
+      .from("details")
+      .select("*, footage(id, file_path, title, channel_name)", { count: "exact" })
+      .eq("status", "idea");
+    query = applyFilters(query);
+    const { data, count, error } = await query
+      .order("created_at", { ascending: sortOrder === "oldest" })
+      .range(from, to);
+    // PostgREST can return 416 when removal makes the last page disappear.
+    // Recount without a range so the user lands on the new last page.
+    if (error?.code === "PGRST103" && page > 1) {
+      const countQuery = supabase.from("details").select("id", { count: "exact", head: true }).eq("status", "idea");
+      const { count: remainingCount, error: countError } = await applyFilters(countQuery);
+      if (countError) throw new Error(countError.message);
+      const lastPage = Math.max(1, Math.ceil((remainingCount ?? 0) / ITEMS_PER_PAGE));
+      if (lastPage < page) return { kind: "redirect", page: lastPage, total: remainingCount ?? 0 };
+    }
+    if (error) throw new Error(error.message);
+
+    const lastPage = Math.max(1, Math.ceil((count ?? 0) / ITEMS_PER_PAGE));
+    if (page > lastPage) return { kind: "redirect", page: lastPage, total: count ?? 0 };
+    return { kind: "ok", rows: await attachGroupsToIdeas((data ?? []) as DetailRow[]), total: count ?? 0, groupId };
+  };
+
+  /** Fetch a page through the cache. */
+  const getIdeasPage = async (page: number) => {
+    const key = `${filterKey}#${page}`;
+    const cached = pageCacheRef.current.get(key);
+    if (cached && Date.now() - cached.at < PAGE_CACHE_TTL_MS) return { result: cached.result, fromCache: true };
+    const result = await fetchIdeasPage(page);
+    if (result.kind === "ok") {
+      pageCacheRef.current.set(key, { result, at: Date.now() });
+      // Keep the cache small: drop the oldest pages.
+      while (pageCacheRef.current.size > 30) {
+        const oldest = pageCacheRef.current.keys().next().value;
+        if (oldest === undefined) break;
+        pageCacheRef.current.delete(oldest);
+      }
+    }
+    return { result, fromCache: false };
+  };
+
   useEffect(() => {
     let cancelled = false;
     async function load() {
       setLoading(true);
-      const from = (currentPage - 1) * ITEMS_PER_PAGE;
-      const to = from + ITEMS_PER_PAGE - 1;
-
       try {
-        let groupDetailIds: number[] | null = null;
-        if (groupId) {
-          const { data: items, error: groupError } = await supabase
-            .from("idea_group_items")
-            .select("detail_id")
-            .eq("group_id", groupId);
-          if (cancelled) return;
-          if (groupError) throw new Error(groupError.message);
-          groupDetailIds = (items ?? [])
-            .map((item: any) => Number(item.detail_id))
-            .filter((id: number) => Number.isFinite(id));
-          if (groupDetailIds.length === 0) {
-            setIdeas([]);
-            setTotalCount(0);
-            setCurrentPage(1);
-            return;
-          }
-        }
-
-        const applyFilters = (query: any) => {
-          let nextQuery = query;
-          if (groupDetailIds) nextQuery = nextQuery.in("id", groupDetailIds);
-          if (gameId) nextQuery = nextQuery.eq("game_id", gameId);
-          if (releaseYear !== "") {
-            const yearGameIds = games
-              .filter((game) => releaseYear === "unknown" ? game.release_year == null : game.release_year === releaseYear)
-              .map((game) => game.id);
-            nextQuery = nextQuery.in("game_id", yearGameIds.length > 0 ? yearGameIds : [-1]);
-          }
-          if (type) nextQuery = nextQuery.eq("detail_type", type);
-          if (pinnedOnly) nextQuery = nextQuery.eq("pinned", true);
-          return applyIdeaTextSearch(nextQuery, debouncedQ, games);
-        };
-
-        if (sortOrder === "random") {
-          const allIds: number[] = [];
-          const chunkSize = 1000;
-          let offset = 0;
-          let exactCount = 0;
-
-          while (true) {
-            let idQuery = supabase
-              .from("details")
-              .select("id", { count: "exact" })
-              .eq("status", "idea");
-            idQuery = applyFilters(idQuery);
-            const { data: idRows, count, error: idError } = await idQuery
-              .order("id", { ascending: true })
-              .range(offset, offset + chunkSize - 1);
-            if (cancelled) return;
-            if (idError) throw new Error(idError.message);
-
-            if (offset === 0) exactCount = count ?? 0;
-            const chunkIds = (idRows ?? [])
-              .map((row: any) => Number(row.id))
-              .filter((id: number) => Number.isFinite(id));
-            allIds.push(...chunkIds);
-
-            if (chunkIds.length < chunkSize || allIds.length >= exactCount) break;
-            offset += chunkSize;
-          }
-
-          const shuffledIds = seededShuffle(allIds, randomSeed);
-          const pageIds = shuffledIds.slice(from, to + 1);
-          setTotalCount(exactCount || allIds.length);
-          const lastPage = Math.max(1, Math.ceil((exactCount || allIds.length) / ITEMS_PER_PAGE));
-          if (currentPage > lastPage) {
-            setCurrentPage(lastPage);
-            return;
-          }
-
-          if (pageIds.length === 0) {
-            setIdeas([]);
-            return;
-          }
-
-          const { data, error } = await supabase
-            .from("details")
-            .select("*, footage(id, file_path, title, channel_name)")
-            .in("id", pageIds);
-          if (cancelled) return;
-          if (error) throw new Error(error.message);
-
-          const rowById = new Map(((data ?? []) as DetailRow[]).map((row) => [row.id, row]));
-          const orderedRows = pageIds
-            .map((id) => rowById.get(id))
-            .filter((row): row is DetailRow => Boolean(row));
-          const enrichedIdeas = await attachGroupsToIdeas(orderedRows);
-          if (cancelled) return;
-          setLoadedGroupId(groupId);
-          setIdeas(enrichedIdeas);
-          void backfillYoutubeChannels(enrichedIdeas);
+        const { result, fromCache } = await getIdeasPage(currentPage);
+        if (cancelled) return;
+        if (result.kind === "empty") {
+          setIdeas([]);
+          setTotalCount(0);
+          setCurrentPage(1);
           return;
         }
-
-        let query = supabase
-          .from("details")
-          .select("*, footage(id, file_path, title, channel_name)", { count: "exact" })
-          .eq("status", "idea");
-        query = applyFilters(query);
-        const { data, count, error } = await query
-          .order("created_at", { ascending: sortOrder === "oldest" })
-          .range(from, to);
-        if (cancelled) return;
-        // PostgREST can return 416 when removal makes the last page disappear.
-        // Recount without a range so the user lands on the new last page.
-        if (error?.code === "PGRST103" && currentPage > 1) {
-          const countQuery = supabase.from("details").select("id", { count: "exact", head: true }).eq("status", "idea");
-          const { count: remainingCount, error: countError } = await applyFilters(countQuery);
-          if (cancelled) return;
-          if (countError) throw new Error(countError.message);
-          const lastPage = Math.max(1, Math.ceil((remainingCount ?? 0) / ITEMS_PER_PAGE));
-          if (lastPage < currentPage) {
-            setTotalCount(remainingCount ?? 0);
-            setCurrentPage(lastPage);
-            return;
-          }
-        }
-        if (error) throw new Error(error.message);
-
-        const lastPage = Math.max(1, Math.ceil((count ?? 0) / ITEMS_PER_PAGE));
-        if (currentPage > lastPage) {
-          setTotalCount(count ?? 0);
-          setCurrentPage(lastPage);
+        if (result.kind === "redirect") {
+          setTotalCount(result.total);
+          setCurrentPage(result.page);
           return;
         }
+        setLoadedGroupId(result.groupId);
+        setIdeas(result.rows);
+        setTotalCount(result.total);
+        if (!fromCache) void backfillYoutubeChannels(result.rows);
 
-        const enrichedIdeas = await attachGroupsToIdeas((data ?? []) as DetailRow[]);
-        if (cancelled) return;
-        setLoadedGroupId(groupId);
-        setIdeas(enrichedIdeas);
-        setTotalCount(count ?? 0);
-        void backfillYoutubeChannels(enrichedIdeas);
+        // Warm the neighbouring pages so Next/Previous feel instant.
+        const lastPage = Math.max(1, Math.ceil(result.total / ITEMS_PER_PAGE));
+        const neighbours = [currentPage + 1, currentPage - 1].filter((page) => page >= 1 && page <= lastPage);
+        for (const page of neighbours) {
+          getIdeasPage(page)
+            .then(({ result: next }) => {
+              if (cancelled || next.kind !== "ok") return;
+              const covers = next.rows
+                .map((row) => games.find((game) => game.id === row.game_id)?.cover_url)
+                .filter((url): url is string => Boolean(url));
+              warmCoverImages(covers);
+            })
+            .catch(() => {});
+        }
       } catch (err) {
         if (cancelled) return;
         notifyError(err instanceof Error ? err.message : "Could not load ideas", "Could not load ideas");
@@ -858,7 +901,9 @@ export default function Home() {
     }
     void load();
     return () => { cancelled = true; };
-  }, [debouncedQ, gameId, groupId, type, releaseYear, sortOrder, pinnedOnly, randomSeed, currentPage, games, groups, ideasRevision]);
+    // getIdeasPage reads the filters captured in filterKey.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterKey, currentPage]);
 
   const toggleSelection = (idea: DetailRow) => {
     setSelectedIds(prev =>
@@ -1117,6 +1162,7 @@ export default function Home() {
     const nextPinned = !current;
     const delta = nextPinned ? 1 : -1;
     setIdeas((prev) => prev.map((idea) => (idea.id === id ? { ...idea, pinned: nextPinned } : idea)));
+    patchCachedRows((idea) => (idea.id === id ? { ...idea, pinned: nextPinned } : idea));
     setPinnedCount((count) => (count === null ? count : Math.max(0, count + delta)));
     const { error } = await supabase
       .from("details")
@@ -1124,6 +1170,7 @@ export default function Home() {
       .eq("id", id);
     if (error) {
       setIdeas((prev) => prev.map((idea) => (idea.id === id ? { ...idea, pinned: current } : idea)));
+      patchCachedRows((idea) => (idea.id === id ? { ...idea, pinned: current } : idea));
       setPinnedCount((count) => (count === null ? count : Math.max(0, count - delta)));
       notifyError(error.message, "Could not update pin");
       return;

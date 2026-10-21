@@ -1,7 +1,8 @@
 "use client";
 
-import Image from "next/image";
-import { useEffect, useState } from "react";
+import Image, { getImageProps } from "next/image";
+import { IDEA_CARD_SIZES } from "@/lib/imageSizes";
+import { useState } from "react";
 
 const REMOTE_IMAGE = /^https?:\/\//i;
 
@@ -27,11 +28,9 @@ type CoverImageProps = {
  * the original URL is used so the cover still appears.
  */
 export function CoverImage({ src, alt = "", sizes, className = "", priority = false, onLoad, onError }: CoverImageProps) {
-  const [useOriginal, setUseOriginal] = useState(false);
-
-  useEffect(() => {
-    setUseOriginal(false);
-  }, [src]);
+  // Remember which src the optimiser failed on, so a new src gets a fresh try.
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const useOriginal = failedSrc === src;
 
   if (!src) return null;
 
@@ -62,8 +61,29 @@ export function CoverImage({ src, alt = "", sizes, className = "", priority = fa
       fetchPriority={priority ? "high" : "auto"}
       draggable={false}
       onLoad={onLoad}
-      onError={() => setUseOriginal(true)}
+      onError={() => setFailedSrc(src)}
       className={`object-cover ${className}`}
     />
   );
 }
+
+/**
+ * Start downloading covers before their cards are shown (e.g. the next page),
+ * requesting exactly the optimised size an idea card would pick, so the image
+ * is already in the browser cache when the card appears.
+ */
+export function warmCoverImages(urls: string[], sizes: string = IDEA_CARD_SIZES) {
+  if (typeof window === "undefined") return;
+  for (const url of new Set(urls)) {
+    if (!REMOTE_IMAGE.test(url) || warmed.has(`${sizes}|${url}`)) continue;
+    warmed.add(`${sizes}|${url}`);
+    const { props } = getImageProps({ src: url, alt: "", fill: true, sizes });
+    const img = new window.Image();
+    img.decoding = "async";
+    if (props.sizes) img.sizes = props.sizes;
+    if (props.srcSet) img.srcset = props.srcSet;
+    img.src = props.src;
+  }
+}
+
+const warmed = new Set<string>();

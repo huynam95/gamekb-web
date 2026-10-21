@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { CoverImage } from "@/components/CoverImage";
+import { IDEA_CARD_SIZES } from "@/lib/imageSizes";
 
 type CoverBackdropProps = {
   src?: string | null;
@@ -13,8 +14,6 @@ type CoverBackdropProps = {
   priority?: boolean;
 };
 
-/** Library-card width: full width on phones, ~360px in the grid. */
-export const IDEA_CARD_SIZES = "(min-width: 1024px) 400px, (min-width: 640px) 50vw, 100vw";
 
 const fallbackStyle = {
   background:
@@ -29,11 +28,9 @@ export function CoverBackdrop({
   sizes = IDEA_CARD_SIZES,
   priority = false,
 }: CoverBackdropProps) {
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    setLoaded(false);
-  }, [src]);
+  // Track which src finished loading, so switching covers fades in again.
+  const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
+  const loaded = Boolean(src) && loadedSrc === src;
 
   return (
     <div className="absolute inset-0 overflow-hidden bg-slate-900">
@@ -47,8 +44,8 @@ export function CoverBackdrop({
         alt={alt}
         sizes={sizes}
         priority={priority}
-        onLoad={() => setLoaded(true)}
-        onError={() => setLoaded(true)}
+        onLoad={() => setLoadedSrc(src ?? null)}
+        onError={() => setLoadedSrc(src ?? null)}
         className={`transition-opacity duration-200 ${loaded ? imageClassName : "opacity-0"}`}
       />
     </div>
