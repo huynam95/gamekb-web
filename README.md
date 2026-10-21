@@ -72,6 +72,15 @@ Do not commit or share `.env.local`. Supabase Row Level Security should still be
 
 Run the authenticated collection-removal API tests with `node --test tests/group-membership.test.cjs`. They use the installed Supabase client with a controlled transport and do not mutate production data.
 
+## Short project topics
+
+- **New Project** opens a blank draft for manual writing. Choose its Topic below the title; the existing editor autosaves changes.
+- The Topic selector on a project card or table row saves the classification directly. It does not change narration, description, tags, hashtags, or assets.
+- Projects generated from a home topic store that topic in `scripts.topic`. Existing projects are backfilled from their legacy description/tags by `database/migrations/20261021045900_add_explicit_script_project_topic.sql`; all other fields are preserved. Empty string means an explicit **No topic** choice, while null/missing values retain legacy-read compatibility.
+- Topic names are saved as project snapshots, so a previously used topic can remain selected even when it is no longer in the current topic list.
+
+Run topic and API regression tests with `node --test tests/script-topics.test.cjs`. The tests use a controlled Supabase transport and static React rendering, not a production mutation or browser rendering session.
+
 ## Responsive layout
 
 The shared shell and library grids use the available CSS viewport, rather than device detection. Browser zoom and OS display scaling can change the column count.

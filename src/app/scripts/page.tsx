@@ -7,6 +7,10 @@ import { AppPageHeader, appPageMainClass, appPageRootClass } from "@/components/
 import { useNotifications } from "@/components/NotificationCenter";
 import { analyzeAssetLinks } from "@/lib/assetLinks";
 import { buildScriptGuide } from "@/lib/scriptGuide";
+import { getScriptTopic, getScriptTopicValue } from "@/lib/scriptTopics";
+import { useProjectTopics } from "@/lib/useProjectTopics";
+import { ProjectTopicSelect } from "@/components/ProjectTopicSelect";
+import type { VideoTheme } from "@/lib/videoThemes";
 import {
   TrashIcon,
   MagnifyingGlassIcon,
@@ -22,11 +26,13 @@ import {
   VideoCameraIcon,
   Bars3Icon,
   ArrowPathIcon,
+  PlusIcon,
 } from "@heroicons/react/24/outline";
 
 /* ================= TYPES & CONFIG ================= */
 
 type ScriptProject = {
+  topic?: string | null;
   id: number;
   title: string;
   content: string;
@@ -53,15 +59,6 @@ const STATUS_STYLE: Record<string, string> = {
   Published: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800",
 };
 
-function getScriptTopic(script: ScriptProject) {
-  const description = script.description || "";
-  const match = description.match(/(?:^|\n)\s*Topic:\s*(.+?)(?:\n|$)/i);
-  const topicFromDescription = match?.[1]?.trim();
-  if (topicFromDescription) return topicFromDescription;
-
-  const topicTag = script.tags?.find((tag) => /^games\s|^afk\s|details/i.test(tag));
-  return topicTag || "No topic";
-}
 
 function getScriptSummary(script: ScriptProject) {
   const description = script.description || "";
@@ -144,7 +141,17 @@ function getTopicVisual(topic: string) {
 
 /* ================= MODAL: STUDIO WORKSPACE ================= */
 
-function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh }: any) {
+function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh, topics, topicsLoading, topicsError, onRetryTopics }: {
+  isOpen: boolean;
+  onClose: () => void;
+  script: ScriptProject | null;
+  onSave: (data: Partial<ScriptProject>) => Promise<boolean>;
+  onRefresh: (id: number) => Promise<ScriptProject | null>;
+  topics: VideoTheme[];
+  topicsLoading: boolean;
+  topicsError: string;
+  onRetryTopics: () => void;
+}) {
   const [formData, setFormData] = useState<Partial<ScriptProject>>({
     title: "",
     content: "",
@@ -267,8 +274,8 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh }: any) 
 
     latestFormDataRef.current = dataToSave;
     lastAssetSyncedContentRef.current = latestContent;
-    await saveNow(dataToSave);
-    onClose();
+    const saved = await saveNow(dataToSave);
+    if (saved) onClose();
   };
 
   const jumpToScriptSection = (start: number, end: number) => {
@@ -504,6 +511,10 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh }: any) 
                 </button>
               </div>
               <p className="mt-1 text-xs font-bold uppercase tracking-widest text-slate-400">Video Project Studio</p>
+              <div className="mt-3 max-w-md">
+                <ProjectTopicSelect label="Topic" value={getScriptTopicValue(formData)} topics={topics} loading={topicsLoading} onChange={(topic) => setFormData((current) => ({ ...current, topic }))} />
+                {topicsError && <p role="alert" className="mt-2 text-xs text-rose-500">{topicsError} <button type="button" onClick={onRetryTopics} className="cursor-pointer font-bold underline">Retry</button></p>}
+              </div>
             </div>
           </div>
 
@@ -765,6 +776,11 @@ export default function ScriptsPage() {
   const [editingScript, setEditingScript] = useState<ScriptProject | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const { topics, loading: topicsLoading, error: topicsError, retry: retryTopics } = useProjectTopics();
+  const [savingTopicIds, setSavingTopicIds] = useState<Set<number>>(new Set());
+  const pendingTopicIds = useRef(new Set<number>());
+  const [creatingProject, setCreatingProject] = useState(false);
+  const creatingProjectRef = useRef(false);
 
   useEffect(() => {
     async function load() {
@@ -831,6 +847,57 @@ export default function ScriptsPage() {
     return true;
   };
 
+  const openProject = (script: ScriptProject) => {
+    if (pendingTopicIds.current.has(script.id)) return;
+    setEditingScript(script);
+    setIsModalOpen(true);
+  };
+
+  const createProject = async () => {
+    if (creatingProjectRef.current) return;
+    creatingProjectRef.current = true;
+    setCreatingProject(true);
+    try {
+      const response = await fetch("/api/scripts", { method: "POST", redirect: "error" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not create project");
+      const project = data as ScriptProject;
+      setScripts((current) => [project, ...current]);
+      setSearchQuery("");
+      setEditingScript(project);
+      setIsModalOpen(true);
+    } catch (error) {
+      notifyError(error instanceof Error ? error.message : "Could not create project", "Project not created");
+    } finally {
+      creatingProjectRef.current = false;
+      setCreatingProject(false);
+    }
+  };
+
+  const changeProjectTopic = async (script: ScriptProject, topic: string) => {
+    if (pendingTopicIds.current.has(script.id)) return;
+    pendingTopicIds.current.add(script.id);
+    setSavingTopicIds((current) => new Set(current).add(script.id));
+    try {
+      const response = await fetch(`/api/scripts/${script.id}/topic`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic }),
+        redirect: "error",
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not save topic");
+      setScripts((current) => current.map((item) => item.id === script.id ? { ...item, topic: data.topic } : item));
+      setEditingScript((current) => current?.id === script.id ? { ...current, topic: data.topic } : current);
+      success("Project topic saved.", "Saved");
+    } catch (error) {
+      notifyError(error instanceof Error ? error.message : "Could not save topic", "Topic not saved");
+    } finally {
+      pendingTopicIds.current.delete(script.id);
+      setSavingTopicIds((current) => { const next = new Set(current); next.delete(script.id); return next; });
+    }
+  };
+
   const handleDelete = async (id: number) => {
     const shouldDelete = await confirm({
       kind: "warning",
@@ -872,7 +939,7 @@ export default function ScriptsPage() {
 
   return (
     <div className={`${appPageRootClass} xl:flex`}>
-      <ScriptEditorModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} script={editingScript} onSave={handleUpdate} onRefresh={refreshScriptProject} />
+      <ScriptEditorModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} script={editingScript} onSave={handleUpdate} onRefresh={refreshScriptProject} topics={topics} topicsLoading={topicsLoading} topicsError={topicsError} onRetryTopics={retryTopics} />
 
       <AppSidebar activePage="scripts" />
 
@@ -882,7 +949,9 @@ export default function ScriptsPage() {
             title="Short Projects"
             description="Organize scripts, source channels, assets, topics, and production status in one place."
             icon={<DocumentTextIcon className="h-5 w-5" />}
+            action={<button type="button" disabled={creatingProject} onClick={() => void createProject()} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-black text-white transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"><PlusIcon className="h-5 w-5" />{creatingProject ? "Creating..." : "New Project"}</button>}
           />
+          {topicsError && <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 text-sm text-rose-600"><span>{topicsError}</span><button type="button" onClick={retryTopics} className="min-h-11 cursor-pointer font-bold underline">Retry topics</button></div>}
           <div className="mb-6 flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
             <div className="relative w-full max-w-2xl">
               <MagnifyingGlassIcon className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-900 sm:left-6 sm:h-6 sm:w-6 dark:text-slate-200" />
@@ -921,7 +990,6 @@ export default function ScriptsPage() {
           </label>
           <div className="project-cards">
             {filteredScripts.map((script) => {
-              const topic = getScriptTopic(script);
               const channels = getScriptChannels(script);
               const status = script.status || "Draft";
               const selected = selectedIds.includes(script.id);
@@ -934,14 +1002,14 @@ export default function ScriptsPage() {
                     </label>
                     <span className={`rounded-xl border px-3 py-2 text-[10px] font-black uppercase tracking-widest ${STATUS_STYLE[status] || STATUS_STYLE.Draft}`}>{status}</span>
                   </div>
-                  <button type="button" onClick={() => { setEditingScript(script); setIsModalOpen(true); }} className="min-w-0 cursor-pointer text-left">
+                  <button type="button" onClick={() => openProject(script)} className="min-w-0 cursor-pointer text-left">
                     <h2 className="break-words text-lg font-black text-slate-900 dark:text-white">{script.title}</h2>
-                    <p className="mt-2 break-words text-sm font-bold text-violet-700 dark:text-violet-300">{topic}</p>
-                    <p className="mt-2 break-words text-xs font-bold text-slate-500">{channels.join(" · ") || "Unknown channel"}</p>
-                    <p className="mt-3 line-clamp-3 break-words text-sm leading-6 text-slate-500">{getScriptSummary(script)}</p>
                   </button>
+                  <div className="mt-3"><ProjectTopicSelect label="Topic" ariaLabel={`Topic for ${script.title}`} value={getScriptTopicValue(script)} topics={topics} loading={topicsLoading} saving={savingTopicIds.has(script.id)} onChange={(topic) => void changeProjectTopic(script, topic)} /></div>
+                  <p className="mt-2 break-words text-xs font-bold text-slate-500">{channels.join(" · ") || "Unknown channel"}</p>
+                  <p className="mt-3 line-clamp-3 break-words text-sm leading-6 text-slate-500">{getScriptSummary(script)}</p>
                   <div className="mt-auto flex items-center justify-end gap-2 pt-4">
-                    <button type="button" onClick={() => { setEditingScript(script); setIsModalOpen(true); }} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-bold dark:border-slate-700"><PencilSquareIcon className="h-4 w-4" /> Open</button>
+                    <button type="button" onClick={() => openProject(script)} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-bold dark:border-slate-700"><PencilSquareIcon className="h-4 w-4" /> Open</button>
                     <button type="button" onClick={() => handleDelete(script.id)} aria-label={`Delete ${script.title}`} className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border border-slate-200 text-rose-500 dark:border-slate-700"><TrashIcon className="h-4 w-4" /></button>
                   </div>
                 </article>
@@ -985,8 +1053,7 @@ export default function ScriptsPage() {
                       key={script.id}
                       className={`group cursor-pointer transition-all ${selected ? "bg-blue-50/70 dark:bg-blue-950/30" : "hover:bg-slate-50/80 dark:hover:bg-slate-900/70"}`}
                       onClick={() => {
-                        setEditingScript(script);
-                        setIsModalOpen(true);
+                        openProject(script);
                       }}
                     >
                       <td className="px-3 py-9 text-center">
@@ -1011,19 +1078,7 @@ export default function ScriptsPage() {
                         </div>
                       </td>
                       <td className="px-4 py-9">
-                        <div
-                          title={topic}
-                          className={`flex h-16 w-full items-center gap-3 rounded-[1.35rem] border px-4 shadow-sm transition-colors ${
-                            topic === "No topic"
-                              ? "border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500"
-                              : "border-violet-100 bg-violet-50 text-violet-800 dark:border-violet-900/70 dark:bg-violet-950/40 dark:text-violet-100"
-                          }`}
-                        >
-                          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-lg shadow-sm ${topicVisual.className}`} aria-hidden="true">
-                            {topicVisual.emoji}
-                          </span>
-                          <span className="min-w-0 flex-1 truncate whitespace-nowrap text-left text-[15px] font-black tracking-tight">{topic}</span>
-                        </div>
+                        <ProjectTopicSelect ariaLabel={`Topic for ${script.title}`} value={getScriptTopicValue(script)} topics={topics} loading={topicsLoading} saving={savingTopicIds.has(script.id)} onChange={(topic) => void changeProjectTopic(script, topic)} />
                       </td>
                       <td className="px-4 py-9">
                         <div
@@ -1056,8 +1111,7 @@ export default function ScriptsPage() {
                           <button
                             onClick={(event) => {
                               event.stopPropagation();
-                              setEditingScript(script);
-                              setIsModalOpen(true);
+                              openProject(script);
                             }}
                             className="cursor-pointer rounded-xl border-2 border-slate-100 bg-white p-3 text-slate-900 shadow-sm transition-all hover:bg-slate-900 hover:text-white dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100 dark:hover:bg-blue-600"
                             type="button"

@@ -8,6 +8,9 @@ import type { DetailRow, Game, ScriptProject } from "@/types/gamekb";
 import type { VideoTheme } from "@/lib/videoThemes";
 import { themeToHashtag } from "@/lib/videoThemes";
 import { TypePill } from "@/components/TypePill";
+import { ProjectTopicSelect } from "@/components/ProjectTopicSelect";
+import { useProjectTopics } from "@/lib/useProjectTopics";
+import { getScriptTopicValue } from "@/lib/scriptTopics";
 import { analyzeAssetLinks } from "@/lib/assetLinks";
 import { useNotifications } from "@/components/NotificationCenter";
 
@@ -116,6 +119,7 @@ export function ScriptEditorModal({
     assets: [],
   });
   const [activeTab, setActiveTab] = useState<"details" | "script" | "assets">("script");
+  const { topics, loading: topicsLoading, error: topicsError, retry: retryTopics } = useProjectTopics(isOpen);
   const [orderedIdeas, setOrderedIdeas] = useState<DetailRow[]>([]);
   const [draggedIdeaId, setDraggedIdeaId] = useState<number | null>(null);
   const [dragOverIdeaId, setDragOverIdeaId] = useState<number | null>(null);
@@ -183,6 +187,7 @@ export function ScriptEditorModal({
 
     return {
       title: `${themePrefix}${titles[0] || "Untitled"}${titles.length > 1 ? "..." : ""}`,
+      topic: theme?.title || "",
       content: openingHook ? `${openingHook}\n\n${ideaBlocks}` : ideaBlocks,
       description: `${themeDescription}Video tổng hợp các chi tiết thú vị.\n\n${fullDescription}`,
       assets: allAssets,
@@ -259,6 +264,10 @@ export function ScriptEditorModal({
           <div>
             <h2 className="text-xl font-black text-slate-900 sm:text-2xl dark:text-slate-50">Create Video Script</h2>
             <p className="mt-1 text-sm font-bold text-slate-500">Drafting from {orderedIdeas.length} ideas</p>
+            <div className="mt-3 w-full sm:w-80">
+              <ProjectTopicSelect label="Topic" value={getScriptTopicValue(formData)} topics={topics} loading={topicsLoading} onChange={(topic) => setFormData((current) => ({ ...current, topic }))} />
+              {topicsError && <p role="alert" className="mt-2 text-xs text-rose-500">{topicsError} <button type="button" onClick={retryTopics} className="cursor-pointer font-bold underline">Retry</button></p>}
+            </div>
           </div>
           <div className="flex flex-wrap gap-2 sm:gap-3">
             <button onClick={onClose} className="cursor-pointer rounded-xl px-4 py-2.5 text-sm font-bold text-slate-500 transition hover:bg-slate-100 sm:px-5 sm:py-3 dark:text-slate-300 dark:hover:bg-slate-800" type="button">Cancel</button>

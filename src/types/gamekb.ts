@@ -45,6 +45,7 @@ export type ScriptAsset = {
 export type ScriptProject = {
   id: number;
   title: string;
+  topic?: string | null;
   content: string;
   assets: ScriptAsset[];
   description: string;
