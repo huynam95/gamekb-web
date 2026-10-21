@@ -1,5 +1,7 @@
 "use client";
 
+import { TypeLabel } from "@/components/TypePill";
+import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -7,14 +9,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { fetchYoutubeMetadata } from "@/lib/youtube";
 import { useNotifications } from "@/components/NotificationCenter";
 import { buildScriptGuide } from "@/lib/scriptGuide";
-import { 
-  HashtagIcon, 
-  TagIcon, 
-  DocumentDuplicateIcon, 
-  VideoCameraIcon,
-  FolderPlusIcon,
-  DocumentPlusIcon
-} from "@heroicons/react/24/outline";
+import { CheckIcon, CloudArrowDownIcon, DocumentDuplicateIcon, DocumentPlusIcon, FilmIcon, FolderPlusIcon, GlobeAltIcon, HashtagIcon, PencilSquareIcon, PuzzlePieceIcon, StarIcon, TagIcon, VideoCameraIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
 /* ================= TYPES ================= */
 
@@ -90,27 +85,27 @@ type ScriptProject = {
 /* ================= STYLES ================= */
 
 const inputClass =
-  "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition";
+  "h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm text-fg placeholder:text-fg-4 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition";
 
 const heroInputClass = 
   "w-full bg-transparent text-3xl md:text-4xl font-extrabold text-white placeholder:text-white/50 border-b-2 border-white/20 px-0 py-2 focus:border-white focus:outline-none transition mb-2";
 
 const textareaClass =
-  "min-h-[120px] w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition resize-y";
+  "min-h-[120px] w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-4 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition resize-y";
 
 const selectClass =
-  "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition cursor-pointer";
+  "h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm text-fg outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition cursor-pointer";
 
 const btnBase =
   "inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold whitespace-nowrap cursor-pointer transition active:scale-[0.98]";
 
 const btnGhost =
-  btnBase + " border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900";
+  btnBase + " border border-line bg-surface text-fg-2 shadow-sm hover:bg-surface-hover hover:text-fg";
 
 const btnGlass = 
   "inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-white/10 bg-black/30 px-4 text-sm font-semibold text-white backdrop-blur-md hover:bg-black/50 transition shadow-sm";
 
-const cardClass = "rounded-2xl border border-slate-200 bg-white p-6 shadow-sm";
+const cardClass = "rounded-2xl border border-line bg-surface p-6 shadow-sm";
 
 /* ================= HELPERS ================= */
 
@@ -123,26 +118,22 @@ function renderLinkOrText(text: string | null) {
         href={text} 
         target="_blank" 
         rel="noopener noreferrer" 
-        className="break-all text-blue-600 hover:text-blue-800 hover:underline font-medium"
+        className="break-all text-accent hover:text-blue-800 hover:underline font-medium"
         onClick={(e) => e.stopPropagation()} 
       >
         {text}
       </a>
     );
   }
-  return <span className="break-all font-mono text-slate-600">{text}</span>;
+  return <span className="break-all font-mono text-fg-2">{text}</span>;
 }
 
 function TypeBadge({ t }: { t: string }) {
-  const map: Record<string, string> = {
-    small_detail: "🔍 Small Detail",
-    easter_egg: "🥚 Easter Egg",
-    npc_reaction: "🗣️ NPC Reaction",
-    physics: "🍎 Physics",
-    troll: "🤡 Troll",
-    punish: "⚖️ Punish",
-  };
-  return <span className="inline-flex items-center rounded-lg border border-white/20 bg-white/10 px-3 py-1 text-xs font-bold text-white backdrop-blur-md shadow-sm">{map[t] || t}</span>;
+  return (
+    <span className="inline-flex items-center rounded-lg border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-md">
+      <TypeLabel typeKey={t} />
+    </span>
+  );
 }
 
 /* ================= COMPONENT: GROUP PICKER ================= */
@@ -157,12 +148,12 @@ function GroupAddPicker({ groups, onAdd, onCreate }: { groups: Group[]; onAdd: (
   }, []);
   return (
     <div ref={boxRef} className="relative">
-      <button type="button" className="text-xs font-bold text-blue-600 hover:underline uppercase tracking-wide" onClick={() => setOpen((v) => !v)}>+ Add Group</button>
+      <button type="button" className="text-xs font-semibold text-accent hover:underline uppercase tracking-wide" onClick={() => setOpen((v) => !v)}>+ Add Group</button>
       {open && (
-        <div className="absolute right-0 top-full z-20 mt-2 w-64 rounded-xl border border-slate-200 bg-white shadow-xl">
+        <div className="absolute right-0 top-full z-20 mt-2 w-64 rounded-xl border border-line bg-surface shadow-xl">
           <div className="p-2"><input className={inputClass} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search groups..." autoFocus /></div>
           <div className="max-h-48 overflow-auto p-1 pt-0">
-            {filtered.length === 0 ? <div className="p-2 text-center"><button type="button" className="w-full rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-900 hover:bg-slate-200" onClick={() => { if (q.trim()) onCreate(q.trim()); setOpen(false); setQ(""); }}>+ Create "{q}"</button></div> : <ul>{filtered.map((g) => <li key={g.id}><button type="button" className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-100" onClick={() => { onAdd(g.id); setOpen(false); setQ(""); }}>{g.name}</button></li>)}</ul>}
+            {filtered.length === 0 ? <div className="p-2 text-center"><button type="button" className="w-full rounded-lg bg-surface-sunken px-3 py-1.5 text-xs font-semibold text-fg hover:bg-slate-200" onClick={() => { if (q.trim()) onCreate(q.trim()); setOpen(false); setQ(""); }}>+ Create "{q}"</button></div> : <ul>{filtered.map((g) => <li key={g.id}><button type="button" className="w-full rounded-lg px-3 py-2 text-left text-sm text-fg hover:bg-surface-sunken" onClick={() => { onAdd(g.id); setOpen(false); setQ(""); }}>{g.name}</button></li>)}</ul>}
           </div>
         </div>
       )}
@@ -311,38 +302,38 @@ function AddToScriptModal({
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in cursor-pointer" onClick={onClose}>
-      <div className="bg-white w-full max-w-xl rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 cursor-auto" onClick={e => e.stopPropagation()}>
+      <div className="bg-surface w-full max-w-xl rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 cursor-auto" onClick={e => e.stopPropagation()}>
         
         {/* Header */}
-        <div className="px-6 py-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+        <div className="px-6 py-5 border-b border-line-soft bg-surface-muted flex justify-between items-center">
           <div>
-            <h2 className="text-xl font-black text-slate-900">Add to Script Project</h2>
-            <p className="text-xs font-bold text-slate-500 mt-1 line-clamp-1">{detail.title}</p>
+            <h2 className="text-xl font-bold text-fg">Add to Script Project</h2>
+            <p className="text-xs font-medium text-fg-3 mt-1 line-clamp-1">{detail.title}</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 font-bold p-2">✕</button>
+          <button onClick={onClose} className="rounded-full p-2 text-fg-4 transition hover:bg-surface-sunken hover:text-fg-2" aria-label="Close" type="button"><XMarkIcon className="h-5 w-5" /></button>
         </div>
 
         {/* Tabs Toggle */}
-        <div className="flex p-2 bg-slate-100/50">
-          <button onClick={() => setActiveTab("existing")} className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold rounded-xl transition ${activeTab === "existing" ? "bg-white text-blue-600 shadow-sm border border-slate-200" : "text-slate-500 hover:bg-slate-100"}`}>
+        <div className="flex p-2 bg-surface-sunken/50">
+          <button onClick={() => setActiveTab("existing")} className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold rounded-xl transition ${activeTab === "existing" ? "bg-surface text-accent shadow-sm border border-line" : "text-fg-3 hover:bg-surface-sunken"}`}>
             <FolderPlusIcon className="w-5 h-5"/> Existing Script
           </button>
-          <button onClick={() => setActiveTab("new")} className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold rounded-xl transition ${activeTab === "new" ? "bg-white text-blue-600 shadow-sm border border-slate-200" : "text-slate-500 hover:bg-slate-100"}`}>
+          <button onClick={() => setActiveTab("new")} className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold rounded-xl transition ${activeTab === "new" ? "bg-surface text-accent shadow-sm border border-line" : "text-fg-3 hover:bg-surface-sunken"}`}>
             <DocumentPlusIcon className="w-5 h-5"/> New Script
           </button>
         </div>
 
         {/* Tab Content */}
-        <div className="p-6 bg-white min-h-[220px]">
+        <div className="p-6 bg-surface min-h-[220px]">
           {activeTab === "existing" ? (
             <div className="space-y-6">
               <div>
-                <label className="text-xs font-bold uppercase text-slate-400 mb-2 block tracking-widest">Select Script</label>
+                <label className="text-xs font-semibold uppercase text-fg-4 mb-2 block tracking-wider">Select Script</label>
                 {scripts.length === 0 ? (
-                  <div className="p-4 rounded-xl border border-dashed border-slate-300 text-center text-sm text-slate-500 font-medium">No scripts found. Create a new one first!</div>
+                  <div className="p-4 rounded-xl border border-dashed border-line-strong text-center text-sm text-fg-3 font-medium">No scripts found. Create a new one first!</div>
                 ) : (
                   <select 
-                    className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-sm cursor-pointer"
+                    className="h-12 w-full rounded-xl border border-line bg-surface px-4 text-sm font-bold text-fg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-sm cursor-pointer"
                     value={selectedScriptId}
                     onChange={e => setSelectedScriptId(Number(e.target.value))}
                   >
@@ -363,9 +354,9 @@ function AddToScriptModal({
           ) : (
             <div className="space-y-6">
               <div>
-                <label className="text-xs font-bold uppercase text-slate-400 mb-2 block tracking-widest">New Script Title</label>
+                <label className="text-xs font-semibold uppercase text-fg-4 mb-2 block tracking-wider">New Script Title</label>
                 <input 
-                  className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-sm"
+                  className="h-12 w-full rounded-xl border border-line bg-surface px-4 text-sm font-bold text-fg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-sm"
                   value={newTitle}
                   onChange={e => setNewTitle(e.target.value)}
                   placeholder="Enter script title..."
@@ -569,11 +560,11 @@ export default function IdeaDetailPage() {
     setIdeaGroups((current) => [...current, newGroup].sort((a, b) => a.name.localeCompare(b.name)));
   }
 
-  if (loading) return <div className="flex h-screen items-center justify-center text-slate-400">Loading mission...</div>;
-  if (!detail) return <div className="p-8 text-center text-slate-500">Idea not found.</div>;
+  if (loading) return <div className="flex h-screen items-center justify-center text-fg-4">Loading mission...</div>;
+  if (!detail) return <div className="p-8 text-center text-fg-3">Idea not found.</div>;
 
   return (
-    <main className="min-h-screen bg-slate-50 pb-20">
+    <main className="min-h-screen bg-surface-muted pb-20">
       
       {/* ADD TO SCRIPT MODAL */}
       <AddToScriptModal 
@@ -604,14 +595,14 @@ export default function IdeaDetailPage() {
               {!editingCore && (
                 <>
                   <button onClick={() => setShowScriptModal(true)} className={btnGlass}>
-                    🎬 Add to Script
+                    <FilmIcon className="h-4 w-4" aria-hidden="true" /> Add to Script
                   </button>
 
                   <button onClick={togglePin} className={btnGlass}>
-                    {detail.pinned ? "⭐ Pinned" : "☆ Pin"}
+                    {detail.pinned ? <><StarSolidIcon className="h-4 w-4 text-amber-300" aria-hidden="true" /> Pinned</> : <><StarIcon className="h-4 w-4" aria-hidden="true" /> Pin</>}
                   </button>
                   <button onClick={() => setEditingCore(true)} className={btnGlass}>
-                    ✏️ Edit
+                    <PencilSquareIcon className="h-4 w-4" aria-hidden="true" /> Edit
                   </button>
                   <button onClick={deleteIdea} className="inline-flex h-9 items-center justify-center rounded-lg bg-rose-500/20 border border-rose-500/50 backdrop-blur-md px-4 text-sm font-semibold text-rose-100 hover:bg-rose-500 hover:text-white transition">
                     Delete
@@ -641,7 +632,7 @@ export default function IdeaDetailPage() {
                      {game?.cover_url ? (
                         <img src={game.cover_url} alt="Cover" className="h-full w-full object-cover" />
                      ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-slate-800 text-4xl">🎮</div>
+                        <div className="flex h-full w-full items-center justify-center bg-slate-800 text-fg-3"><PuzzlePieceIcon className="h-12 w-12" aria-hidden="true" /></div>
                      )}
                      {/* Phản chiếu nhẹ */}
                      <div className="absolute inset-0 bg-gradient-to-tr from-black/40 to-transparent pointer-events-none" />
@@ -650,9 +641,9 @@ export default function IdeaDetailPage() {
 
                {/* 2. TEXT CONTENT */}
                <div className="min-w-0 flex-1 pb-2">
-                  <div className="mb-3 flex flex-wrap items-center gap-3 text-sm font-bold uppercase tracking-widest text-blue-300">
+                  <div className="mb-3 flex flex-wrap items-center gap-3 text-sm font-semibold uppercase tracking-wider text-blue-300">
                      <span>{game?.title}</span>
-                     <span className="text-slate-500">•</span>
+                     <span className="text-fg-3">•</span>
                      <span>{game?.release_year || "N/A"}</span>
                   </div>
 
@@ -660,7 +651,7 @@ export default function IdeaDetailPage() {
                      <div className="space-y-4 rounded-xl bg-black/40 p-4 border border-white/10 backdrop-blur-md">
                         <input className={heroInputClass} value={draftTitle} onChange={e => setDraftTitle(e.target.value)} autoFocus />
                         <div>
-                           <label className="text-xs text-slate-400 uppercase font-bold">Type</label>
+                           <label className="text-xs text-fg-4 uppercase font-semibold">Type</label>
                            <select className="w-full bg-slate-800 text-white rounded p-2 mt-1 border border-slate-600" value={draftType} onChange={e => setDraftType(e.target.value)}>
                               <option value="small_detail">Small Detail</option>
                               <option value="easter_egg">Easter Egg</option>
@@ -696,43 +687,43 @@ export default function IdeaDetailPage() {
             
             {/* DESCRIPTION */}
             <div className={cardClass}>
-              <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2">Detail Description</h3>
+              <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-fg-4 border-b border-line-soft pb-2">Detail Description</h3>
               {editingCore ? (
                  <textarea className={textareaClass} value={draftDesc} onChange={e => setDraftDesc(e.target.value)} />
               ) : (
-                <div className="whitespace-pre-wrap break-words text-base leading-relaxed text-slate-800">
-                   {detail.description || <span className="italic text-slate-400">No description provided.</span>}
+                <div className="whitespace-pre-wrap break-words text-base leading-relaxed text-fg">
+                   {detail.description || <span className="italic text-fg-4">No description provided.</span>}
                 </div>
               )}
             </div>
 
             {/* FOOTAGE */}
             <div className={cardClass}>
-              <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2">Evidence / Footage</h3>
+              <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-fg-4 border-b border-line-soft pb-2">Evidence / Footage</h3>
               
               <div className="mb-4 flex gap-2">
                 <input className={inputClass} placeholder="YouTube link..." value={fp} onChange={e => setFp(e.target.value)} disabled={fetchingTitle} onKeyDown={e => e.key === 'Enter' && addFootage()} />
                 <button onClick={addFootage} disabled={fetchingTitle} className={btnGhost}>{fetchingTitle ? "..." : "+"}</button>
               </div>
 
-              {footage.length === 0 ? <p className="text-sm text-slate-400 italic">No footage added.</p> : (
+              {footage.length === 0 ? <p className="text-sm text-fg-4 italic">No footage added.</p> : (
                 <ul className="space-y-3">
                   {footage.map(f => (
-                    <li key={f.id} className="group relative overflow-hidden rounded-xl border border-slate-100 bg-slate-50 p-3 hover:border-blue-200 hover:shadow-md transition">
+                    <li key={f.id} className="group relative overflow-hidden rounded-xl border border-line-soft bg-surface-muted p-3 hover:border-blue-200 hover:shadow-md transition">
                       <div className="flex items-start justify-between gap-3 relative z-10">
                         <div className="flex items-start gap-3 min-w-0">
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-rose-500 shadow-sm text-xs">▶</span>
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface text-rose-500 shadow-sm text-xs">▶</span>
                           <div className="min-w-0 pt-0.5">
-                            {f.title && <div className="font-bold text-sm text-slate-900 line-clamp-1 hover:text-blue-600"><a href={f.file_path || "#"} target="_blank">{f.title}</a></div>}
-                            <div className="truncate text-xs text-slate-500">{renderLinkOrText(f.file_path)}</div>
+                            {f.title && <div className="font-bold text-sm text-fg line-clamp-1 hover:text-blue-600"><a href={f.file_path || "#"} target="_blank">{f.title}</a></div>}
+                            <div className="truncate text-xs text-fg-3">{renderLinkOrText(f.file_path)}</div>
                           </div>
                         </div>
                         <button onClick={() => deleteFootage(f.id)} className="text-slate-300 hover:text-rose-500">×</button>
                       </div>
                       {/* Download Status */}
                       <div className="mt-2 pl-11">
-                         <button onClick={() => toggleDownloaded(f.id, f.downloaded)} className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded transition ${f.downloaded ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500 hover:bg-slate-300"}`}>
-                           {f.downloaded ? "✓ Downloaded" : "☁ Need Download"}
+                         <button onClick={() => toggleDownloaded(f.id, f.downloaded)} className={`inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider px-2 py-1 rounded transition ${f.downloaded ? "bg-emerald-100 text-emerald-700" : "bg-surface-strong text-fg-3 hover:bg-slate-300"}`}>
+                           {f.downloaded ? <><CheckIcon className="h-3.5 w-3.5" aria-hidden="true" /> Downloaded</> : <><CloudArrowDownIcon className="h-3.5 w-3.5" aria-hidden="true" /> Need download</>}
                          </button>
                       </div>
                     </li>
@@ -743,17 +734,17 @@ export default function IdeaDetailPage() {
 
             {/* SOURCES */}
             <div className={cardClass}>
-              <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2">References</h3>
+              <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-fg-4 border-b border-line-soft pb-2">References</h3>
               <div className="mb-4 flex gap-2">
                 <input className={inputClass} placeholder="Source URL..." value={srcUrl} onChange={e => setSrcUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && addSource()} />
                 <button onClick={addSource} disabled={savingItem} className={btnGhost}>+</button>
               </div>
               <ul className="space-y-2">
                   {sources.map(s => (
-                    <li key={s.id} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm hover:bg-white transition">
+                    <li key={s.id} className="flex items-center justify-between rounded-lg border border-line-soft bg-surface-muted px-3 py-2 text-sm hover:bg-white dark:hover:bg-surface-sunken transition">
                       <div className="flex items-center gap-3 overflow-hidden">
-                        <span className="text-blue-500">🌍</span>
-                        <div className="min-w-0 truncate font-medium text-slate-700">{renderLinkOrText(s.url)}</div>
+                        <GlobeAltIcon className="h-4 w-4 shrink-0 text-blue-500" aria-hidden="true" />
+                        <div className="min-w-0 truncate font-medium text-fg-2">{renderLinkOrText(s.url)}</div>
                       </div>
                       <button onClick={() => deleteSource(s.id)} className="text-slate-300 hover:text-rose-500">×</button>
                     </li>
@@ -767,13 +758,13 @@ export default function IdeaDetailPage() {
              {/* GROUP CARD */}
              <div className={`${cardClass} border-t-4 border-t-blue-500`}>
                <div className="mb-4 flex items-center justify-between">
-                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">Collections</h3>
+                 <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-3">Collections</h3>
                  <GroupAddPicker groups={allGroups.filter((group) => !ideaGroups.some((current) => current.id === group.id))} onAdd={addToGroup} onCreate={createGroup} />
                </div>
-               {ideaGroups.length === 0 ? <p className="text-sm text-slate-400">Uncategorized</p> : (
+               {ideaGroups.length === 0 ? <p className="text-sm text-fg-4">Uncategorized</p> : (
                  <div className="flex flex-wrap gap-2">
                    {ideaGroups.map(g => (
-                     <span key={g.id} className="group inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-bold text-slate-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 transition">
+                     <span key={g.id} className="group inline-flex items-center gap-1 rounded-lg border border-line bg-surface-muted px-2 py-1 text-xs font-bold text-fg-2 hover:border-blue-300 hover:bg-accent-soft hover:text-blue-700 transition">
                        {g.name}
                        <button onClick={() => removeFromGroup(g.id)} className="ml-1 text-slate-300 hover:text-rose-500">×</button>
                      </span>
@@ -784,20 +775,20 @@ export default function IdeaDetailPage() {
 
              {/* META CARD */}
              <div className={cardClass}>
-               <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-slate-400">Meta Info</h3>
+               <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-fg-4">Meta Info</h3>
                <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
-                     <span className="text-slate-500">Created</span>
+                     <span className="text-fg-3">Created</span>
                      <span className="font-medium">{new Date(detail.created_at || "").toLocaleDateString()}</span>
                   </div>
                   {detail.pinned_at && (
                      <div className="flex justify-between">
-                        <span className="text-slate-500">Pinned</span>
+                        <span className="text-fg-3">Pinned</span>
                         <span className="font-medium">{new Date(detail.pinned_at).toLocaleDateString()}</span>
                      </div>
                   )}
                   <div className="flex justify-between">
-                     <span className="text-slate-500">Game Genre</span>
+                     <span className="text-fg-3">Game Genre</span>
                      <span className="font-medium max-w-[150px] truncate text-right">{game?.genres_text || "-"}</span>
                   </div>
                </div>

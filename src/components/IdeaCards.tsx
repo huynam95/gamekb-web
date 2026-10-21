@@ -1,38 +1,41 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { Bars3Icon, CheckIcon, DocumentDuplicateIcon, ExclamationTriangleIcon, EyeIcon, FolderIcon, HashtagIcon, LinkIcon, PencilSquareIcon, TagIcon, TrashIcon, VideoCameraIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { Bars3Icon, CheckIcon, DocumentDuplicateIcon, ExclamationTriangleIcon, EyeIcon, FolderIcon, HashtagIcon, LinkIcon, PencilSquareIcon, StarIcon, TagIcon, TrashIcon, VideoCameraIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import { supabase } from "@/lib/supabaseClient";
 import type { DetailRow, Game, ScriptProject } from "@/types/gamekb";
 import type { VideoTheme } from "@/lib/videoThemes";
 import { themeToHashtag } from "@/lib/videoThemes";
-import { TypePill } from "@/components/TypePill";
+import { TypeLabel, TypePill } from "@/components/TypePill";
 import { ProjectTopicSelect } from "@/components/ProjectTopicSelect";
 import { useProjectTopics } from "@/lib/useProjectTopics";
 import { getScriptTopicValue } from "@/lib/scriptTopics";
+import { Button, buttonClass } from "@/components/ui/Button";
+import { Field, Input } from "@/components/ui/Field";
+import { Modal, ModalBody, ModalFooter, ModalHeader } from "@/components/ui/Modal";
+import { CoverBackdrop } from "@/components/CoverBackdrop";
 import { analyzeAssetLinks } from "@/lib/assetLinks";
 import { useNotifications } from "@/components/NotificationCenter";
 
 
 export function QuickViewModal({ idea, isOpen, onClose }: { idea: DetailRow | null; isOpen: boolean; onClose: () => void }) {
-  if (!isOpen || !idea) return null;
-
   return (
-    <div className="modal-overlay fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in" onClick={onClose}>
-      <div className="scroll-dialog bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95" onClick={(event) => event.stopPropagation()}>
-        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-          <h3 className="font-bold text-slate-900 truncate pr-4">{idea.title}</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600" type="button">✕</button>
-        </div>
-        <div className="p-6 space-y-4 text-sm leading-relaxed text-slate-600 whitespace-pre-wrap break-words max-h-[60dvh] overflow-y-auto">
-          {idea.description || "No description available."}
-        </div>
-        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
-          <button onClick={onClose} className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-lg hover:bg-slate-800 transition" type="button">Close</button>
-        </div>
-      </div>
-    </div>
+    <Modal open={isOpen && !!idea} onClose={onClose} size="md" zClass="z-[200]" labelledBy="quick-view-title">
+      {idea && (
+        <>
+          <ModalHeader id="quick-view-title" title={idea.title} eyebrow={<TypeLabel typeKey={idea.detail_type} />} onClose={onClose} />
+          <ModalBody className="max-h-[60dvh] whitespace-pre-wrap break-words text-sm leading-relaxed text-fg-2">
+            {idea.description || "No description available."}
+          </ModalBody>
+          <ModalFooter>
+            <Link href={`/idea/${idea.id}`} className={buttonClass({ variant: "secondary", size: "sm" })}>Open detail</Link>
+            <Button variant="primary" size="sm" onClick={onClose}>Close</Button>
+          </ModalFooter>
+        </>
+      )}
+    </Modal>
   );
 }
 
@@ -41,59 +44,56 @@ export function GameEditorModal({ game, isOpen, onClose, onUpdate }: { game: Gam
   const [cover, setCover] = useState("");
   const [releaseYear, setReleaseYear] = useState("");
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState("");
 
   useEffect(() => {
     if (game) {
       setTitle(game.title);
       setCover(game.cover_url || "");
       setReleaseYear(game.release_year ? String(game.release_year) : "");
+      setFormError("");
     }
   }, [game]);
 
-  async function handleSave() {
+  async function handleSave(event?: FormEvent) {
+    event?.preventDefault();
     if (!game) return;
     const parsedReleaseYear = releaseYear.trim() ? Number(releaseYear) : null;
-    if (parsedReleaseYear !== null && (!Number.isInteger(parsedReleaseYear) || parsedReleaseYear < 1970 || parsedReleaseYear > 2100)) return;
+    if (parsedReleaseYear !== null && (!Number.isInteger(parsedReleaseYear) || parsedReleaseYear < 1970 || parsedReleaseYear > 2100)) {
+      setFormError("Release year must be between 1970 and 2100.");
+      return;
+    }
     setLoading(true);
     const { error } = await supabase.from("games").update({ title, cover_url: cover, release_year: parsedReleaseYear }).eq("id", game.id);
     setLoading(false);
-    if (!error) {
-      onUpdate({ ...game, title, cover_url: cover, release_year: parsedReleaseYear });
-      onClose();
+    if (error) {
+      setFormError(error.message);
+      return;
     }
+    onUpdate({ ...game, title, cover_url: cover, release_year: parsedReleaseYear });
+    onClose();
   }
 
-  if (!isOpen || !game) return null;
-
   return (
-    <div className="modal-overlay fixed inset-0 z-[110] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
-      <div className="scroll-dialog w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95">
-        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-          <h3 className="font-bold text-gray-900 text-sm">Edit Game Info</h3>
-          <button onClick={onClose} className="text-gray-400" type="button">✕</button>
-        </div>
-        <div className="p-5 space-y-4">
-          <div>
-            <label className="text-[10px] font-bold uppercase text-gray-400 mb-1 block tracking-wider">Title</label>
-            <input className="w-full h-10 border rounded-lg px-3 text-sm outline-none focus:border-blue-500 shadow-sm" value={title} onChange={(event) => setTitle(event.target.value)} />
-          </div>
-          <div>
-            <label className="text-[10px] font-bold uppercase text-gray-400 mb-1 block tracking-wider">Release Year</label>
-            <input type="number" min="1970" max="2100" className="w-full h-10 border rounded-lg px-3 text-sm outline-none focus:border-blue-500 shadow-sm" value={releaseYear} onChange={(event) => setReleaseYear(event.target.value)} placeholder="2026" />
-          </div>
-          <div>
-            <label className="text-[10px] font-bold uppercase text-gray-400 mb-1 block tracking-wider">Cover URL</label>
-            <input className="w-full h-10 border rounded-lg px-3 text-sm outline-none focus:border-blue-500 shadow-sm" value={cover} onChange={(event) => setCover(event.target.value)} />
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button onClick={onClose} className="px-4 py-2 text-xs font-bold text-gray-400" type="button">Cancel</button>
-            <button onClick={handleSave} disabled={loading} className="px-5 py-2 text-xs font-bold text-white bg-blue-600 rounded-lg shadow-sm" type="button">
-              {loading ? "Saving..." : "Save Changes"}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <Modal open={isOpen && !!game} onClose={onClose} size="sm" zClass="z-[110]" onSubmit={handleSave} labelledBy="game-editor-title">
+      <ModalHeader id="game-editor-title" title="Edit game info" onClose={onClose} />
+      <ModalBody className="space-y-4">
+        <Field label="Title">
+          <Input value={title} onChange={(event) => setTitle(event.target.value)} autoFocus />
+        </Field>
+        <Field label="Release year">
+          <Input type="number" min="1970" max="2100" value={releaseYear} onChange={(event) => setReleaseYear(event.target.value)} placeholder="2026" />
+        </Field>
+        <Field label="Cover URL">
+          <Input value={cover} onChange={(event) => setCover(event.target.value)} placeholder="https://..." />
+        </Field>
+        {formError && <p className="rounded-xl bg-danger-soft px-3 py-2 text-sm font-medium text-rose-600 dark:text-rose-300">{formError}</p>}
+      </ModalBody>
+      <ModalFooter>
+        <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+        <Button type="submit" variant="accent" size="sm" disabled={loading}>{loading ? "Saving..." : "Save changes"}</Button>
+      </ModalFooter>
+    </Modal>
   );
 }
 
@@ -255,29 +255,26 @@ export function ScriptEditorModal({
     applyIdeaOrder(orderedIdeas.filter((idea) => idea.id !== ideaId));
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="modal-overlay fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/70 p-2 sm:p-4 backdrop-blur-sm animate-in fade-in" onClick={onClose}>
-      <div className="editor-dialog flex w-full max-w-[min(80rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-2xl animate-in zoom-in-95 sm:rounded-3xl dark:border-slate-800 dark:bg-slate-950" onClick={(event) => event.stopPropagation()}>
+    <Modal open={isOpen} onClose={onClose} size="editor" zClass="z-[120]" className="rounded-[1.5rem] sm:rounded-3xl" labelledBy="script-editor-title">
         <div className="flex flex-col gap-3 border-b border-slate-100 bg-white px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8 lg:py-5 dark:border-slate-800 dark:bg-slate-950">
           <div>
-            <h2 className="text-xl font-black text-slate-900 sm:text-2xl dark:text-slate-50">Create Video Script</h2>
-            <p className="mt-1 text-sm font-bold text-slate-500">Drafting from {orderedIdeas.length} ideas</p>
+            <h2 id="script-editor-title" className="text-xl font-bold text-fg sm:text-2xl">Create Video Script</h2>
+            <p className="mt-1 text-sm font-medium text-fg-3">Drafting from {orderedIdeas.length} ideas</p>
             <div className="mt-3 w-full sm:w-80">
               <ProjectTopicSelect label="Topic" value={getScriptTopicValue(formData)} topics={topics} loading={topicsLoading} onChange={(topic) => setFormData((current) => ({ ...current, topic }))} />
               {topicsError && <p role="alert" className="mt-2 text-xs text-rose-500">{topicsError} <button type="button" onClick={retryTopics} className="cursor-pointer font-bold underline">Retry</button></p>}
             </div>
           </div>
           <div className="flex flex-wrap gap-2 sm:gap-3">
-            <button onClick={onClose} className="cursor-pointer rounded-xl px-4 py-2.5 text-sm font-bold text-slate-500 transition hover:bg-slate-100 sm:px-5 sm:py-3 dark:text-slate-300 dark:hover:bg-slate-800" type="button">Cancel</button>
+            <button onClick={onClose} className="cursor-pointer rounded-xl px-4 py-2.5 text-sm font-medium text-slate-500 transition hover:bg-slate-100 sm:px-5 sm:py-3 dark:text-slate-300 dark:hover:bg-slate-800" type="button">Cancel</button>
             <button disabled={orderedIdeas.length === 0} onClick={() => { onSave(formData); onClose(); }} className="cursor-pointer rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg transition hover:bg-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-3" type="button">Save Project</button>
           </div>
         </div>
 
         <div className="flex overflow-x-auto border-b border-slate-100 bg-slate-50 px-2 sm:px-6 lg:px-8 dark:border-slate-800 dark:bg-slate-900/60">
           {(["script", "details", "assets"] as const).map((tab) => (
-            <button key={tab} onClick={() => setActiveTab(tab)} className={`shrink-0 cursor-pointer border-b-2 px-4 py-3 text-xs font-black uppercase tracking-[0.12em] transition sm:px-6 sm:py-4 sm:text-sm ${activeTab === tab ? "border-blue-600 text-blue-600 dark:text-blue-400" : "border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"}`} type="button">
+            <button key={tab} onClick={() => setActiveTab(tab)} className={`shrink-0 cursor-pointer border-b-2 px-4 py-3 text-xs font-semibold uppercase tracking-wider transition sm:px-6 sm:py-4 sm:text-sm ${activeTab === tab ? "border-blue-600 text-blue-600 dark:text-blue-400" : "border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"}`} type="button">
               {tab === "script" ? "Content" : tab === "details" ? "Metadata" : "Assets"}
             </button>
           ))}
@@ -289,15 +286,15 @@ export function ScriptEditorModal({
               <aside className="flex min-h-0 max-h-[280px] flex-col rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4 lg:max-h-none lg:rounded-3xl dark:border-slate-800 dark:bg-slate-900">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-500 dark:text-blue-300">Idea Order</p>
-                    <p className="mt-1 text-xs font-bold text-slate-400 dark:text-slate-500">Drag to reorder. Remove one to delete its script and footage links.</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-blue-500 dark:text-blue-300">Idea Order</p>
+                    <p className="mt-1 text-xs font-medium text-slate-400 dark:text-slate-500">Drag to reorder. Remove one to delete its script and footage links.</p>
                   </div>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-slate-500 dark:bg-slate-800 dark:text-slate-300">{orderedIdeas.length}</span>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-300">{orderedIdeas.length}</span>
                 </div>
 
                 <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
                   {orderedIdeas.length === 0 && (
-                    <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-xs font-bold text-slate-400 dark:border-slate-700 dark:text-slate-500">No ideas left in this script.</div>
+                    <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-xs font-medium text-slate-400 dark:border-slate-700 dark:text-slate-500">No ideas left in this script.</div>
                   )}
                   {orderedIdeas.map((idea, index) => {
                     const isDragOver = dragOverIdeaId === idea.id && draggedIdeaId !== idea.id;
@@ -330,15 +327,15 @@ export function ScriptEditorModal({
                         }}
                         className={`group flex cursor-grab items-start gap-3 rounded-2xl border p-3 text-left shadow-sm transition active:cursor-grabbing ${isDragOver ? "border-blue-400 bg-blue-50 ring-2 ring-blue-100 dark:border-blue-500 dark:bg-blue-500/10 dark:ring-blue-500/20" : "border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700 dark:hover:bg-slate-900"}`}
                       >
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-xs font-black text-slate-400 shadow-sm dark:bg-slate-800 dark:text-slate-300">{index + 1}</div>
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-xs font-medium text-slate-400 shadow-sm dark:bg-slate-800 dark:text-slate-300">{index + 1}</div>
                         <div className="min-w-0 flex-1">
                           <div className="flex min-w-0 items-center gap-2">
-                            <p className="truncate text-sm font-black text-slate-800 dark:text-slate-100">{findGameTitle(idea)}</p>
+                            <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{findGameTitle(idea)}</p>
                             <Bars3Icon className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:text-slate-500 dark:text-slate-600 dark:group-hover:text-slate-300" />
                           </div>
-                          <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">{idea.title}</p>
+                          <p className="mt-1 line-clamp-2 text-xs font-medium leading-5 text-slate-500 dark:text-slate-400">{idea.title}</p>
                           {channels.length > 0 && (
-                            <div className="mt-2 flex min-w-0 items-center gap-1.5 text-[10px] font-black text-rose-600 dark:text-rose-300" title={channels.join(", ")}>
+                            <div className="mt-2 flex min-w-0 items-center gap-1.5 text-[11px] font-semibold text-rose-600 dark:text-rose-300" title={channels.join(", ")}>
                               <VideoCameraIcon className="h-3.5 w-3.5 shrink-0" />
                               <span className="truncate">{channels[0]}</span>
                               {channels.length > 1 && <span className="shrink-0 text-slate-400 dark:text-slate-500">+{channels.length - 1}</span>}
@@ -365,13 +362,13 @@ export function ScriptEditorModal({
               <div className="flex min-w-0 flex-col gap-3">
                 <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Script Content</p>
-                    <p className="mt-1 text-xs font-bold text-slate-400 dark:text-slate-500">Use Idea Order on the left to organize each section.</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-fg-4">Script Content</p>
+                    <p className="mt-1 text-xs font-medium text-slate-400 dark:text-slate-500">Use Idea Order on the left to organize each section.</p>
                   </div>
                   <button
                     type="button"
                     onClick={copyWholeScript}
-                    className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-black dark:bg-blue-600 dark:hover:bg-blue-700"
+                    className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-black dark:bg-blue-600 dark:hover:bg-blue-700"
                   >
                     <DocumentDuplicateIcon className="h-4 w-4" /> Copy Script
                   </button>
@@ -389,16 +386,16 @@ export function ScriptEditorModal({
           {activeTab === "details" && (
             <div className="mx-auto max-w-5xl space-y-8">
               <div>
-                <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-slate-400">Title</label>
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-fg-4">Title</label>
                 <input className="h-14 w-full rounded-2xl border border-slate-200 bg-white px-5 text-lg font-bold outline-none shadow-sm focus:border-blue-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100" value={formData.title} onChange={(event) => setFormData({ ...formData, title: event.target.value })} />
               </div>
               <div>
-                <label className="mb-2 block text-xs font-bold uppercase tracking-widest text-slate-400">Description</label>
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-fg-4">Description</label>
                 <textarea className="h-64 w-full rounded-2xl border border-slate-200 bg-white p-5 text-base leading-7 outline-none shadow-sm focus:border-blue-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100" value={formData.description} onChange={(event) => setFormData({ ...formData, description: event.target.value })} />
               </div>
               <div className="grid gap-6 sm:grid-cols-2 lg:gap-10">
                 <div className="space-y-4">
-                  <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400"><HashtagIcon className="h-4 w-4" /> Hashtags</label>
+                  <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-fg-4"><HashtagIcon className="h-4 w-4" /> Hashtags</label>
                   <div className="flex flex-wrap gap-2">
                     {formData.hashtags?.map((tag, index) => (
                       <span key={index} className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-600 shadow-sm dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-300">{tag}</span>
@@ -406,7 +403,7 @@ export function ScriptEditorModal({
                   </div>
                 </div>
                 <div className="space-y-4">
-                  <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400"><TagIcon className="h-4 w-4" /> Tags</label>
+                  <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-fg-4"><TagIcon className="h-4 w-4" /> Tags</label>
                   <div className="flex flex-wrap gap-2">
                     {formData.tags?.map((tag, index) => (
                       <span key={index} className="rounded-lg border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">{tag}</span>
@@ -421,14 +418,14 @@ export function ScriptEditorModal({
             <div className="mx-auto max-w-5xl space-y-5">
               <div className="flex flex-col gap-3 px-1 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-400">Selected Footage</label>
-                  <p className="mt-1 text-xs font-semibold text-slate-400 dark:text-slate-500">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-fg-4">Selected Footage</label>
+                  <p className="mt-1 text-xs font-medium text-slate-400 dark:text-slate-500">
                     {(formData.assets || []).length} entries · {assetAnalysis.uniqueLinkCount} unique links
                   </p>
                 </div>
                 <button
                   onClick={() => navigator.clipboard.writeText(assetAnalysis.uniqueAssets.map((asset) => asset.url).filter(Boolean).join("\n"))}
-                  className="inline-flex cursor-pointer items-center gap-2 self-start rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs font-black text-blue-700 transition hover:border-blue-300 hover:bg-blue-100 sm:self-auto dark:border-blue-500/25 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/15"
+                  className="inline-flex cursor-pointer items-center gap-2 self-start rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs font-semibold text-blue-700 transition hover:border-blue-300 hover:bg-blue-100 sm:self-auto dark:border-blue-500/25 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/15"
                   type="button"
                   title="Copy each source video only once"
                 >
@@ -442,8 +439,8 @@ export function ScriptEditorModal({
                     <ExclamationTriangleIcon className="h-5 w-5" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-black">{assetAnalysis.repeatedLinkCount} duplicate {assetAnalysis.repeatedLinkCount === 1 ? "link" : "links"} detected</p>
-                    <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">
+                    <p className="text-sm font-semibold">{assetAnalysis.repeatedLinkCount} duplicate {assetAnalysis.repeatedLinkCount === 1 ? "link" : "links"} detected</p>
+                    <p className="mt-1 text-xs font-medium leading-5 text-slate-500 dark:text-slate-400">
                       {assetAnalysis.duplicateVideoCount} source {assetAnalysis.duplicateVideoCount === 1 ? "video appears" : "videos appear"} in more than one selected idea. Rows marked Duplicate point to the same video, even when the YouTube URL format is different.
                     </p>
                   </div>
@@ -462,24 +459,24 @@ export function ScriptEditorModal({
                         key={`${asset.url}-${index}`}
                         className={`group flex items-center gap-3 p-4 transition sm:gap-5 sm:p-5 ${isRepeated ? "bg-slate-100/70 hover:bg-slate-100 dark:bg-slate-800/55 dark:hover:bg-slate-800/80" : "hover:bg-slate-50 dark:hover:bg-slate-800/60"}`}
                       >
-                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-black transition ${isRepeated ? "bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-300" : "bg-slate-100 text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-500 dark:bg-slate-800 dark:text-slate-500 dark:group-hover:bg-blue-500/15 dark:group-hover:text-blue-300"}`}>
+                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-semibold transition ${isRepeated ? "bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-300" : "bg-slate-100 text-slate-400 group-hover:bg-blue-100 group-hover:text-blue-500 dark:bg-slate-800 dark:text-slate-500 dark:group-hover:bg-blue-500/15 dark:group-hover:text-blue-300"}`}>
                           {isRepeated ? <LinkIcon className="h-4 w-4" /> : `#${displayNumber ?? ""}`}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex min-w-0 flex-wrap items-center gap-2">
                             <p className="min-w-0 truncate text-sm font-bold text-slate-700 sm:text-base dark:text-slate-100">{asset.name}</p>
                             {asset.channel_name && (
-                              <span className="shrink-0 rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-black text-rose-700 dark:border-rose-500/25 dark:bg-rose-500/10 dark:text-rose-300">
+                              <span className="shrink-0 rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-700 dark:border-rose-500/25 dark:bg-rose-500/10 dark:text-rose-300">
                                 {asset.channel_name}
                               </span>
                             )}
                             {duplicate && (
-                              <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-wide ${isRepeated ? "bg-slate-500 text-white dark:bg-slate-600" : "border border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>
+                              <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold uppercase tracking-wide ${isRepeated ? "bg-slate-500 text-white dark:bg-slate-600" : "border border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>
                                 {isRepeated ? "Duplicate" : `Same source ×${duplicate.total}`}
                               </span>
                             )}
                           </div>
-                          <p className="mt-1 truncate font-sans text-xs text-slate-400">{asset.url}</p>
+                          <p className="mt-1 truncate font-sans text-xs text-fg-4">{asset.url}</p>
                         </div>
                         <a href={asset.url} target="_blank" rel="noopener noreferrer" className="shrink-0 cursor-pointer rounded-xl bg-slate-100 p-3 text-slate-400 shadow-sm transition hover:bg-blue-600 hover:text-white dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-blue-600 dark:hover:text-white" title="Open source video">
                           <VideoCameraIcon className="h-5 w-5" />
@@ -488,14 +485,13 @@ export function ScriptEditorModal({
                     );
                   })
                 ) : (
-                  <div className="p-16 text-center text-base italic text-slate-400">No assets linked to these ideas.</div>
+                  <div className="p-16 text-center text-base italic text-fg-4">No assets linked to these ideas.</div>
                 )}
               </div>
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -524,20 +520,17 @@ export function IdeaItem({
   groupName?: string;
   removingFromGroup?: boolean;
 }) {
-  const hasCover = !!game?.cover_url;
   const ideaGroups = r.groups ?? [];
   const channelNames = [...new Set((r.footage ?? []).map((item) => item.channel_name?.trim()).filter(Boolean) as string[])];
   const primaryGroup = ideaGroups[0];
   const primaryChannel = channelNames[0];
 
   return (
-    <li onClick={() => isSelectMode && onToggleSelect(r)} className={`group relative h-64 w-full overflow-hidden rounded-2xl border shadow-sm transition-shadow duration-150 ${isSelectMode ? "cursor-pointer active:scale-[0.99]" : "hover:shadow-xl"} ${isSelected ? "border-blue-500 ring-2 ring-blue-500 ring-offset-2 ring-offset-slate-50" : "border-slate-200 bg-slate-900"}`}>
-      {hasCover ? (
-        <div className={`absolute inset-0 bg-cover bg-center opacity-60 transition-opacity duration-150 ${isSelectMode ? "" : "group-hover:opacity-45"}`} style={{ backgroundImage: `url(${game.cover_url})` }} />
-      ) : (
-        <div className="absolute inset-0 bg-slate-800 opacity-50" />
-      )}
-      <div className={`absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/60 to-transparent ${isSelected ? "opacity-90 bg-blue-900/20" : ""}`} />
+    <li onClick={() => isSelectMode && onToggleSelect(r)} className={`group relative h-64 w-full overflow-hidden rounded-2xl border bg-slate-900 shadow-sm transition-shadow duration-150 ${isSelectMode ? "cursor-pointer active:scale-[0.99]" : "hover:shadow-xl"} ${isSelected ? "border-blue-500 ring-2 ring-blue-500 ring-offset-2 ring-offset-background" : "border-line"}`}>
+      <div className={`absolute inset-0 transition-opacity duration-150 ${isSelectMode ? "" : "group-hover:opacity-75"}`}>
+        <CoverBackdrop src={game?.cover_url} alt="" imageClassName="opacity-60" />
+      </div>
+      <div className={`absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/60 to-transparent ${isSelected ? "opacity-90 bg-blue-900/20" : ""}`} />
       {isSelectMode && (
         <>
           <button
@@ -571,10 +564,10 @@ export function IdeaItem({
       )}
       <div className="absolute inset-0 flex flex-col justify-end p-5">
         <div className="z-10">
-          <div className="mb-1 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 z-20 relative">
+          <div className="relative z-20 mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-white/65">
             <span className="truncate max-w-[80%]">{game?.title}</span>
             {!isSelectMode && game && (
-              <button onClick={(event) => { event.stopPropagation(); onEditGame(game); }} className="touch-reveal cursor-pointer rounded p-1 text-slate-500 opacity-0 transition-opacity hover:bg-white/20 hover:text-white group-hover:opacity-100 group-focus-within:opacity-100" type="button">
+              <button onClick={(event) => { event.stopPropagation(); onEditGame(game); }} className="touch-reveal cursor-pointer rounded p-1 text-white/60 opacity-0 transition-opacity hover:bg-white/20 hover:text-white group-hover:opacity-100 group-focus-within:opacity-100" type="button" aria-label={`Edit ${game.title}`} title="Edit game info">
                 <PencilSquareIcon className="h-3 w-3" />
               </button>
             )}
@@ -583,14 +576,14 @@ export function IdeaItem({
           {(primaryGroup || primaryChannel) && (
             <div className="mb-2 flex min-w-0 items-center gap-1.5 overflow-hidden">
               {primaryGroup && (
-                <span className="inline-flex min-w-0 max-w-[55%] items-center gap-1 rounded-md border border-white/10 bg-white/10 px-1.5 py-1 text-[9px] font-bold text-white/85 backdrop-blur-sm" title={ideaGroups.map((group) => group.name).join(", ")}>
+                <span className="inline-flex min-w-0 max-w-[55%] items-center gap-1 rounded-md border border-white/10 bg-white/10 px-1.5 py-1 text-[11px] font-medium text-white/85 backdrop-blur-sm" title={ideaGroups.map((group) => group.name).join(", ")}>
                   <FolderIcon className="h-3 w-3 shrink-0 text-sky-300" />
                   <span className="truncate">{primaryGroup.name}</span>
                   {ideaGroups.length > 1 && <span className="shrink-0 text-white/55">+{ideaGroups.length - 1}</span>}
                 </span>
               )}
               {primaryChannel && (
-                <span className="inline-flex min-w-0 max-w-[55%] items-center gap-1 rounded-md border border-white/10 bg-black/20 px-1.5 py-1 text-[9px] font-bold text-white/75 backdrop-blur-sm" title={channelNames.join(", ")}>
+                <span className="inline-flex min-w-0 max-w-[55%] items-center gap-1 rounded-md border border-white/10 bg-black/20 px-1.5 py-1 text-[11px] font-medium text-white/75 backdrop-blur-sm" title={channelNames.join(", ")}>
                   <VideoCameraIcon className="h-3 w-3 shrink-0 text-rose-300" />
                   <span className="truncate">{primaryChannel}</span>
                   {channelNames.length > 1 && <span className="shrink-0 text-white/45">+{channelNames.length - 1}</span>}
@@ -600,16 +593,16 @@ export function IdeaItem({
           )}
           <div className="flex items-center gap-2">
             <TypePill typeKey={r.detail_type} />
-            {r.pinned && <span className="text-[10px] font-bold text-amber-400">★ Pinned</span>}
+            {r.pinned && <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-300"><StarSolidIcon className="h-3 w-3" aria-hidden="true" /> Pinned</span>}
           </div>
         </div>
       </div>
       {!isSelectMode && (
         <div className="touch-reveal absolute top-3 right-3 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity z-20 flex flex-col gap-2">
-          <button onClick={(event) => { event.stopPropagation(); onTogglePin(r.id, !!r.pinned); }} className={`touch-target flex h-8 w-8 cursor-pointer items-center justify-center rounded-full shadow-lg backdrop-blur-md transition-colors duration-150 ${r.pinned ? "bg-amber-400 text-white" : "bg-white/10 text-white hover:bg-white/20"}`} type="button">
-            {r.pinned ? "★" : "☆"}
+          <button onClick={(event) => { event.stopPropagation(); onTogglePin(r.id, !!r.pinned); }} className={`touch-target flex h-8 w-8 cursor-pointer items-center justify-center rounded-full shadow-lg backdrop-blur-md transition-colors duration-150 ${r.pinned ? "bg-amber-400 text-white" : "bg-white/10 text-white hover:bg-white/20"}`} type="button" aria-pressed={!!r.pinned} aria-label={r.pinned ? `Unpin ${r.title}` : `Pin ${r.title}`} title={r.pinned ? "Unpin" : "Pin"}>
+            {r.pinned ? <StarSolidIcon className="h-4 w-4" /> : <StarIcon className="h-4 w-4" />}
           </button>
-          <button onClick={(event) => { event.stopPropagation(); onQuickView(r); }} className="touch-target flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white shadow-lg backdrop-blur-md transition-colors duration-150 hover:bg-emerald-500" title="Quick Preview" type="button">
+          <button onClick={(event) => { event.stopPropagation(); onQuickView(r); }} className="touch-target flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white shadow-lg backdrop-blur-md transition-colors duration-150 hover:bg-emerald-500" title="Quick preview" aria-label={`Quick preview: ${r.title}`} type="button">
             <EyeIcon className="h-4 w-4" />
           </button>
         </div>

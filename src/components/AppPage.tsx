@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { buttonClass } from "@/components/ui/Button";
 
 type AppPageHeaderProps = {
   title: string;
@@ -19,8 +20,7 @@ export const appPageContainerClass =
 export const appPageSurfaceClass =
   "rounded-[1.75rem] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900";
 
-export const appPagePrimaryActionClass =
-  "inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl bg-slate-900 px-5 text-sm font-black text-white shadow-sm transition hover:bg-slate-800 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200";
+export const appPagePrimaryActionClass = buttonClass({ variant: "primary", size: "md" });
 
 export function AppPageHeader({ title, description, icon, action, className = "" }: AppPageHeaderProps) {
   return (

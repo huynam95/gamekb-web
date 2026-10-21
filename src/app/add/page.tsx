@@ -2,16 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentType, SVGProps } from "react";
-import {
-  CheckIcon,
-  ChevronDownIcon,
-  CubeTransparentIcon,
-  ExclamationTriangleIcon,
-  FaceSmileIcon,
-  MagnifyingGlassIcon,
-  SparklesIcon,
-  UserGroupIcon,
-} from "@heroicons/react/24/outline";
+import { CheckIcon, ChevronDownIcon, CloudArrowDownIcon, CubeTransparentIcon, ExclamationTriangleIcon, FaceSmileIcon, FilmIcon, FolderOpenIcon, MagnifyingGlassIcon, SparklesIcon, UserGroupIcon } from "@heroicons/react/24/outline";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchYoutubeMetadata } from "@/lib/youtube";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -115,14 +106,14 @@ function renderLinkOrText(text: string) {
         href={text}
         target="_blank"
         rel="noopener noreferrer"
-        className="break-all text-blue-600 hover:underline"
+        className="break-all text-accent hover:underline"
         onClick={(e) => e.stopPropagation()}
       >
         {text}
       </a>
     );
   }
-  return <span className="break-all font-mono text-slate-500">{text}</span>;
+  return <span className="break-all font-mono text-fg-3">{text}</span>;
 }
 
 /* ================= SUB-COMPONENTS (Giữ nguyên GameCombobox, GroupPicker) ================= */
@@ -157,13 +148,13 @@ function ModernSelect<T extends string | number>({
 
   return (
     <div ref={boxRef} className="relative">
-      <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">
+      <span className="mb-2 block text-[11px] font-semibold uppercase tracking-wider text-fg-4">
         {label}
       </span>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`group flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 text-left shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 ${compact ? "h-12" : "h-14"}`}
+        className={`group flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-white px-3 text-left shadow-sm transition hover:border-line-strong hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 ${compact ? "h-12" : "h-14"}`}
       >
         <span className="flex min-w-0 items-center gap-3">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-500 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700">
@@ -174,18 +165,18 @@ function ModernSelect<T extends string | number>({
             )}
           </span>
           <span className="min-w-0">
-            <span className="block truncate text-sm font-black text-slate-900 dark:text-slate-100">
+            <span className="block truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
               {selected.label}
             </span>
             {selected.description && !compact && (
-              <span className="block truncate text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              <span className="block truncate text-[11px] font-semibold uppercase tracking-wider text-fg-4">
                 {selected.description}
               </span>
             )}
           </span>
         </span>
         <ChevronDownIcon
-          className={`h-4 w-4 shrink-0 text-slate-400 transition ${open ? "rotate-180" : ""}`}
+          className={`h-4 w-4 shrink-0 text-fg-4 transition ${open ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -215,12 +206,12 @@ function ModernSelect<T extends string | number>({
                     )}
                   </span>
                   <span className="min-w-0">
-                    <span className="block truncate text-sm font-black">
+                    <span className="block truncate text-sm font-semibold">
                       {option.label}
                     </span>
                     {option.description && (
                       <span
-                        className={`block truncate text-[10px] font-bold uppercase tracking-wider ${active ? "text-white/60 dark:text-slate-600" : "text-slate-400"}`}
+                        className={`block truncate text-[11px] font-semibold uppercase tracking-wider ${active ? "text-white/60 dark:text-slate-600" : "text-fg-4"}`}
                       >
                         {option.description}
                       </span>
@@ -266,12 +257,12 @@ function GameCombobox({ games, selectedGameId, onSelect, onCreateGame }: any) {
 
   return (
     <div ref={boxRef} className="relative">
-      <label className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-400">
+      <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-fg-4">
         Game Select *
       </label>
       <button
         type="button"
-        className={`flex w-full cursor-pointer items-center justify-between text-left ${inputClass} ${!selectedGame ? "text-slate-400" : "font-bold"}`}
+        className={`flex w-full cursor-pointer items-center justify-between text-left ${inputClass} ${!selectedGame ? "text-fg-4" : "font-bold"}`}
         onClick={() => setOpen((v) => !v)}
       >
         <span className="truncate">
@@ -294,7 +285,7 @@ function GameCombobox({ games, selectedGameId, onSelect, onCreateGame }: any) {
             {filtered.length === 0 ? (
               <button
                 type="button"
-                className="w-full cursor-pointer rounded-xl bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-100"
+                className="w-full cursor-pointer rounded-xl bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 hover:bg-surface-sunken dark:bg-slate-800 dark:text-slate-100"
                 onClick={() => {
                   setOpen(false);
                   onCreateGame(query.trim());
@@ -350,20 +341,20 @@ function GroupPicker({ groups, selectedIds, onToggle, onCreateGroup }: any) {
   return (
     <div ref={boxRef} className="relative">
       <div className="mb-3 flex items-center justify-between">
-        <label className="text-xs font-black uppercase tracking-widest text-slate-400">
+        <label className="text-xs font-semibold uppercase tracking-wider text-fg-4">
           Add to Collection
         </label>
         <button
           type="button"
           onClick={() => setOpen(!open)}
-          className="cursor-pointer text-xs font-bold text-blue-600 hover:underline"
+          className="cursor-pointer text-xs font-bold text-accent hover:underline"
         >
           {open ? "Close" : "+ Add"}
         </button>
       </div>
       <div className="flex flex-wrap gap-2 min-h-[40px]">
         {selectedIds.length === 0 && !open && (
-          <span className="text-xs text-slate-400 italic font-medium">
+          <span className="text-xs text-fg-4 italic font-medium">
             Not assigned to any collection.
           </span>
         )}
@@ -373,7 +364,7 @@ function GroupPicker({ groups, selectedIds, onToggle, onCreateGroup }: any) {
             g && (
               <span
                 key={id}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-blue-100 bg-accent-soft px-3 py-1.5 text-xs font-bold text-accent"
               >
                 {g.name}{" "}
                 <button
@@ -401,7 +392,7 @@ function GroupPicker({ groups, selectedIds, onToggle, onCreateGroup }: any) {
             {filtered.length === 0 ? (
               <button
                 type="button"
-                className="w-full cursor-pointer rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-900 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-100"
+                className="w-full cursor-pointer rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-900 hover:bg-surface-sunken dark:bg-slate-800 dark:text-slate-100"
                 onClick={() => {
                   if (q.trim()) onCreateGroup(q.trim());
                   setQ("");
@@ -414,10 +405,10 @@ function GroupPicker({ groups, selectedIds, onToggle, onCreateGroup }: any) {
                 <button
                   key={g.id}
                   type="button"
-                  className={`flex w-full cursor-pointer items-center justify-between rounded-xl px-3 py-2 text-left text-xs font-bold transition ${selectedIds.includes(g.id) ? "bg-blue-50 text-blue-600" : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"}`}
+                  className={`flex w-full cursor-pointer items-center justify-between rounded-xl px-3 py-2 text-left text-xs font-bold transition ${selectedIds.includes(g.id) ? "bg-accent-soft text-accent" : "text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"}`}
                   onClick={() => onToggle(g.id)}
                 >
-                  <span>{g.name}</span> {selectedIds.includes(g.id) && "✓"}
+                  <span>{g.name}</span> {selectedIds.includes(g.id) && <CheckIcon className="h-4 w-4 shrink-0" aria-hidden="true" />}
                 </button>
               ))
             )}
@@ -742,7 +733,7 @@ export default function AddIdeaPage() {
                   />
                   {showCreateGame && (
                     <div className="rounded-2xl border-2 border-blue-100 bg-blue-50/50 p-6 animate-in zoom-in-95">
-                      <h4 className="mb-3 text-xs font-black uppercase tracking-widest text-blue-800">
+                      <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-blue-800">
                         New Game Entry
                       </h4>
                       <div className="flex gap-3">
@@ -764,7 +755,7 @@ export default function AddIdeaPage() {
                     </div>
                   )}
                   <label className="block">
-                    <span className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-400">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-fg-4">
                       Idea Title *
                     </span>
                     <input
@@ -776,7 +767,7 @@ export default function AddIdeaPage() {
                   </label>
                   {!loadingSimilar && similar.length > 0 && (
                     <div className="rounded-2xl border-2 border-amber-100 bg-amber-50 p-5">
-                      <div className="mb-3 text-[10px] font-black uppercase tracking-widest text-amber-700">
+                      <div className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-amber-700">
                         Similarity Warning
                       </div>
                       <ul className="space-y-2">
@@ -799,7 +790,7 @@ export default function AddIdeaPage() {
                     </div>
                   )}
                   <label className="block">
-                    <span className="mb-2 block text-xs font-black uppercase tracking-widest text-slate-400">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-fg-4">
                       Detailed Description *
                     </span>
                     <textarea
@@ -813,12 +804,12 @@ export default function AddIdeaPage() {
               </div>
 
               <div className={cardClass}>
-                <h3 className="mb-6 text-sm font-black uppercase tracking-widest text-slate-900 flex items-center gap-2">
-                  <span>📂</span> Attachments & Media
+                <h3 className="mb-6 text-sm font-semibold uppercase tracking-wider text-fg flex items-center gap-2">
+                  <FolderOpenIcon className="h-4 w-4" aria-hidden="true" /> Attachments & Media
                 </h3>
                 <div className="grid gap-8 md:grid-cols-2">
                   <div className="space-y-4">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-fg-4">
                       Footage / Clips
                     </div>
                     <div className="flex gap-2">
@@ -846,16 +837,16 @@ export default function AddIdeaPage() {
                       {stagedFootage.map((f, i) => (
                         <li
                           key={i}
-                          className="rounded-2xl bg-slate-50 p-4 border border-slate-100 group"
+                          className="rounded-2xl bg-surface-muted p-4 border border-line-soft group"
                         >
                           <div className="flex justify-between items-start mb-2">
                             <div className="min-w-0 pr-4">
                               {f.title && (
-                                <div className="font-bold text-xs text-slate-900 line-clamp-1 mb-1">
-                                  🎬 {f.title}
+                                <div className="font-bold text-xs text-fg line-clamp-1 mb-1">
+                                  <FilmIcon className="mr-1 inline h-3.5 w-3.5 align-[-2px]" aria-hidden="true" />{f.title}
                                 </div>
                               )}
-                              <div className="truncate text-[10px] font-mono font-bold text-slate-400">
+                              <div className="truncate text-[11px] font-mono font-medium text-fg-4">
                                 {renderLinkOrText(f.file_path)}
                               </div>
                             </div>
@@ -878,9 +869,9 @@ export default function AddIdeaPage() {
                               n[i].downloaded = !n[i].downloaded;
                               setStagedFootage(n);
                             }}
-                            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition shadow-sm ${f.downloaded ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-500"}`}
+                            className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition shadow-sm ${f.downloaded ? "bg-emerald-100 text-emerald-700" : "bg-surface-strong text-fg-3"}`}
                           >
-                            {f.downloaded ? "✓ Downloaded" : "☁ Need Download"}
+                            {f.downloaded ? <><CheckIcon className="h-3.5 w-3.5" aria-hidden="true" /> Downloaded</> : <><CloudArrowDownIcon className="h-3.5 w-3.5" aria-hidden="true" /> Need download</>}
                           </button>
                         </li>
                       ))}
@@ -888,7 +879,7 @@ export default function AddIdeaPage() {
                   </div>
 
                   <div className="space-y-4">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-fg-4">
                       Sources / References
                     </div>
                     <div className="flex gap-2">
@@ -916,9 +907,9 @@ export default function AddIdeaPage() {
                       {stagedSources.map((s, i) => (
                         <li
                           key={i}
-                          className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3 text-xs border border-slate-100"
+                          className="flex items-center justify-between rounded-xl bg-surface-muted px-4 py-3 text-xs border border-line-soft"
                         >
-                          <span className="truncate font-bold text-slate-500">
+                          <span className="truncate font-bold text-fg-3">
                             {renderLinkOrText(s.url)}
                           </span>
                           <button
@@ -968,7 +959,7 @@ export default function AddIdeaPage() {
               </div>
 
               <div className={cardClass}>
-                <h3 className="mb-6 text-xs font-black uppercase tracking-widest text-slate-400">
+                <h3 className="mb-6 text-xs font-semibold uppercase tracking-wider text-fg-4">
                   Settings
                 </h3>
                 <div className="space-y-5">
@@ -983,7 +974,7 @@ export default function AddIdeaPage() {
                       type="checkbox"
                       checked={pinned}
                       onChange={(e) => setPinned(e.target.checked)}
-                      className="h-5 w-5 rounded-lg border-slate-300 text-slate-900 focus:ring-0"
+                      className="h-5 w-5 rounded-lg border-line-strong text-fg focus:ring-0"
                     />
                     <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
                       Pin this idea

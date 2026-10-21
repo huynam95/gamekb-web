@@ -20,7 +20,7 @@ export function ProjectTopicSelect({ value, topics, onChange, label, ariaLabel =
 
   return (
     <div className="min-w-0 w-full" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-      {label && <label htmlFor={id} className="mb-1.5 block text-xs font-black text-slate-500 dark:text-slate-400">{label}</label>}
+      {label && <label htmlFor={id} className="mb-1.5 block text-xs font-medium text-slate-500 dark:text-slate-400">{label}</label>}
       <select
         id={id}
         aria-label={ariaLabel}

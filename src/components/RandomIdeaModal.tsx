@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import { CheckIcon, MagnifyingGlassIcon, SparklesIcon } from "@heroicons/react/24/outline";
 import type { DetailRow, Game } from "@/types/gamekb";
 
 type RandomIdeaModalProps = {
@@ -41,8 +41,8 @@ export function RandomIdeaModal({
     <div className="random-picker modal-overlay fixed inset-0 z-[150] bg-slate-950/95 p-5 backdrop-blur-sm" onClick={onClose}>
       <div className="random-picker-header mb-6 flex w-full max-w-[1400px] items-center justify-between gap-3" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-white shadow-lg backdrop-blur-md">
-          <span className="text-2xl leading-none" aria-hidden="true">✦</span>
-          <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-white px-2 text-xs font-black text-slate-950 dark:bg-white dark:text-slate-950">{items.length}</span>
+          <SparklesIcon className="h-6 w-6" aria-hidden="true" />
+          <span className="flex h-7 min-w-7 items-center justify-center rounded-full bg-white px-2 text-xs font-semibold text-slate-950 dark:bg-white dark:text-slate-950">{items.length}</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -54,8 +54,8 @@ export function RandomIdeaModal({
             title={`Save ${selectedIds.length} picked idea${selectedIds.length === 1 ? "" : "s"} to project`}
             aria-label="Save picked ideas to project"
           >
-            <span className="leading-none" aria-hidden="true">✓</span>
-            <span className="text-sm font-black">{selectedIds.length}</span>
+            <CheckIcon className="h-5 w-5" aria-hidden="true" />
+            <span className="text-sm font-semibold">{selectedIds.length}</span>
           </button>
 
           {selectedIds.length > 0 && (
@@ -115,8 +115,8 @@ export function RandomIdeaModal({
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-transparent" />
 
                   <div className="absolute inset-x-0 bottom-0 p-6">
-                    <p className="mb-2 line-clamp-1 text-[10px] font-black uppercase tracking-widest text-slate-400">{game?.title || "Unknown Game"}</p>
-                    <h3 className="line-clamp-3 text-xl font-black leading-tight text-white">{idea.title}</h3>
+                    <p className="mb-2 line-clamp-1 text-[11px] font-semibold uppercase tracking-wider text-fg-4">{game?.title || "Unknown Game"}</p>
+                    <h3 className="line-clamp-3 text-xl font-bold leading-tight text-white">{idea.title}</h3>
                   </div>
                 </Link>
 
@@ -137,7 +137,7 @@ export function RandomIdeaModal({
                   title={isSelected ? "Remove from project tray" : "Pick for project tray"}
                   aria-label={isSelected ? "Remove from project tray" : "Pick for project tray"}
                 >
-                  {isSelected ? "✓" : ""}
+                  {isSelected ? <CheckIcon className="h-5 w-5" aria-hidden="true" /> : null}
                 </button>
             </div>
           );

@@ -76,12 +76,12 @@ export default function MigratePage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 p-10">
-      <div className="mx-auto max-w-2xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="mb-4 text-2xl font-bold text-slate-900">
-          🛠 Data Migration Tool
+    <div className="min-h-screen bg-surface-muted p-10">
+      <div className="mx-auto max-w-2xl rounded-2xl border border-line bg-surface p-6 shadow-sm">
+        <h1 className="mb-4 text-2xl font-bold text-fg">
+          Data Migration Tool
         </h1>
-        <p className="mb-6 text-sm text-slate-600">
+        <p className="mb-6 text-sm text-fg-2">
           Công cụ này sẽ quét Footage còn thiếu title hoặc tên kênh YouTube, rồi cập nhật metadata vào CSDL.
         </p>
 
@@ -90,7 +90,7 @@ export default function MigratePage() {
              <span>Progress</span>
              <span>{progress}%</span>
           </div>
-          <div className="h-2 w-full rounded-full bg-slate-100">
+          <div className="h-2 w-full rounded-full bg-surface-sunken">
             <div 
                 className="h-2 rounded-full bg-blue-600 transition-all duration-300" 
                 style={{ width: `${progress}%` }} 
@@ -106,13 +106,13 @@ export default function MigratePage() {
           {isRunning ? "Running..." : "Start Update"}
         </button>
 
-        <div className="mt-6 h-64 overflow-auto rounded-xl border border-slate-100 bg-slate-900 p-4 font-mono text-xs text-green-400">
+        <div className="mt-6 h-64 overflow-auto rounded-xl border border-line-soft bg-slate-900 p-4 font-mono text-xs text-green-400">
           {logs.map((log, i) => (
             <div key={i} className="mb-1">
               {log}
             </div>
           ))}
-          {logs.length === 0 && <span className="text-slate-500">Waiting to start...</span>}
+          {logs.length === 0 && <span className="text-fg-3">Waiting to start...</span>}
         </div>
       </div>
     </div>

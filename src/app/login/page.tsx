@@ -1,6 +1,7 @@
 // app/login/page.tsx
 "use client";
 
+import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -43,7 +44,7 @@ export default function LoginPage() {
           <h1 className="bg-gradient-to-r from-slate-100 to-slate-500 bg-clip-text text-3xl font-black text-transparent">
             Restricted Area
           </h1>
-          <p className="mt-2 text-sm text-slate-400">Enter access code to continue.</p>
+          <p className="mt-2 text-sm text-fg-4">Enter access code to continue.</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
@@ -52,7 +53,7 @@ export default function LoginPage() {
               type="password"
               value={pass}
               onChange={(e) => setPass(e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-center text-lg font-bold text-white placeholder:text-slate-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition tracking-widest"
+              className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-center text-lg font-bold text-white placeholder:text-slate-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition tracking-wider"
               placeholder="••••••••"
               autoFocus
             />
@@ -60,19 +61,19 @@ export default function LoginPage() {
 
           {err && (
             <div className="rounded-lg bg-rose-500/20 p-3 text-center text-xs font-bold text-rose-300 border border-rose-500/30">
-              ⚠️ {err}
+              <ExclamationTriangleIcon className="mr-1 inline h-4 w-4 align-[-3px]" aria-hidden="true" />{err}
             </div>
           )}
 
           <button
             disabled={loading}
-            className="w-full rounded-xl bg-slate-100 py-3 text-sm font-bold text-slate-900 shadow-lg hover:bg-white hover:scale-[1.02] disabled:opacity-70 disabled:hover:scale-100 transition active:scale-[0.98]"
+            className="w-full rounded-xl bg-surface-sunken py-3 text-sm font-bold text-fg shadow-lg hover:bg-white dark:hover:bg-surface-sunken hover:scale-[1.02] disabled:opacity-70 disabled:hover:scale-100 transition active:scale-[0.98]"
           >
             {loading ? "Verifying..." : "Unlock System"}
           </button>
         </form>
 
-        <div className="mt-6 text-center text-[10px] text-slate-600 uppercase tracking-widest">
+        <div className="mt-6 text-center text-[11px] text-fg-2 uppercase tracking-wider">
           GameKB Secure Server
         </div>
       </div>

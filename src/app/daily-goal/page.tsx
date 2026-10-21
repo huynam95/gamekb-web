@@ -250,10 +250,10 @@ export default function DailyGoalPage() {
             <div className="bg-gradient-to-br from-violet-500 via-fuchsia-500 to-orange-400 px-5 py-6 text-white sm:px-8 sm:py-8">
               <div className="flex flex-wrap items-center justify-between gap-5">
                 <div>
-                  <p className="text-xs font-black uppercase tracking-[0.2em] text-white/70">Today&apos;s progress</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-white/70">Today&apos;s progress</p>
                   <div className="mt-2 flex items-baseline gap-2">
                     <span className="text-4xl font-black tabular-nums sm:text-5xl">{completedCount}</span>
-                    <span className="text-lg font-black text-white/70">of {totalCount} done</span>
+                    <span className="text-lg font-bold text-white/70">of {totalCount} done</span>
                   </div>
                 </div>
                 <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15 backdrop-blur">
@@ -266,7 +266,7 @@ export default function DailyGoalPage() {
               </div>
 
               <div className="mt-5 h-2.5 overflow-hidden rounded-full bg-white/20">
-                <div className="h-full rounded-full bg-white transition-[width] duration-300" style={{ width: `${percentage}%` }} />
+                <div className="h-full rounded-full bg-surface transition-[width] duration-300" style={{ width: `${percentage}%` }} />
               </div>
             </div>
 
@@ -285,7 +285,7 @@ export default function DailyGoalPage() {
                 <button
                   type="button"
                   onClick={addTask}
-                  className="flex h-11 shrink-0 cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-black text-white transition hover:bg-violet-600 dark:bg-white dark:text-slate-950 dark:hover:bg-violet-400"
+                  className="flex h-11 shrink-0 cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-violet-600 dark:bg-white dark:text-slate-950 dark:hover:bg-violet-400"
                 >
                   <PlusIcon className="h-5 w-5" />
                   <span className="hidden sm:inline">Add task</span>
@@ -297,8 +297,8 @@ export default function DailyGoalPage() {
                   <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-violet-50 text-violet-500 dark:bg-violet-950/40 dark:text-violet-300">
                     <CheckIcon className="h-8 w-8" />
                   </div>
-                  <h2 className="mt-5 text-xl font-black">Your list is clear.</h2>
-                  <p className="mt-2 max-w-sm text-sm font-semibold leading-6 text-slate-500 dark:text-slate-400">Add the few things that would make today feel like a win.</p>
+                  <h2 className="mt-5 text-xl font-bold">Your list is clear.</h2>
+                  <p className="mt-2 max-w-sm text-sm font-medium leading-6 text-slate-500 dark:text-slate-400">Add the few things that would make today feel like a win.</p>
                 </div>
               ) : (
                 <div className="mt-5 space-y-2">
@@ -366,7 +366,7 @@ export default function DailyGoalPage() {
                               <button
                                 type="button"
                                 onClick={cancelEdit}
-                                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-fg-4 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-100"
                                 aria-label="Cancel editing"
                               >
                                 <XMarkIcon className="h-4 w-4" />
@@ -376,7 +376,7 @@ export default function DailyGoalPage() {
                             <button
                               type="button"
                               onClick={() => beginEdit(item)}
-                              className="touch-reveal flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-400 opacity-100 transition hover:bg-violet-50 hover:text-violet-600 sm:opacity-0 sm:group-hover:opacity-100 group-focus-within:opacity-100 dark:hover:bg-violet-950/30 dark:hover:text-violet-300"
+                              className="touch-reveal flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-fg-4 opacity-100 transition hover:bg-violet-50 hover:text-violet-600 sm:opacity-0 sm:group-hover:opacity-100 group-focus-within:opacity-100 dark:hover:bg-violet-950/30 dark:hover:text-violet-300"
                               aria-label="Edit task"
                             >
                               <PencilSquareIcon className="h-4 w-4" />
@@ -386,7 +386,7 @@ export default function DailyGoalPage() {
                           <button
                             type="button"
                             onClick={() => deleteTask(item.id)}
-                            className="touch-reveal flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-slate-400 opacity-100 transition hover:bg-rose-50 hover:text-rose-600 sm:opacity-0 sm:group-hover:opacity-100 group-focus-within:opacity-100 dark:hover:bg-rose-950/30 dark:hover:text-rose-300"
+                            className="touch-reveal flex h-9 w-9 cursor-pointer items-center justify-center rounded-xl text-fg-4 opacity-100 transition hover:bg-rose-50 hover:text-rose-600 sm:opacity-0 sm:group-hover:opacity-100 group-focus-within:opacity-100 dark:hover:bg-rose-950/30 dark:hover:text-rose-300"
                             aria-label="Delete task"
                           >
                             <TrashIcon className="h-4 w-4" />
@@ -399,8 +399,8 @@ export default function DailyGoalPage() {
               )}
 
               {totalCount > 0 && (
-                <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-4 text-xs font-black uppercase tracking-[0.14em] text-slate-400 dark:border-slate-800 dark:text-slate-500">
-                  <span>{openCount === 0 ? "Everything is done ✦" : `${openCount} ${openCount === 1 ? "task" : "tasks"} left`}</span>
+                <div className="mt-5 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-4 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:border-slate-800 dark:text-slate-500">
+                  <span>{openCount === 0 ? "Everything is done" : `${openCount} ${openCount === 1 ? "task" : "tasks"} left`}</span>
                   <span>{percentage}% complete</span>
                 </div>
               )}

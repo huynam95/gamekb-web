@@ -308,11 +308,11 @@ export default function LongVideoProjectPage() {
 
 
   if (loading) {
-    return <div className={appPageRootClass}><AppSidebar activePage="longVideos" /><main className={`${appPageMainClass} flex min-h-screen items-center justify-center`}><p className="text-sm font-black text-slate-400">Opening project...</p></main></div>;
+    return <div className={appPageRootClass}><AppSidebar activePage="longVideos" /><main className={`${appPageMainClass} flex min-h-screen items-center justify-center`}><p className="text-sm font-medium text-fg-4">Opening project...</p></main></div>;
   }
 
   if (!workspace) {
-    return <div className={appPageRootClass}><AppSidebar activePage="longVideos" /><main className={`${appPageMainClass} flex min-h-screen items-center justify-center`}><button onClick={() => router.push("/long-videos")} className="cursor-pointer rounded-xl bg-slate-900 px-4 py-2 text-sm font-black text-white">Back to Long Video Projects</button></main></div>;
+    return <div className={appPageRootClass}><AppSidebar activePage="longVideos" /><main className={`${appPageMainClass} flex min-h-screen items-center justify-center`}><button onClick={() => router.push("/long-videos")} className="cursor-pointer rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Back to Long Video Projects</button></main></div>;
   }
 
   const encodedTitle = encodeURIComponent(workspace.project.title);
@@ -328,10 +328,10 @@ export default function LongVideoProjectPage() {
             icon={<FilmIcon className="h-5 w-5" />}
             action={
               <div className="flex flex-wrap items-center gap-2">
-                <Link href={`/long-videos`} className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black uppercase tracking-wider text-slate-500 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"><ArrowLeftIcon className="h-4 w-4" /> Projects</Link>
-                <Link href={`/?longProject=${projectId}&longProjectTitle=${encodedTitle}`} className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl bg-violet-600 px-4 text-xs font-black uppercase tracking-wider text-white shadow-sm transition hover:bg-violet-700"><PlusIcon className="h-4 w-4" /> Pick ideas</Link>
+                <Link href={`/long-videos`} className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold uppercase tracking-wider text-slate-500 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"><ArrowLeftIcon className="h-4 w-4" /> Projects</Link>
+                <Link href={`/?longProject=${projectId}&longProjectTitle=${encodedTitle}`} className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl bg-violet-600 px-4 text-xs font-semibold uppercase tracking-wider text-white shadow-sm transition hover:bg-violet-700"><PlusIcon className="h-4 w-4" /> Pick ideas</Link>
                 <span
-                  className={`inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-[10px] font-black uppercase tracking-wider ${
+                  className={`inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-[11px] font-semibold uppercase tracking-wider ${
                     saveState === "error"
                       ? "border-rose-200 bg-rose-50 text-rose-600 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300"
                       : saveState === "saving"
@@ -351,8 +351,8 @@ export default function LongVideoProjectPage() {
             <div className="grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
               <div className="min-w-0">
                 <div className="mb-1.5 flex items-center justify-between gap-3">
-                  <span className="text-xs font-black text-slate-500">Project thumbnail</span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">JPG, PNG or WebP · 5 MB</span>
+                  <span className="text-xs font-medium text-fg-3">Project thumbnail</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-fg-4">JPG, PNG or WebP · 5 MB</span>
                 </div>
                 <div className="group relative aspect-video overflow-hidden rounded-2xl border border-slate-200 bg-slate-950 dark:border-slate-700">
                   {workspace.project.thumbnail_url ? (
@@ -360,12 +360,12 @@ export default function LongVideoProjectPage() {
                   ) : (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-violet-600 via-fuchsia-600 to-slate-950 text-white">
                       <PhotoIcon className="h-9 w-9 text-white/75" />
-                      <p className="mt-2 text-xs font-black uppercase tracking-[0.16em] text-white/65">No thumbnail yet</p>
+                      <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-white/65">No thumbnail yet</p>
                     </div>
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-black/10" />
                   <div className="absolute inset-x-3 bottom-3 flex items-center gap-2">
-                    <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-xl bg-white px-3 text-xs font-black text-slate-900 shadow-lg transition hover:bg-slate-100">
+                    <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-xl bg-surface px-3 text-xs font-semibold text-fg shadow-lg transition hover:bg-surface-sunken">
                       <ArrowUpTrayIcon className="h-4 w-4" />
                       {uploadingThumbnail ? "Uploading..." : workspace.project.thumbnail_url ? "Replace" : "Upload"}
                       <input
@@ -393,18 +393,18 @@ export default function LongVideoProjectPage() {
                     )}
                   </div>
                 </div>
-                <p className="mt-2 text-xs font-semibold leading-5 text-slate-400">This image becomes the background of the project card in Long Video Projects.</p>
+                <p className="mt-2 text-xs font-medium leading-5 text-fg-4">This image becomes the background of the project card in Long Video Projects.</p>
               </div>
 
               <div className="min-w-0">
                 <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.6fr)_minmax(0,0.7fr)]">
-                  <label className="block"><span className="mb-1.5 block text-xs font-black text-slate-500">Project title</span><input value={workspace.project.title} onChange={(event) => updateProject("title", event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-black outline-none focus:border-violet-400 dark:border-slate-700 dark:bg-slate-950" /></label>
-                  <label className="block"><span className="mb-1.5 block text-xs font-black text-slate-500">Status</span><select value={workspace.project.status} onChange={(event) => updateProject("status", event.target.value as LongVideoProject["status"])} className="h-11 w-full cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold outline-none dark:border-slate-700 dark:bg-slate-950">{PROJECT_STATUS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-                  <label className="block"><span className="mb-1.5 block text-xs font-black text-slate-500">Target duration</span><div className="relative"><input type="number" min={1} value={workspace.project.target_duration_minutes} onChange={(event) => updateProject("target_duration_minutes", Number(event.target.value))} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 pr-12 text-sm font-bold outline-none dark:border-slate-700 dark:bg-slate-950" /><span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">min</span></div></label>
+                  <label className="block"><span className="mb-1.5 block text-xs font-medium text-fg-3">Project title</span><input value={workspace.project.title} onChange={(event) => updateProject("title", event.target.value)} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold outline-none focus:border-violet-400 dark:border-slate-700 dark:bg-slate-950" /></label>
+                  <label className="block"><span className="mb-1.5 block text-xs font-medium text-fg-3">Status</span><select value={workspace.project.status} onChange={(event) => updateProject("status", event.target.value as LongVideoProject["status"])} className="h-11 w-full cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold outline-none dark:border-slate-700 dark:bg-slate-950">{PROJECT_STATUS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
+                  <label className="block"><span className="mb-1.5 block text-xs font-medium text-fg-3">Target duration</span><div className="relative"><input type="number" min={1} value={workspace.project.target_duration_minutes} onChange={(event) => updateProject("target_duration_minutes", Number(event.target.value))} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 pr-12 text-sm font-bold outline-none dark:border-slate-700 dark:bg-slate-950" /><span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-fg-4">min</span></div></label>
                 </div>
                 <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                  <label className="block"><span className="mb-1.5 block text-xs font-black text-slate-500">Main goal</span><textarea value={workspace.project.core_idea ?? ""} onChange={(event) => updateProject("core_idea", event.target.value)} rows={3} className="w-full resize-y rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold outline-none focus:border-violet-400 dark:border-slate-700 dark:bg-slate-950" placeholder="What should this video deliver?" /></label>
-                  <label className="block"><span className="mb-1.5 block text-xs font-black text-slate-500">Thumbnail concept</span><textarea value={workspace.project.thumbnail_notes ?? ""} onChange={(event) => updateProject("thumbnail_notes", event.target.value)} rows={3} className="w-full resize-y rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold outline-none focus:border-violet-400 dark:border-slate-700 dark:bg-slate-950" placeholder="Main subject, text, background, contrast..." /></label>
+                  <label className="block"><span className="mb-1.5 block text-xs font-medium text-fg-3">Main goal</span><textarea value={workspace.project.core_idea ?? ""} onChange={(event) => updateProject("core_idea", event.target.value)} rows={3} className="w-full resize-y rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold outline-none focus:border-violet-400 dark:border-slate-700 dark:bg-slate-950" placeholder="What should this video deliver?" /></label>
+                  <label className="block"><span className="mb-1.5 block text-xs font-medium text-fg-3">Thumbnail concept</span><textarea value={workspace.project.thumbnail_notes ?? ""} onChange={(event) => updateProject("thumbnail_notes", event.target.value)} rows={3} className="w-full resize-y rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold outline-none focus:border-violet-400 dark:border-slate-700 dark:bg-slate-950" placeholder="Main subject, text, background, contrast..." /></label>
                 </div>
               </div>
             </div>
@@ -413,18 +413,18 @@ export default function LongVideoProjectPage() {
           <section className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5">
             <div className="mb-4 flex flex-wrap items-center gap-3">
               <div className="min-w-0">
-                <h2 className="text-lg font-black">Ideas</h2>
-                <p className="text-xs font-semibold text-slate-400">{stats.completed}/{stats.total} done · {stats.remaining} left</p>
+                <h2 className="text-lg font-bold">Ideas</h2>
+                <p className="text-xs font-medium text-fg-4">{stats.completed}/{stats.total} done · {stats.remaining} left</p>
               </div>
               <div className="h-1.5 min-w-[120px] flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                 <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${stats.progress}%` }} />
               </div>
-              <span className="text-xs font-black text-slate-400">{stats.progress}%</span>
-              <Link href={`/?longProject=${projectId}&longProjectTitle=${encodedTitle}`} className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-3 text-xs font-black text-violet-700 transition hover:bg-violet-100 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-300"><PlusIcon className="h-4 w-4" /> Add</Link>
+              <span className="text-xs font-medium text-fg-4">{stats.progress}%</span>
+              <Link href={`/?longProject=${projectId}&longProjectTitle=${encodedTitle}`} className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-3 text-xs font-semibold text-violet-700 transition hover:bg-violet-100 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-300"><PlusIcon className="h-4 w-4" /> Add</Link>
             </div>
 
             {workspace.ideas.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 p-12 text-center dark:border-slate-700"><CameraIcon className="mx-auto h-10 w-10 text-slate-300" /><h3 className="mt-3 text-lg font-black">No ideas in this project yet</h3><p className="mt-1 text-sm text-slate-400">Pick ideas from All Ideas, then return here to plan your recording.</p><Link href={`/?longProject=${projectId}&longProjectTitle=${encodedTitle}`} className="mt-5 inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-violet-600 px-5 text-sm font-black text-white hover:bg-violet-700"><PlusIcon className="h-4 w-4" /> Pick ideas</Link></div>
+              <div className="rounded-2xl border border-dashed border-slate-300 p-12 text-center dark:border-slate-700"><CameraIcon className="mx-auto h-10 w-10 text-slate-300" /><h3 className="mt-3 text-lg font-bold">No ideas in this project yet</h3><p className="mt-1 text-sm text-fg-4">Pick ideas from All Ideas, then return here to plan your recording.</p><Link href={`/?longProject=${projectId}&longProjectTitle=${encodedTitle}`} className="mt-5 inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-violet-600 px-5 text-sm font-semibold text-white hover:bg-violet-700"><PlusIcon className="h-4 w-4" /> Pick ideas</Link></div>
             ) : (
               <div className="space-y-2">
                 {workspace.ideas.map((item, index) => {
@@ -445,7 +445,7 @@ export default function LongVideoProjectPage() {
                     >
                       <div className="grid min-w-0 grid-cols-[18px_24px_28px_minmax(0,1fr)_32px] items-center gap-2 lg:grid-cols-[18px_24px_28px_minmax(180px,0.8fr)_minmax(260px,1.2fr)_32px]">
                         <Bars3Icon className="h-4 w-4 cursor-grab text-slate-300 active:cursor-grabbing" />
-                        <span className="text-center text-[11px] font-black tabular-nums text-slate-400">{String(index + 1).padStart(2, "0")}</span>
+                        <span className="text-center text-[11px] font-medium tabular-nums text-fg-4">{String(index + 1).padStart(2, "0")}</span>
                         <button
                           type="button"
                           onClick={() => updateIdea(index, { capture_status: completed ? "to_record" : "approved" }, true)}
@@ -460,8 +460,8 @@ export default function LongVideoProjectPage() {
                         </button>
 
                         <Link href={`/idea/${item.detail_id}`} className="min-w-0 cursor-pointer" title={`${gameTitle} · ${item.detail.title}`}>
-                          <p className={`truncate text-sm font-black ${completed ? "text-slate-500 line-through dark:text-slate-400" : "text-slate-900 dark:text-white"}`}>{item.detail.title}</p>
-                          <p className="truncate text-[10px] font-bold text-slate-400">{gameTitle}</p>
+                          <p className={`truncate text-sm font-semibold ${completed ? "text-slate-500 line-through dark:text-slate-400" : "text-slate-900 dark:text-white"}`}>{item.detail.title}</p>
+                          <p className="truncate text-[11px] font-medium text-fg-4">{gameTitle}</p>
                         </Link>
 
                         <input

@@ -1,8 +1,9 @@
 "use client";
 
+import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { PlayCircleIcon, ChartBarIcon, DocumentTextIcon, PuzzlePieceIcon } from "@heroicons/react/24/outline";
+import { ChartBarIcon, DocumentTextIcon, PlayCircleIcon, PuzzlePieceIcon, SparklesIcon } from "@heroicons/react/24/outline";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppPageHeader, appPageContainerClass, appPageMainClass, appPageRootClass } from "@/components/AppPage";
 import { GameEditorModal, IdeaItem, QuickViewModal, ScriptEditorModal } from "@/components/IdeaCards";
@@ -18,7 +19,7 @@ function StatCard({ title, value, icon: Icon, color }: { title: string, value: n
          <Icon className={`w-8 h-8 ${color.replace('bg-', 'text-')}`} />
       </div>
       <div>
-        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{title}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-fg-4">{title}</p>
         <h4 className="text-3xl font-black text-slate-900 dark:text-slate-100">{value}</h4>
       </div>
     </div>
@@ -100,7 +101,7 @@ export default function Dashboard() {
       {isSelectMode && (
          <div className="app-selection-bar fixed bottom-0 inset-x-0 z-[80] border-t border-slate-200 bg-white/95 p-4 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
             <div className="mx-auto max-w-4xl flex flex-wrap items-center justify-between gap-3">
-               <div className="flex items-center gap-4"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-white font-bold text-sm">{selectedIds.length}</span><span className="text-sm font-bold uppercase tracking-widest text-slate-600 dark:text-slate-300">Ideas Selected</span></div>
+               <div className="flex items-center gap-4"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-900 text-white font-bold text-sm">{selectedIds.length}</span><span className="text-sm font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">Ideas Selected</span></div>
                <button disabled={selectedIds.length === 0} onClick={() => setShowEditor(true)} className="flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-white font-bold shadow-lg hover:bg-blue-700 active:scale-95 transition disabled:opacity-50"><PlayCircleIcon className="h-5 w-5" /> Create Script</button>
             </div>
          </div>
@@ -125,8 +126,8 @@ export default function Dashboard() {
 
            {pinnedIdeas.length > 0 && (
              <div className="mb-12">
-               <h3 className="mb-6 flex items-center gap-2 text-lg font-black text-slate-800 dark:text-slate-100">
-                 <span className="text-amber-500">★</span> Pinned Ideas
+               <h3 className="mb-6 flex items-center gap-2 text-lg font-bold text-slate-800 dark:text-slate-100">
+                 <StarSolidIcon className="h-5 w-5 text-amber-500" aria-hidden="true" /> Pinned Ideas
                </h3>
                <ul className="idea-grid">
                   {pinnedIdeas.map(r => (
@@ -137,7 +138,7 @@ export default function Dashboard() {
            )}
 
            <div>
-             <h3 className="mb-6 flex items-center gap-2 text-lg font-black text-slate-800 dark:text-slate-100">✨ Recently Added</h3>
+             <h3 className="mb-6 flex items-center gap-2 text-lg font-bold text-slate-800 dark:text-slate-100"><SparklesIcon className="h-5 w-5 text-accent" aria-hidden="true" /> Recently Added</h3>
              <ul className="idea-grid">
                 {recentIdeas.map(r => (
                    <IdeaItem key={r.id} r={r} game={r.game} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={async (id, current) => { await supabase.from("details").update({ pinned: !current }).eq("id", id); window.location.reload(); }} onEditGame={(g) => setEditingGame(g)} onQuickView={(idea) => setPreviewIdea(idea)} />

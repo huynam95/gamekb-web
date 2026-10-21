@@ -91,7 +91,7 @@ export default function AddGamePage() {
              description="Add a game to your library so you can start collecting details and video ideas."
              icon={<PuzzlePieceIcon className="h-5 w-5" />}
              action={
-               <Link href="/" className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-500 transition hover:bg-slate-50 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white">
+               <Link href="/" className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-500 transition hover:bg-slate-50 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white">
                  <ArrowLeftIcon className="h-4 w-4" /> Back to Ideas
                </Link>
              }
@@ -103,7 +103,7 @@ export default function AddGamePage() {
                  
                  {/* Title Input */}
                  <div className="space-y-2">
-                    <label className="text-sm font-bold uppercase text-slate-500 tracking-wider flex items-center gap-2">
+                    <label className="text-sm font-semibold uppercase text-fg-3 tracking-wider flex items-center gap-2">
                        <PuzzlePieceIcon className="w-4 h-4" /> Game Title
                     </label>
                     <input 
@@ -118,7 +118,7 @@ export default function AddGamePage() {
 
                  {/* Release Year Input */}
                  <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-slate-500">
+                    <label className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-fg-3">
                        <CalendarDaysIcon className="h-4 w-4" /> Release Year
                     </label>
                     <input
@@ -130,12 +130,12 @@ export default function AddGamePage() {
                       value={releaseYear}
                       onChange={(e) => setReleaseYear(e.target.value)}
                     />
-                    <p className="pl-2 text-xs text-slate-400">Used by the Year filter on All Ideas. You can leave it blank and add it later.</p>
+                    <p className="pl-2 text-xs text-fg-4">Used by the Year filter on All Ideas. You can leave it blank and add it later.</p>
                  </div>
 
                  {/* Cover URL Input */}
                  <div className="space-y-2">
-                    <label className="text-sm font-bold uppercase text-slate-500 tracking-wider flex items-center gap-2">
+                    <label className="text-sm font-semibold uppercase text-fg-3 tracking-wider flex items-center gap-2">
                        <PhotoIcon className="w-4 h-4" /> Cover Image URL
                     </label>
                     <input 
@@ -145,7 +145,7 @@ export default function AddGamePage() {
                       value={coverUrl}
                       onChange={e => setCoverUrl(e.target.value)}
                     />
-                    <p className="text-xs text-slate-400 pl-2">Paste a direct link to an image (jpg, png, webp).</p>
+                    <p className="text-xs text-fg-4 pl-2">Paste a direct link to an image (jpg, png, webp).</p>
                  </div>
 
                  {/* Image Preview */}
@@ -166,7 +166,7 @@ export default function AddGamePage() {
 
               {/* Footer Actions */}
               <div className="flex items-center justify-end gap-4 border-t border-slate-100 bg-slate-50 px-8 py-6 dark:border-slate-800 dark:bg-slate-950/50">
-                 <Link href="/" className="cursor-pointer px-6 py-3 text-sm font-bold text-slate-500 transition hover:text-slate-800 dark:text-slate-400 dark:hover:text-white">
+                 <Link href="/" className="cursor-pointer px-6 py-3 text-sm font-medium text-slate-500 transition hover:text-slate-800 dark:text-slate-400 dark:hover:text-white">
                     Cancel
                  </Link>
                  <button 

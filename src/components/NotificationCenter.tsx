@@ -156,13 +156,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                 <NoticeIcon className="h-5 w-5" />
               </div>
               <div className="min-w-0 flex-1 pt-0.5">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">{notice.title || noticeStyle.label}</p>
-                <p className="mt-1 text-sm font-black leading-5 text-slate-900 dark:text-slate-50">{notice.message}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">{notice.title || noticeStyle.label}</p>
+                <p className="mt-1 text-sm font-semibold leading-5 text-slate-900 dark:text-slate-50">{notice.message}</p>
               </div>
               <button
                 type="button"
                 onClick={() => setNotice(null)}
-                className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-fg-4 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-100"
                 aria-label="Dismiss notification"
               >
                 <XMarkIcon className="h-4 w-4" />
@@ -180,22 +180,22 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                 <ConfirmIcon className="h-7 w-7" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">{confirmState.title || confirmStyle.label}</p>
-                <p className="mt-2 whitespace-pre-wrap text-lg font-black leading-7 text-slate-900 dark:text-slate-50">{confirmState.message}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">{confirmState.title || confirmStyle.label}</p>
+                <p className="mt-2 whitespace-pre-wrap text-lg font-bold leading-7 text-slate-900 dark:text-slate-50">{confirmState.message}</p>
               </div>
             </div>
             <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4 dark:border-slate-800 dark:bg-slate-900/70">
               <button
                 type="button"
                 onClick={() => settleConfirm(false)}
-                className="h-11 cursor-pointer rounded-full border border-slate-200 bg-white px-5 text-xs font-black uppercase tracking-[0.16em] text-slate-500 transition hover:bg-slate-50 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                className="h-11 cursor-pointer rounded-full border border-slate-200 bg-white px-5 text-xs font-semibold uppercase tracking-wider text-slate-500 transition hover:bg-slate-50 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
               >
                 {confirmState.cancelText}
               </button>
               <button
                 type="button"
                 onClick={() => settleConfirm(true)}
-                className={`h-11 cursor-pointer rounded-full px-6 text-xs font-black uppercase tracking-[0.16em] text-white shadow-sm transition active:scale-[0.98] ${confirmStyle.button}`}
+                className={`h-11 cursor-pointer rounded-full px-6 text-xs font-semibold uppercase tracking-wider text-white shadow-sm transition active:scale-[0.98] ${confirmStyle.button}`}
               >
                 {confirmState.confirmText}
               </button>

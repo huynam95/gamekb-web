@@ -1,23 +1,79 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Semantic colour tokens. Components use these (bg-surface, text-fg-3,
+   border-line, ...) so light and dark mode switch from one place instead of
+   overriding individual Tailwind classes with !important. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-muted: #f8fafc;
+  --surface-hover: #f8fafc;
+  --surface-sunken: #f1f5f9;
+  --surface-strong: #e2e8f0;
+  --fg: #0f172a;
+  --fg-2: #334155;
+  --fg-3: #64748b;
+  --fg-4: #94a3b8;
+  --line-soft: #f1f5f9;
+  --line: #e2e8f0;
+  --line-strong: #cbd5e1;
+  --accent: #2563eb;
+  --accent-soft: #eff6ff;
+  --accent-line: #bfdbfe;
+  --danger-soft: #fff1f2;
+  --scrollbar: #cbd5e1;
+  --selection: rgba(37, 99, 235, 0.18);
   color-scheme: light;
 }
 
 .dark {
   --background: #020617;
   --foreground: #e2e8f0;
+  --surface: #0f172a;
+  --surface-muted: #111827;
+  --surface-hover: #1e293b;
+  --surface-sunken: #1e293b;
+  --surface-strong: #334155;
+  --fg: #f8fafc;
+  --fg-2: #cbd5e1;
+  --fg-3: #94a3b8;
+  --fg-4: #64748b;
+  --line-soft: #1e293b;
+  --line: #334155;
+  --line-strong: #475569;
+  --accent: #60a5fa;
+  --accent-soft: rgba(37, 99, 235, 0.16);
+  --accent-line: rgba(96, 165, 250, 0.35);
+  --danger-soft: rgba(225, 29, 72, 0.16);
+  --scrollbar: #334155;
+  --selection: rgba(96, 165, 250, 0.22);
   color-scheme: dark;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-strong: var(--surface-strong);
+  --color-fg: var(--fg);
+  --color-fg-2: var(--fg-2);
+  --color-fg-3: var(--fg-3);
+  --color-fg-4: var(--fg-4);
+  --color-line-soft: var(--line-soft);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-line: var(--accent-line);
+  --color-danger-soft: var(--danger-soft);
+  --font-sans: var(--font-app-sans, Inter), Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: var(--font-app-mono, ui-monospace), ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 html {
@@ -27,149 +83,15 @@ html {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
 }
 
 * {
-  scrollbar-color: #cbd5e1 transparent;
-}
-
-.dark * {
-  scrollbar-color: #334155 transparent;
+  scrollbar-color: var(--scrollbar) transparent;
 }
 
 ::selection {
-  background: rgba(37, 99, 235, 0.18);
-}
-
-.dark ::selection {
-  background: rgba(96, 165, 250, 0.22);
-}
-
-/* Dark mode base skin for the existing Tailwind-heavy UI.
-   This keeps the current class names working without repainting every page by hand. */
-.dark .bg-white {
-  background-color: #0f172a !important;
-}
-
-.dark .bg-slate-50,
-.dark .bg-slate-50\/50,
-.dark .bg-slate-50\/80 {
-  background-color: #111827 !important;
-}
-
-.dark .bg-slate-100,
-.dark .bg-slate-100\/50 {
-  background-color: #1e293b !important;
-}
-
-.dark .bg-slate-200 {
-  background-color: #334155 !important;
-}
-
-.dark .bg-blue-50 {
-  background-color: rgba(37, 99, 235, 0.16) !important;
-}
-
-.dark .bg-rose-50 {
-  background-color: rgba(225, 29, 72, 0.16) !important;
-}
-
-.dark .text-slate-950,
-.dark .text-slate-900,
-.dark .text-slate-800 {
-  color: #f8fafc !important;
-}
-
-.dark .text-slate-700,
-.dark .text-slate-600 {
-  color: #cbd5e1 !important;
-}
-
-.dark .text-slate-500 {
-  color: #94a3b8 !important;
-}
-
-.dark .text-slate-400 {
-  color: #64748b !important;
-}
-
-.dark .text-blue-600,
-.dark .text-blue-700 {
-  color: #60a5fa !important;
-}
-
-.dark .border-slate-100,
-.dark .border-slate-200,
-.dark .border-slate-300 {
-  border-color: #334155 !important;
-}
-
-.dark .border-blue-200 {
-  border-color: rgba(96, 165, 250, 0.35) !important;
-}
-
-.dark .shadow-slate-200,
-.dark .shadow-slate-200\/40 {
-  --tw-shadow-color: rgba(0, 0, 0, 0.25) !important;
-}
-
-.dark .placeholder\:text-slate-300::placeholder,
-.dark .placeholder\:text-slate-400::placeholder,
-.dark .placeholder\:text-slate-500::placeholder {
-  color: #64748b !important;
-}
-
-.dark .hover\:bg-slate-50:hover,
-.dark .hover\:bg-slate-50\/80:hover,
-.dark .hover\:bg-slate-100:hover {
-  background-color: #1e293b !important;
-}
-
-.dark .hover\:bg-blue-50:hover {
-  background-color: rgba(37, 99, 235, 0.18) !important;
-}
-
-.dark .hover\:bg-white:hover {
-  background-color: #1e293b !important;
-}
-
-.dark input,
-.dark textarea,
-.dark select {
-  color-scheme: dark;
-}
-
-.dark .dark\:bg-white {
-  background-color: #ffffff !important;
-}
-
-.dark .dark\:bg-slate-800 {
-  background-color: #1e293b !important;
-}
-
-.dark .dark\:bg-slate-900 {
-  background-color: #0f172a !important;
-}
-
-.dark .dark\:bg-slate-950 {
-  background-color: #020617 !important;
-}
-
-.dark .dark\:text-slate-950 {
-  color: #020617 !important;
-}
-
-.dark .dark\:text-slate-100 {
-  color: #f1f5f9 !important;
-}
-
-.dark .dark\:text-slate-300 {
-  color: #cbd5e1 !important;
-}
-
-.dark .dark\:text-slate-400 {
-  color: #94a3b8 !important;
+  background: var(--selection);
 }
 
 /* Keep navigation feeling instant. Expensive entrance animations made page switches feel laggy. */
@@ -187,6 +109,8 @@ body {
 /* Layout follows the available CSS viewport, including display scaling and zoom.
    iPad portrait uses the compact header; landscape has room for a slim sidebar. */
 :root {
+  /* Where sticky toolbars stop: below the compact top bar (68px + border) on phone/tablet. */
+  --app-sticky-top: calc(77px + env(safe-area-inset-top, 0px));
   --app-sidebar-width: 0px;
   --app-content-max: 1600px;
   --app-library-max: 2400px;
@@ -238,22 +162,17 @@ html {
   gap: 20px;
 }
 
-.topic-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
-  gap: 10px;
-}
-
-.topic-card-heading {
-  flex-wrap: wrap;
+/* Library toolbar: phone stacks, tablet uses two rows, wide screens one row. */
+.library-toolbar {
+  position: relative;
+  z-index: 40;
 }
 
 .library-filter-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
-  flex: 1;
 }
 
 .library-filter-fields > * {
@@ -262,16 +181,26 @@ html {
 }
 
 .library-search,
-.library-game {
+.library-game,
+.library-sort {
   grid-column: 1 / -1;
 }
 
-.library-filter-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+.topic-strip {
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+  /* Fade the trailing edge so it is clear the strip scrolls sideways. */
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+  padding-right: 24px;
+}
+
+.topic-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.topic-strip > * {
+  scroll-snap-align: start;
 }
 
 .app-selection-bar {
@@ -345,6 +274,7 @@ html {
   .editor-dialog { overflow-y: auto; }
   .editor-dialog > :last-child { flex: 1 0 auto; overflow-y: visible; }
   .app-mobile-nav { position: relative; }
+  :root { --app-sticky-top: 8px; }
 }
 
 .project-cards {
@@ -362,15 +292,21 @@ html {
 }
 
 @media (min-width: 768px) {
-  .library-filter-fields {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 0.6fr) minmax(0, 0.8fr);
+  .library-toolbar {
+    position: sticky;
+    top: var(--app-sticky-top);
   }
-  .library-game { grid-column: auto; }
-  .topic-card-heading { flex-wrap: nowrap; }
+  .library-filter-fields {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+  .library-search { grid-column: span 7; }
+  .library-game { grid-column: span 5; }
+  .library-year, .library-type { grid-column: span 3; }
+  .library-sort { grid-column: span 6; }
 }
 
 @media (min-width: 1024px) {
-  :root { --app-sidebar-width: 224px; --app-page-gutter: 32px; }
+  :root { --app-sidebar-width: 224px; --app-page-gutter: 32px; --app-sticky-top: 12px; }
   html { scroll-padding-top: 2rem; }
   .app-sidebar { display: flex; }
   .app-mobile-nav { display: none; }
@@ -387,10 +323,11 @@ html {
   .project-cards, .project-card-selection { display: none; }
 }
 
-@media (min-width: 1800px) {
-  .library-toolbar { flex-direction: row; align-items: center; }
-  .library-filter-fields { grid-template-columns: minmax(16rem, 1fr) minmax(12rem, 16rem) 8rem 10rem auto; }
-  .library-search { grid-column: auto; }
+@media (min-width: 1680px) {
+  .library-filter-fields {
+    grid-template-columns: minmax(16rem, 1fr) minmax(11rem, 15rem) minmax(8rem, 10rem) minmax(9rem, 11rem) auto;
+  }
+  .library-search, .library-game, .library-year, .library-type, .library-sort { grid-column: auto; }
 }
 
 @media (min-width: 2200px) {
@@ -414,5 +351,4 @@ html {
   .touch-reveal { opacity: 1; }
   .collection-action { display: flex; min-width: 36px; min-height: 36px; }
   .touch-target { min-width: 44px; min-height: 44px; }
-  .topic-card-heading { flex-wrap: wrap; }
 }

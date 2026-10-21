@@ -1,5 +1,7 @@
 "use client";
 
+import { Modal } from "@/components/ui/Modal";
+import { getTopicVisual as getSharedTopicVisual } from "@/lib/topicVisuals";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -124,19 +126,7 @@ async function enrichScriptsWithFootageChannels(rows: ScriptProject[]) {
 }
 
 function getTopicVisual(topic: string) {
-  const normalized = topic.toLowerCase();
-
-  if (topic === "No topic") return { emoji: "🎬", className: "from-slate-200 to-slate-100 text-slate-500 dark:from-slate-800 dark:to-slate-900 dark:text-slate-300" };
-  if (normalized.includes("troll other")) return { emoji: "🎮", className: "from-fuchsia-500 to-violet-600 text-white" };
-  if (normalized.includes("troll")) return { emoji: "🃏", className: "from-pink-500 to-rose-500 text-white" };
-  if (normalized.includes("remember")) return { emoji: "🧠", className: "from-indigo-500 to-blue-600 text-white" };
-  if (normalized.includes("punish")) return { emoji: "⚡", className: "from-amber-400 to-orange-500 text-white" };
-  if (normalized.includes("fourth") || normalized.includes("wall")) return { emoji: "🪞", className: "from-cyan-400 to-sky-500 text-white" };
-  if (normalized.includes("afk")) return { emoji: "⏳", className: "from-emerald-400 to-teal-500 text-white" };
-  if (normalized.includes("detail") || normalized.includes("noticed")) return { emoji: "🔎", className: "from-blue-400 to-cyan-500 text-white" };
-  if (normalized.includes("unexpected")) return { emoji: "✦", className: "from-violet-500 to-indigo-600 text-white" };
-
-  return { emoji: "🎥", className: "from-blue-500 to-violet-600 text-white" };
+  return getSharedTopicVisual(topic, -1);
 }
 
 /* ================= MODAL: STUDIO WORKSPACE ================= */
@@ -473,17 +463,8 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh, topics,
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div
-      className="modal-overlay fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/70 p-2 sm:p-4 lg:p-6 backdrop-blur-md"
-      onClick={() => void closeWithSave()}
-    >
-      <div
-        className="editor-dialog flex w-full max-w-[min(1300px,calc(100vw-1rem))] flex-col overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-2xl sm:rounded-[2rem] lg:rounded-[2.5rem] dark:border-slate-800 dark:bg-slate-950"
-        onClick={(event) => event.stopPropagation()}
-      >
+    <Modal open={isOpen} onClose={() => void closeWithSave()} size="editor" zClass="z-[150]" className="max-w-[min(1300px,calc(100vw-1rem))] rounded-[1.5rem] sm:rounded-[2rem] lg:rounded-[2.5rem]">
         <div className="flex flex-col gap-4 border-b border-slate-100 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-10 lg:py-7 dark:border-slate-800">
           <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-5">
             <div className="rounded-2xl bg-blue-600 p-3 text-white shadow-lg shadow-blue-100 dark:shadow-blue-950/40">
@@ -500,17 +481,17 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh, topics,
                     onBlur={() => setIsEditingTitle(false)}
                   />
                 ) : (
-                  <h2 title={String(formData.title || "Untitled project")} className="min-w-0 flex-1 truncate whitespace-nowrap text-xl font-black tracking-tight text-slate-900 sm:text-2xl dark:text-slate-50">{formData.title}</h2>
+                  <h2 title={String(formData.title || "Untitled project")} className="min-w-0 flex-1 truncate whitespace-nowrap text-xl font-bold tracking-tight text-slate-900 sm:text-2xl dark:text-slate-50">{formData.title}</h2>
                 )}
                 <button
                   onClick={() => setIsEditingTitle(!isEditingTitle)}
                   className="cursor-pointer rounded-xl p-2 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
                   type="button"
                 >
-                  {isEditingTitle ? <CheckIcon className="h-6 w-6 text-green-600" /> : <PencilSquareIcon className="h-5 w-5 text-slate-400" />}
+                  {isEditingTitle ? <CheckIcon className="h-6 w-6 text-green-600" /> : <PencilSquareIcon className="h-5 w-5 text-fg-4" />}
                 </button>
               </div>
-              <p className="mt-1 text-xs font-bold uppercase tracking-widest text-slate-400">Video Project Studio</p>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-fg-4">Video Project Studio</p>
               <div className="mt-3 max-w-md">
                 <ProjectTopicSelect label="Topic" value={getScriptTopicValue(formData)} topics={topics} loading={topicsLoading} onChange={(topic) => setFormData((current) => ({ ...current, topic }))} />
                 {topicsError && <p role="alert" className="mt-2 text-xs text-rose-500">{topicsError} <button type="button" onClick={onRetryTopics} className="cursor-pointer font-bold underline">Retry</button></p>}
@@ -520,7 +501,7 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh, topics,
 
           <div className="flex items-center gap-3 lg:gap-5">
             <select
-              className="h-11 cursor-pointer rounded-2xl bg-slate-100 px-4 text-sm font-black outline-none dark:bg-slate-900 dark:text-slate-100"
+              className="h-11 cursor-pointer rounded-2xl bg-slate-100 px-4 text-sm font-semibold outline-none dark:bg-slate-900 dark:text-slate-100"
               value={formData.status || "Draft"}
               onChange={(event) => setFormData({ ...formData, status: event.target.value as any })}
             >
@@ -535,13 +516,13 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh, topics,
               onClick={() => void refreshProject()}
               disabled={isRefreshing}
               title="Refresh project from database"
-              className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-xs font-black uppercase tracking-[0.12em] text-slate-600 shadow-sm transition hover:border-blue-300 hover:text-blue-600 disabled:cursor-wait disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-blue-700 dark:hover:text-blue-300"
+              className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-xs font-semibold uppercase tracking-wider text-slate-600 shadow-sm transition hover:border-blue-300 hover:text-blue-600 disabled:cursor-wait disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-blue-700 dark:hover:text-blue-300"
             >
               <ArrowPathIcon className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
               <span className="hidden sm:inline">Refresh</span>
             </button>
             <div
-              className={`inline-flex h-11 items-center gap-2 rounded-2xl border px-4 text-xs font-black uppercase tracking-[0.12em] ${
+              className={`inline-flex h-11 items-center gap-2 rounded-2xl border px-4 text-xs font-semibold uppercase tracking-wider ${
                 saveState === "error"
                   ? "border-rose-200 bg-rose-50 text-rose-600 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300"
                   : saveState === "saving"
@@ -565,8 +546,8 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh, topics,
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex shrink-0 cursor-pointer items-center gap-2 border-b-4 px-4 py-4 text-xs font-black uppercase tracking-[0.16em] transition-all sm:gap-3 sm:px-6 lg:px-8 lg:py-5 lg:tracking-[0.2em] ${
-                activeTab === tab.id ? "border-blue-600 text-blue-600 dark:text-blue-400" : "border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-slate-100"
+              className={`flex shrink-0 cursor-pointer items-center gap-2 border-b-4 px-4 py-4 text-xs font-semibold uppercase tracking-wider transition-all sm:gap-3 sm:px-6 lg:px-8 lg:py-5 lg:tracking-wider ${
+                activeTab === tab.id ? "border-blue-600 text-blue-600 dark:text-blue-400" : "border-transparent text-fg-4 hover:text-slate-700 dark:hover:text-slate-100"
               }`}
               type="button"
             >
@@ -581,15 +562,15 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh, topics,
               <aside className="flex min-h-0 max-h-[300px] flex-col rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm sm:p-4 xl:max-h-none xl:rounded-3xl dark:border-slate-800 dark:bg-slate-900">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-500 dark:text-blue-300">Script Order</p>
-                    <p className="mt-1 text-xs font-bold text-slate-400 dark:text-slate-500">Drag to reorder. Click a card to jump to that section.</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-blue-500 dark:text-blue-300">Script Order</p>
+                    <p className="mt-1 text-xs font-medium text-slate-400 dark:text-slate-500">Drag to reorder. Click a card to jump to that section.</p>
                   </div>
-                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-black text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-300">{scriptGuide.filter((section) => !section.isHook).length}</span>
+                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-300">{scriptGuide.filter((section) => !section.isHook).length}</span>
                 </div>
 
                 <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
                   {scriptGuide.length === 0 && (
-                    <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-xs font-bold text-slate-400 dark:border-slate-700 dark:text-slate-500">No script sections found.</div>
+                    <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-xs font-medium text-slate-400 dark:border-slate-700 dark:text-slate-500">No script sections found.</div>
                   )}
                   {scriptGuide.map((section) => {
                     const channels = getSectionChannels(section);
@@ -626,17 +607,17 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh, topics,
                         }}
                         className={`group flex items-start gap-3 rounded-2xl border p-3 text-left shadow-sm transition ${section.isHook ? "cursor-pointer border-violet-200 bg-violet-50 hover:bg-violet-100 dark:border-violet-500/25 dark:bg-violet-500/10 dark:hover:bg-violet-500/15" : `cursor-grab active:cursor-grabbing ${isDragOver ? "border-blue-400 bg-blue-50 ring-2 ring-blue-100 dark:border-blue-500 dark:bg-blue-500/10 dark:ring-blue-500/20" : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700"}`}`}
                       >
-                        <div className={`flex h-8 min-w-8 shrink-0 items-center justify-center rounded-xl px-1 text-xs font-black shadow-sm ${section.isHook ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300"}`}>
+                        <div className={`flex h-8 min-w-8 shrink-0 items-center justify-center rounded-xl px-1 text-xs font-semibold shadow-sm ${section.isHook ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300"}`}>
                           {section.isHook ? "H" : section.number}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex min-w-0 items-center gap-2">
-                            <p className={`truncate text-sm font-black ${section.isHook ? "text-violet-800 dark:text-violet-200" : "text-slate-800 dark:text-slate-100"}`}>{section.label}</p>
+                            <p className={`truncate text-sm font-semibold ${section.isHook ? "text-violet-800 dark:text-violet-200" : "text-slate-800 dark:text-slate-100"}`}>{section.label}</p>
                             {!section.isHook && <Bars3Icon className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:text-slate-500 dark:text-slate-600 dark:group-hover:text-slate-300" />}
                           </div>
-                          <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">{section.preview}</p>
+                          <p className="mt-1 line-clamp-2 text-xs font-medium leading-5 text-slate-500 dark:text-slate-400">{section.preview}</p>
                           {channels.length > 0 && (
-                            <div className="mt-2 flex min-w-0 items-center gap-1.5 text-[10px] font-black text-rose-600 dark:text-rose-300" title={channels.join(", ")}>
+                            <div className="mt-2 flex min-w-0 items-center gap-1.5 text-[11px] font-semibold text-rose-600 dark:text-rose-300" title={channels.join(", ")}>
                               <VideoCameraIcon className="h-3.5 w-3.5 shrink-0" />
                               <span className="truncate">{channels[0]}</span>
                               {channels.length > 1 && <span className="shrink-0 text-slate-400 dark:text-slate-500">+{channels.length - 1}</span>}
@@ -652,13 +633,13 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh, topics,
               <div className="flex min-w-0 flex-col gap-3">
                 <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Script Content</p>
-                    <p className="mt-1 text-xs font-bold text-slate-400 dark:text-slate-500">The order panel stays outside the copied script.</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-fg-4">Script Content</p>
+                    <p className="mt-1 text-xs font-medium text-slate-400 dark:text-slate-500">The order panel stays outside the copied script.</p>
                   </div>
                   <button
                     type="button"
                     onClick={copyWholeScript}
-                    className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-black dark:bg-blue-600 dark:hover:bg-blue-700"
+                    className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-black dark:bg-blue-600 dark:hover:bg-blue-700"
                   >
                     <DocumentDuplicateIcon className="h-4 w-4" /> Copy Script
                   </button>
@@ -677,7 +658,7 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh, topics,
           {activeTab === "metadata" && (
             <div className="mx-auto max-w-4xl space-y-8">
               <div className="space-y-4">
-                <label className="ml-4 block text-xs font-black uppercase tracking-widest text-slate-400">Video Summary Description</label>
+                <label className="ml-4 block text-xs font-semibold uppercase tracking-wider text-fg-4">Video Summary Description</label>
                 <textarea
                   className="h-64 w-full resize-none rounded-[1.5rem] border border-slate-100 bg-slate-50 p-5 text-base font-bold leading-relaxed text-slate-700 outline-none sm:p-8 lg:rounded-[2rem] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
                   value={formData.description || ""}
@@ -685,7 +666,7 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh, topics,
                 />
                 <div className="flex flex-wrap gap-2 pt-4">
                   {formData.hashtags?.map((tag, index) => (
-                    <span key={index} className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-black text-blue-600 dark:border-blue-900 dark:bg-blue-950/60 dark:text-blue-300">
+                    <span key={index} className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-600 dark:border-blue-900 dark:bg-blue-950/60 dark:text-blue-300">
                       {tag.startsWith("#") ? tag : `#${tag}`}
                     </span>
                   ))}
@@ -698,15 +679,15 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh, topics,
             <div className="mx-auto max-w-4xl space-y-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Project Assets</p>
-                  <p className="mt-1 text-xs font-bold text-slate-400 dark:text-slate-500">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-fg-4">Project Assets</p>
+                  <p className="mt-1 text-xs font-medium text-slate-400 dark:text-slate-500">
                     {(formData.assets || []).length} entries · {assetAnalysis.uniqueLinkCount} unique links
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => navigator.clipboard.writeText(assetAnalysis.uniqueAssets.map((asset) => asset.url).filter(Boolean).join("\n"))}
-                  className="inline-flex cursor-pointer items-center gap-2 self-start rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs font-black text-blue-700 transition hover:bg-blue-100 sm:self-auto dark:border-blue-500/25 dark:bg-blue-500/10 dark:text-blue-300"
+                  className="inline-flex cursor-pointer items-center gap-2 self-start rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 sm:self-auto dark:border-blue-500/25 dark:bg-blue-500/10 dark:text-blue-300"
                 >
                   <DocumentDuplicateIcon className="h-4 w-4" /> Copy Unique Links
                 </button>
@@ -716,8 +697,8 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh, topics,
                 <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-100/80 p-4 text-slate-700 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
                   <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 shrink-0 text-slate-500 dark:text-slate-300" />
                   <div>
-                    <p className="text-sm font-black">{assetAnalysis.repeatedLinkCount} duplicate {assetAnalysis.repeatedLinkCount === 1 ? "link" : "links"} detected</p>
-                    <p className="mt-1 text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">
+                    <p className="text-sm font-semibold">{assetAnalysis.repeatedLinkCount} duplicate {assetAnalysis.repeatedLinkCount === 1 ? "link" : "links"} detected</p>
+                    <p className="mt-1 text-xs font-medium leading-5 text-slate-500 dark:text-slate-400">
                       Download only the first occurrence. Equivalent YouTube watch, Shorts, embed, live, and youtu.be URLs are treated as the same source video.
                     </p>
                   </div>
@@ -732,26 +713,26 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh, topics,
 
                   return (
                     <div key={`${asset.url}-${index}`} className={`group flex items-center gap-4 rounded-2xl border p-4 transition-all sm:gap-5 sm:p-5 ${isRepeated ? "border-slate-300 bg-slate-100/80 dark:border-slate-700 dark:bg-slate-800/60" : "border-slate-200 bg-slate-50 hover:border-blue-500 dark:border-slate-800 dark:bg-slate-900"}`}>
-                      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border font-black shadow-sm transition-all ${isRepeated ? "border-slate-300 bg-slate-200 text-slate-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300" : "border-slate-100 bg-white text-slate-400 group-hover:bg-blue-600 group-hover:text-white dark:border-slate-800 dark:bg-slate-950"}`}>
+                      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border font-black shadow-sm transition-all ${isRepeated ? "border-slate-300 bg-slate-200 text-slate-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300" : "border-slate-100 bg-white text-fg-4 group-hover:bg-blue-600 group-hover:text-white dark:border-slate-800 dark:bg-slate-950"}`}>
                         {isRepeated ? <LinkIcon className="h-5 w-5" /> : `#${displayNumber ?? ""}`}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex min-w-0 flex-wrap items-center gap-2">
-                          <p className="truncate text-base font-black text-slate-900 dark:text-slate-50">{asset.name}</p>
+                          <p className="truncate text-base font-bold text-slate-900 dark:text-slate-50">{asset.name}</p>
                           {asset.channel_name && (
-                            <span className="shrink-0 rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-black text-rose-700 dark:border-rose-500/25 dark:bg-rose-500/10 dark:text-rose-300">
+                            <span className="shrink-0 rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-700 dark:border-rose-500/25 dark:bg-rose-500/10 dark:text-rose-300">
                               {asset.channel_name}
                             </span>
                           )}
                           {duplicate && (
-                            <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-wide ${isRepeated ? "bg-slate-500 text-white dark:bg-slate-600" : "border border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>
+                            <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold uppercase tracking-wide ${isRepeated ? "bg-slate-500 text-white dark:bg-slate-600" : "border border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>
                               {isRepeated ? "Duplicate" : `Same source ×${duplicate.total}`}
                             </span>
                           )}
                         </div>
-                        <p className="mt-1 truncate font-mono text-xs font-bold text-slate-500">{asset.url}</p>
+                        <p className="mt-1 truncate font-mono text-xs font-medium text-fg-3">{asset.url}</p>
                       </div>
-                      <a href={asset.url} target="_blank" rel="noopener noreferrer" className="shrink-0 cursor-pointer rounded-xl border border-slate-200 bg-white p-3 text-slate-400 shadow-sm hover:text-blue-600 dark:border-slate-800 dark:bg-slate-950">
+                      <a href={asset.url} target="_blank" rel="noopener noreferrer" className="shrink-0 cursor-pointer rounded-xl border border-slate-200 bg-white p-3 text-fg-4 shadow-sm hover:text-blue-600 dark:border-slate-800 dark:bg-slate-950">
                         <LinkIcon className="h-5 w-5" />
                       </a>
                     </div>
@@ -761,8 +742,7 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh, topics,
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -949,7 +929,7 @@ export default function ScriptsPage() {
             title="Short Projects"
             description="Organize scripts, source channels, assets, topics, and production status in one place."
             icon={<DocumentTextIcon className="h-5 w-5" />}
-            action={<button type="button" disabled={creatingProject} onClick={() => void createProject()} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-black text-white transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"><PlusIcon className="h-5 w-5" />{creatingProject ? "Creating..." : "New Project"}</button>}
+            action={<button type="button" disabled={creatingProject} onClick={() => void createProject()} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60"><PlusIcon className="h-5 w-5" />{creatingProject ? "Creating..." : "New Project"}</button>}
           />
           {topicsError && <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 text-sm text-rose-600"><span>{topicsError}</span><button type="button" onClick={retryTopics} className="min-h-11 cursor-pointer font-bold underline">Retry topics</button></div>}
           <div className="mb-6 flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
@@ -965,17 +945,17 @@ export default function ScriptsPage() {
 
             {selectedIds.length > 0 && (
               <div className="flex items-center gap-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 shadow-sm dark:border-blue-900/60 dark:bg-blue-950/40">
-                <span className="text-sm font-black text-blue-700 dark:text-blue-300">{selectedIds.length} selected</span>
+                <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">{selectedIds.length} selected</span>
                 <button
                   onClick={() => setSelectedIds([])}
-                  className="flex cursor-pointer items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold text-slate-500 transition hover:bg-white dark:text-slate-300 dark:hover:bg-slate-900"
+                  className="flex cursor-pointer items-center gap-1 rounded-xl px-3 py-2 text-xs font-medium text-slate-500 transition hover:bg-white dark:text-slate-300 dark:hover:bg-slate-900"
                   type="button"
                 >
                   <XMarkIcon className="h-4 w-4" /> Clear
                 </button>
                 <button
                   onClick={handleBulkDelete}
-                  className="flex cursor-pointer items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-rose-700 active:scale-[0.98]"
+                  className="flex cursor-pointer items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-700 active:scale-[0.98]"
                   type="button"
                 >
                   <TrashIcon className="h-4 w-4" /> Delete Selected
@@ -996,18 +976,18 @@ export default function ScriptsPage() {
               return (
                 <article key={script.id} className={`flex min-w-0 flex-col rounded-2xl border p-4 shadow-sm ${selected ? "border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-950/30" : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"}`}>
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                    <label className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-bold text-slate-500">
+                    <label className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-medium text-fg-3">
                       <input type="checkbox" checked={selected} onChange={() => toggleSelected(script.id)} aria-label={`Select ${script.title}`} className="h-5 w-5 accent-blue-600" />
                       {new Date(script.created_at).toLocaleDateString("vi-VN")}
                     </label>
-                    <span className={`rounded-xl border px-3 py-2 text-[10px] font-black uppercase tracking-widest ${STATUS_STYLE[status] || STATUS_STYLE.Draft}`}>{status}</span>
+                    <span className={`rounded-xl border px-3 py-2 text-[11px] font-semibold uppercase tracking-wider ${STATUS_STYLE[status] || STATUS_STYLE.Draft}`}>{status}</span>
                   </div>
                   <button type="button" onClick={() => openProject(script)} className="min-w-0 cursor-pointer text-left">
-                    <h2 className="break-words text-lg font-black text-slate-900 dark:text-white">{script.title}</h2>
+                    <h2 className="break-words text-lg font-bold text-slate-900 dark:text-white">{script.title}</h2>
                   </button>
                   <div className="mt-3"><ProjectTopicSelect label="Topic" ariaLabel={`Topic for ${script.title}`} value={getScriptTopicValue(script)} topics={topics} loading={topicsLoading} saving={savingTopicIds.has(script.id)} onChange={(topic) => void changeProjectTopic(script, topic)} /></div>
-                  <p className="mt-2 break-words text-xs font-bold text-slate-500">{channels.join(" · ") || "Unknown channel"}</p>
-                  <p className="mt-3 line-clamp-3 break-words text-sm leading-6 text-slate-500">{getScriptSummary(script)}</p>
+                  <p className="mt-2 break-words text-xs font-medium text-fg-3">{channels.join(" · ") || "Unknown channel"}</p>
+                  <p className="mt-3 line-clamp-3 break-words text-sm leading-6 text-fg-3">{getScriptSummary(script)}</p>
                   <div className="mt-auto flex items-center justify-end gap-2 pt-4">
                     <button type="button" onClick={() => openProject(script)} className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 px-4 text-sm font-bold dark:border-slate-700"><PencilSquareIcon className="h-4 w-4" /> Open</button>
                     <button type="button" onClick={() => handleDelete(script.id)} aria-label={`Delete ${script.title}`} className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border border-slate-200 text-rose-500 dark:border-slate-700"><TrashIcon className="h-4 w-4" /></button>
@@ -1015,7 +995,7 @@ export default function ScriptsPage() {
                 </article>
               );
             })}
-            {filteredScripts.length === 0 && <p className="col-span-full py-16 text-center font-bold text-slate-500">No video projects found. Try another search or create a new project from selected ideas.</p>}
+            {filteredScripts.length === 0 && <p className="col-span-full py-16 text-center font-bold text-fg-3">No video projects found. Try another search or create a new project from selected ideas.</p>}
           </div>
 
           <div className="projects-table overflow-x-auto rounded-[1.75rem] border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -1028,15 +1008,15 @@ export default function ScriptsPage() {
                       aria-label="Select all visible projects"
                       checked={allVisibleSelected}
                       onChange={toggleSelectAllVisible}
-                      className="h-5 w-5 cursor-pointer rounded border-slate-300 accent-blue-600"
+                      className="h-5 w-5 cursor-pointer rounded border-line-strong accent-blue-600"
                     />
                   </th>
-                  <th className="w-[25%] px-4 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Project</th>
-                  <th className="w-[20%] px-4 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Topic</th>
-                  <th className="w-[17%] px-4 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Channel</th>
-                  <th className="w-[10%] px-4 py-7 text-center text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Status</th>
-                  <th className="w-[10%] px-4 py-7 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Summary</th>
-                  <th className="w-[13%] px-3 py-7 text-right text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Action</th>
+                  <th className="w-[25%] px-4 py-7 text-[11px] font-semibold uppercase tracking-wider text-fg-3">Project</th>
+                  <th className="w-[20%] px-4 py-7 text-[11px] font-semibold uppercase tracking-wider text-fg-3">Topic</th>
+                  <th className="w-[17%] px-4 py-7 text-[11px] font-semibold uppercase tracking-wider text-fg-3">Channel</th>
+                  <th className="w-[10%] px-4 py-7 text-center text-[11px] font-semibold uppercase tracking-wider text-fg-3">Status</th>
+                  <th className="w-[10%] px-4 py-7 text-[11px] font-semibold uppercase tracking-wider text-fg-3">Summary</th>
+                  <th className="w-[13%] px-3 py-7 text-right text-[11px] font-semibold uppercase tracking-wider text-fg-3">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -1063,17 +1043,17 @@ export default function ScriptsPage() {
                           checked={selected}
                           onClick={(event) => event.stopPropagation()}
                           onChange={() => toggleSelected(script.id)}
-                          className="h-5 w-5 cursor-pointer rounded border-slate-300 accent-blue-600"
+                          className="h-5 w-5 cursor-pointer rounded border-line-strong accent-blue-600"
                         />
                       </td>
                       <td className="px-4 py-9">
                         <div className="flex items-center gap-3 lg:gap-5">
-                          <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-2xl shadow-lg shadow-slate-200 transition-transform group-hover:scale-[1.03] dark:shadow-black/30 ${topicVisual.className}`}>
-                            <span aria-hidden="true">{topicVisual.emoji}</span>
+                          <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-2xl shadow-lg shadow-slate-200 transition-transform group-hover:scale-[1.03] dark:shadow-black/30 ${topicVisual.gradientClass}`}>
+                            <topicVisual.Icon className="h-7 w-7" aria-hidden="true" />
                           </div>
                           <div className="min-w-0 flex-1 overflow-hidden">
-                            <p title={script.title} className="block max-w-full truncate whitespace-nowrap text-base font-black uppercase tracking-tight text-slate-900 dark:text-slate-50">{script.title}</p>
-                            <p className="mt-1 text-[10px] font-bold uppercase text-slate-400">{new Date(script.created_at).toLocaleDateString("vi-VN")}</p>
+                            <p title={script.title} className="block max-w-full truncate whitespace-nowrap text-base font-bold uppercase tracking-tight text-slate-900 dark:text-slate-50">{script.title}</p>
+                            <p className="mt-1 text-[11px] font-semibold uppercase text-fg-4">{new Date(script.created_at).toLocaleDateString("vi-VN")}</p>
                           </div>
                         </div>
                       </td>
@@ -1093,15 +1073,15 @@ export default function ScriptsPage() {
                             <VideoCameraIcon className="h-5 w-5" />
                           </span>
                           <div className="min-w-0 flex-1">
-                            <p className="truncate whitespace-nowrap text-sm font-black">{channels[0] || "Unknown channel"}</p>
+                            <p className="truncate whitespace-nowrap text-sm font-semibold">{channels[0] || "Unknown channel"}</p>
                             {channels.length > 1 && (
-                              <p className="mt-1 text-[10px] font-black uppercase tracking-wide opacity-65">+{channels.length - 1} more</p>
+                              <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide opacity-65">+{channels.length - 1} more</p>
                             )}
                           </div>
                         </div>
                       </td>
                       <td className="px-4 py-9 text-center">
-                        <span className={`rounded-xl border px-4 py-2 text-[10px] font-black uppercase tracking-widest shadow-sm ${STATUS_STYLE[status] || STATUS_STYLE.Draft}`}>{status}</span>
+                        <span className={`rounded-xl border px-4 py-2 text-[11px] font-semibold uppercase tracking-wider shadow-sm ${STATUS_STYLE[status] || STATUS_STYLE.Draft}`}>{status}</span>
                       </td>
                       <td className="px-4 py-9 text-sm font-bold italic leading-relaxed text-slate-700 dark:text-slate-300">
                         <p className="line-clamp-2 pr-6">{summary}</p>
@@ -1123,7 +1103,7 @@ export default function ScriptsPage() {
                               event.stopPropagation();
                               handleDelete(script.id);
                             }}
-                            className="cursor-pointer rounded-xl border-2 border-slate-100 bg-white p-3 text-slate-400 shadow-sm transition-all hover:text-rose-600 dark:border-slate-800 dark:bg-slate-950 dark:hover:text-rose-400"
+                            className="cursor-pointer rounded-xl border-2 border-slate-100 bg-white p-3 text-fg-4 shadow-sm transition-all hover:text-rose-600 dark:border-slate-800 dark:bg-slate-950 dark:hover:text-rose-400"
                             type="button"
                           >
                             <TrashIcon className="h-5 w-5" />
@@ -1137,8 +1117,8 @@ export default function ScriptsPage() {
                 {filteredScripts.length === 0 && (
                   <tr>
                     <td colSpan={7} className="px-10 py-20 text-center">
-                      <p className="text-lg font-black text-slate-500 dark:text-slate-400">No video projects found.</p>
-                      <p className="mt-2 text-sm font-bold text-slate-400">Try another search or create a new project from selected ideas.</p>
+                      <p className="text-lg font-bold text-slate-500 dark:text-slate-400">No video projects found.</p>
+                      <p className="mt-2 text-sm font-medium text-fg-4">Try another search or create a new project from selected ideas.</p>
                     </td>
                   </tr>
                 )}

@@ -2,15 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  CameraIcon,
-  ClockIcon,
-  FilmIcon,
-  PlusIcon,
-  TrashIcon,
-  XMarkIcon,
-} from "@heroicons/react/24/outline";
+import { CameraIcon, ClockIcon, FilmIcon, PlusIcon, TrashIcon, VideoCameraIcon } from "@heroicons/react/24/outline";
 import { AppSidebar } from "@/components/AppSidebar";
+import { Button } from "@/components/ui/Button";
+import { Field, Input, Textarea } from "@/components/ui/Field";
+import { Modal, ModalBody, ModalFooter, ModalHeader } from "@/components/ui/Modal";
 import { AppPageHeader, appPageMainClass, appPagePrimaryActionClass, appPageRootClass } from "@/components/AppPage";
 import { useNotifications } from "@/components/NotificationCenter";
 import type { LongVideoProject } from "@/types/gamekb";
@@ -127,12 +123,12 @@ export default function LongVideosPage() {
           </div>
 
           {loading ? (
-            <div className="rounded-[2rem] border border-slate-200 bg-white p-12 text-center text-sm font-bold text-slate-400 dark:border-slate-800 dark:bg-slate-900">Loading projects...</div>
+            <div className="rounded-[2rem] border border-slate-200 bg-white p-12 text-center text-sm font-medium text-fg-4 dark:border-slate-800 dark:bg-slate-900">Loading projects...</div>
           ) : filtered.length === 0 ? (
             <div className="rounded-[2rem] border border-dashed border-slate-300 bg-white p-14 text-center dark:border-slate-700 dark:bg-slate-900">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-violet-50 text-3xl dark:bg-violet-950/30">🎥</div>
-              <h2 className="mt-4 text-xl font-black">Start a long video project</h2>
-              <p className="mt-2 text-sm text-slate-500">Create the project first, then pick ideas from your main library.</p>
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-violet-50 text-violet-500 dark:bg-violet-950/30"><VideoCameraIcon className="h-8 w-8" aria-hidden="true" /></div>
+              <h2 className="mt-4 text-xl font-bold">Start a long video project</h2>
+              <p className="mt-2 text-sm text-fg-3">Create the project first, then pick ideas from your main library.</p>
             </div>
           ) : (
             <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -161,7 +157,7 @@ export default function LongVideosPage() {
                         <div className="absolute inset-0 bg-gradient-to-br from-violet-600 via-fuchsia-600 to-slate-950" />
                       )}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-black/15" />
-                      <span className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider shadow-sm ${STATUS_STYLE[project.status]}`}>{STATUS_LABEL[project.status]}</span>
+                      <span className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider shadow-sm ${STATUS_STYLE[project.status]}`}>{STATUS_LABEL[project.status]}</span>
                       <button
                         type="button"
                         onClick={(event) => { event.stopPropagation(); void remove(project); }}
@@ -174,13 +170,13 @@ export default function LongVideosPage() {
                         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/25 backdrop-blur">
                           <div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${progress}%` }} />
                         </div>
-                        <span className="rounded-lg bg-black/40 px-2 py-1 text-[10px] font-black text-white backdrop-blur">{progress}%</span>
+                        <span className="rounded-lg bg-black/40 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur">{progress}%</span>
                       </div>
                     </div>
 
                     <div className="p-4">
-                      <h2 className="line-clamp-2 min-h-[2.5rem] text-base font-black leading-5 text-slate-900 dark:text-white">{project.title}</h2>
-                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-bold text-slate-500 dark:text-slate-400">
+                      <h2 className="line-clamp-2 min-h-[2.5rem] text-base font-bold leading-5 text-slate-900 dark:text-white">{project.title}</h2>
+                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-medium text-slate-500 dark:text-slate-400">
                         <span className="inline-flex items-center gap-1.5"><FilmIcon className="h-4 w-4" />{items.length}</span>
                         <span className="inline-flex items-center gap-1.5"><CameraIcon className="h-4 w-4" />{remaining} left</span>
                         <span className="inline-flex items-center gap-1.5"><ClockIcon className="h-4 w-4" />{project.target_duration_minutes}m</span>
@@ -194,28 +190,32 @@ export default function LongVideosPage() {
         </div>
       </main>
 
-      {showCreate && (
-        <div className="modal-overlay fixed inset-0 z-[99990] flex items-center justify-center overflow-y-auto bg-slate-950/65 p-4 backdrop-blur-sm" onMouseDown={() => setShowCreate(false)}>
-          <form onSubmit={createProject} onMouseDown={(event) => event.stopPropagation()} className="my-auto w-full max-w-xl overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950">
-            <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5 dark:border-slate-800">
-              <div><p className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-500">New project</p><h2 className="mt-1 text-2xl font-black">Create long video project</h2></div>
-              <button type="button" onClick={() => setShowCreate(false)} className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:text-slate-700 dark:bg-slate-900"><XMarkIcon className="h-5 w-5" /></button>
-            </div>
-            <div className="space-y-4 p-6">
-              <label className="block"><span className="mb-1.5 block text-xs font-black text-slate-500">Project title</span><input autoFocus value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-bold outline-none focus:border-violet-400 dark:border-slate-700 dark:bg-slate-900" placeholder="50 details that make RDR2 feel alive" /></label>
-              <label className="block"><span className="mb-1.5 block text-xs font-black text-slate-500">Main goal</span><textarea value={form.core_idea} onChange={(event) => setForm((current) => ({ ...current, core_idea: event.target.value }))} rows={3} className="w-full resize-y rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm font-semibold outline-none focus:border-violet-400 dark:border-slate-700 dark:bg-slate-900" placeholder="What should this video deliver to viewers?" /></label>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label><span className="mb-1.5 block text-xs font-black text-slate-500">Target duration</span><div className="relative"><input type="number" min={1} value={form.target_duration_minutes} onChange={(event) => setForm((current) => ({ ...current, target_duration_minutes: Number(event.target.value) }))} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 pr-12 text-sm font-bold dark:border-slate-700 dark:bg-slate-900" /><span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">min</span></div></label>
-                <label><span className="mb-1.5 block text-xs font-black text-slate-500">Thumbnail concept</span><input value={form.thumbnail_notes} onChange={(event) => setForm((current) => ({ ...current, thumbnail_notes: event.target.value }))} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold dark:border-slate-700 dark:bg-slate-900" placeholder="Subject, text, contrast..." /></label>
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} size="md" zClass="z-[99990]" onSubmit={createProject} labelledBy="create-long-video-title">
+        <ModalHeader id="create-long-video-title" eyebrow="New project" eyebrowClassName="text-violet-500" title="Create long video project" onClose={() => setShowCreate(false)} />
+        <ModalBody className="space-y-4">
+          <Field label="Project title">
+            <Input autoFocus value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} className="h-12 text-base" placeholder="50 details that make RDR2 feel alive" />
+          </Field>
+          <Field label="Main goal">
+            <Textarea value={form.core_idea} onChange={(event) => setForm((current) => ({ ...current, core_idea: event.target.value }))} rows={3} className="resize-y" placeholder="What should this video deliver to viewers?" />
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Target duration">
+              <div className="relative">
+                <Input type="number" min={1} value={form.target_duration_minutes} onChange={(event) => setForm((current) => ({ ...current, target_duration_minutes: Number(event.target.value) }))} className="pr-12" />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-fg-4">min</span>
               </div>
-            </div>
-            <div className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4 dark:border-slate-800 dark:bg-slate-900/50">
-              <button type="button" onClick={() => setShowCreate(false)} className="h-11 cursor-pointer rounded-xl border border-slate-200 bg-white px-4 text-xs font-black uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:bg-slate-950">Cancel</button>
-              <button disabled={saving || !form.title.trim()} className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-violet-600 px-5 text-sm font-black text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"><CameraIcon className="h-4 w-4" />{saving ? "Creating..." : "Create project"}</button>
-            </div>
-          </form>
-        </div>
-      )}
+            </Field>
+            <Field label="Thumbnail concept">
+              <Input value={form.thumbnail_notes} onChange={(event) => setForm((current) => ({ ...current, thumbnail_notes: event.target.value }))} placeholder="Subject, text, contrast..." />
+            </Field>
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="ghost" size="sm" onClick={() => setShowCreate(false)}>Cancel</Button>
+          <Button type="submit" variant="violet" size="sm" disabled={saving || !form.title.trim()}><CameraIcon className="h-4 w-4" />{saving ? "Creating..." : "Create project"}</Button>
+        </ModalFooter>
+      </Modal>
     </div>
   );
 }

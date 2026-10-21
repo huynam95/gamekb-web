@@ -1,5 +1,6 @@
 "use client";
 
+import { PhotoIcon } from "@heroicons/react/24/outline";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -8,18 +9,18 @@ import { useNotifications } from "@/components/NotificationCenter";
 /* ================= STYLES ================= */
 
 const inputClass =
-  "h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition";
+  "h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm text-fg placeholder:text-fg-4 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition";
 
 const textareaClass =
-  "min-h-[100px] w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition resize-y";
+  "min-h-[100px] w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-4 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition resize-y";
 
 const btnPrimary =
   "inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 text-sm font-semibold text-white shadow-md shadow-slate-900/10 hover:bg-slate-800 disabled:opacity-70 disabled:cursor-not-allowed transition active:scale-[0.98]";
 
 const btnGhost =
-  "inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900 transition active:scale-[0.98]";
+  "inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-line bg-surface px-4 text-sm font-semibold text-fg-2 shadow-sm hover:bg-surface-hover hover:text-fg transition active:scale-[0.98]";
 
-const cardClass = "rounded-2xl border border-slate-200 bg-white p-6 shadow-sm";
+const cardClass = "rounded-2xl border border-line bg-surface p-6 shadow-sm";
 
 /* ================= COMPONENT ================= */
 
@@ -132,18 +133,18 @@ Warning: This will delete ALL ideas attached to this game!`,
     }
   }
 
-  if (loading) return <div className="p-10 text-center text-slate-500">Loading game data...</div>;
+  if (loading) return <div className="p-10 text-center text-fg-3">Loading game data...</div>;
   if (!loading && !title && err) return <div className="p-10 text-center text-rose-500">{err}</div>;
 
   return (
-    <main className="min-h-screen bg-slate-50 pb-20">
+    <main className="min-h-screen bg-surface-muted pb-20">
       <div className="mx-auto max-w-4xl px-4 py-8">
         
         {/* HEADER */}
         <div className="mb-8 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Edit Game</h1>
-            <p className="text-sm text-slate-500">Update details for #{id}</p>
+            <h1 className="text-2xl font-bold text-fg">Edit Game</h1>
+            <p className="text-sm text-fg-3">Update details for #{id}</p>
           </div>
           <button onClick={() => router.back()} className={btnGhost}>
             Cancel
@@ -158,7 +159,7 @@ Warning: This will delete ALL ideas attached to this game!`,
               
               {/* MESSAGES */}
               {err && (
-                <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+                <div className="mb-4 rounded-xl border border-rose-200 bg-danger-soft px-4 py-3 text-sm text-rose-900">
                   {err}
                 </div>
               )}
@@ -170,7 +171,7 @@ Warning: This will delete ALL ideas attached to this game!`,
 
               <div className="space-y-5">
                 <label className="block">
-                  <span className="mb-1 block text-sm font-semibold text-slate-900">Game Title *</span>
+                  <span className="mb-1 block text-sm font-semibold text-fg">Game Title *</span>
                   <input
                     className={inputClass}
                     value={title}
@@ -181,19 +182,19 @@ Warning: This will delete ALL ideas attached to this game!`,
 
                 {/* MỚI: Ô nhập Cover URL */}
                 <label className="block">
-                  <span className="mb-1 block text-sm font-semibold text-slate-900">Cover Image URL</span>
+                  <span className="mb-1 block text-sm font-semibold text-fg">Cover Image URL</span>
                   <input 
                     className={inputClass} 
                     value={coverUrl} 
                     onChange={(e) => setCoverUrl(e.target.value)} 
                     placeholder="https://..." 
                   />
-                  <p className="mt-1 text-xs text-slate-500">Link to vertical poster or box art.</p>
+                  <p className="mt-1 text-xs text-fg-3">Link to vertical poster or box art.</p>
                 </label>
 
                 <div className="grid gap-5 sm:grid-cols-2">
                   <label className="block">
-                    <span className="mb-1 block text-sm font-semibold text-slate-900">Release Year</span>
+                    <span className="mb-1 block text-sm font-semibold text-fg">Release Year</span>
                     <input
                       type="number"
                       className={inputClass}
@@ -204,7 +205,7 @@ Warning: This will delete ALL ideas attached to this game!`,
                   </label>
 
                   <label className="block">
-                    <span className="mb-1 block text-sm font-semibold text-slate-900">Genres</span>
+                    <span className="mb-1 block text-sm font-semibold text-fg">Genres</span>
                     <input
                       className={inputClass}
                       value={genres}
@@ -215,7 +216,7 @@ Warning: This will delete ALL ideas attached to this game!`,
                 </div>
 
                 <label className="block">
-                  <span className="mb-1 block text-sm font-semibold text-slate-900">Notes</span>
+                  <span className="mb-1 block text-sm font-semibold text-fg">Notes</span>
                   <textarea
                     className={textareaClass}
                     value={notes}
@@ -238,13 +239,13 @@ Warning: This will delete ALL ideas attached to this game!`,
             </div>
 
              {/* DANGER ZONE */}
-             <div className="rounded-2xl border border-rose-100 bg-rose-50 p-6">
+             <div className="rounded-2xl border border-rose-100 bg-danger-soft p-6">
                 <h3 className="text-sm font-bold text-rose-900">Danger Zone</h3>
                 <p className="mt-1 text-sm text-rose-700">Deleting this game will remove it from all associated ideas.</p>
                 <button 
                   onClick={deleteGame}
                   disabled={saving}
-                  className="mt-4 inline-flex h-9 items-center justify-center rounded-lg border border-rose-200 bg-white px-4 text-sm font-semibold text-rose-600 shadow-sm hover:bg-rose-600 hover:text-white transition"
+                  className="mt-4 inline-flex h-9 items-center justify-center rounded-lg border border-rose-200 bg-surface px-4 text-sm font-semibold text-rose-600 shadow-sm hover:bg-rose-600 hover:text-white transition"
                 >
                    {saving ? "Processing..." : "Delete Game"}
                 </button>
@@ -254,15 +255,15 @@ Warning: This will delete ALL ideas attached to this game!`,
           {/* RIGHT: PREVIEW (CẬP NHẬT ĐỂ HIỆN ẢNH) */}
           <section className="lg:col-span-1">
             <div className="sticky top-8 space-y-4">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Preview</h3>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-4">Preview</h3>
               
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition">
+              <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm transition">
                 {/* Phần hiển thị ảnh */}
-                <div className="relative h-48 w-full bg-slate-100">
+                <div className="relative h-48 w-full bg-surface-sunken">
                   {coverUrl ? (
                     <img src={coverUrl} alt="Preview" className="h-full w-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
                   ) : (
-                    <div className="flex h-full items-center justify-center text-4xl text-slate-200">🖼️</div>
+                    <div className="flex h-full items-center justify-center text-slate-300 dark:text-slate-600"><PhotoIcon className="h-12 w-12" aria-hidden="true" /></div>
                   )}
                   {/* Overlay text nếu không có ảnh hoặc ảnh lỗi */}
                   {!coverUrl && (
@@ -273,23 +274,23 @@ Warning: This will delete ALL ideas attached to this game!`,
                 </div>
 
                 <div className="p-4">
-                  <h3 className="text-lg font-bold text-slate-900 break-words">
+                  <h3 className="text-lg font-bold text-fg break-words">
                     {title.trim() || "Untitled Game"}
                   </h3>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {releaseYear && (
-                      <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-700">
+                      <span className="inline-flex items-center rounded-md border border-line bg-surface-muted px-2 py-0.5 text-xs font-medium text-fg-2">
                         {releaseYear}
                       </span>
                     )}
                     {genres.trim() && genres.split(',').map((g, i) => (
-                      <span key={i} className="inline-flex items-center rounded-md border border-blue-100 bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                      <span key={i} className="inline-flex items-center rounded-md border border-blue-100 bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent">
                         {g.trim()}
                       </span>
                     ))}
                   </div>
                   {notes && (
-                     <p className="mt-3 text-xs text-slate-500 line-clamp-3">
+                     <p className="mt-3 text-xs text-fg-3 line-clamp-3">
                        {notes}
                      </p>
                   )}
