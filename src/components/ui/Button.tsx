@@ -1,6 +1,6 @@
 import { forwardRef, type ButtonHTMLAttributes } from "react";
 
-export type ButtonVariant = "primary" | "accent" | "secondary" | "ghost" | "danger" | "violet";
+export type ButtonVariant = "primary" | "accent" | "secondary" | "ghost" | "danger" | "destructive" | "violet";
 export type ButtonSize = "sm" | "md" | "lg" | "icon" | "icon-sm";
 
 const base =
@@ -13,6 +13,7 @@ const variants: Record<ButtonVariant, string> = {
   secondary: "border border-line bg-surface text-fg-2 shadow-sm hover:border-line-strong hover:bg-surface-hover hover:text-fg",
   ghost: "text-fg-3 hover:bg-surface-sunken hover:text-fg",
   danger: "text-rose-600 hover:bg-danger-soft dark:text-rose-300",
+  destructive: "bg-rose-600 text-white shadow-sm hover:bg-rose-700",
 };
 
 const sizes: Record<ButtonSize, string> = {

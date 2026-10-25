@@ -33,6 +33,8 @@ import {
   ArrowPathIcon,
   PlusIcon,
   ChevronDownIcon,
+  CheckCircleIcon,
+  EllipsisHorizontalIcon,
 } from "@heroicons/react/24/outline";
 
 /* ================= TYPES & CONFIG ================= */
@@ -65,17 +67,6 @@ const STATUS_STYLE: Record<string, string> = {
   Published: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800",
 };
 
-
-function getScriptSummary(script: ScriptProject) {
-  const description = script.description || "";
-  const cleaned = description
-    .split("\n")
-    .filter((line) => !/^\s*(Topic|Hook):/i.test(line))
-    .join("\n")
-    .trim();
-
-  return cleaned || "No summary...";
-}
 
 function getScriptChannels(script: ScriptProject) {
   return Array.from(
@@ -758,6 +749,8 @@ export default function ScriptsPage() {
   const [loadingScripts, setLoadingScripts] = useState(true);
   const [statusFilter, setStatusFilter] = useState<"All" | (typeof PROJECT_STATUSES)[number]>("All");
   const [topicFilter, setTopicFilter] = useState<string>(ALL_TOPICS);
+  /** Checkboxes are hidden until the user starts selecting. */
+  const [selectMode, setSelectMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [editingScript, setEditingScript] = useState<ScriptProject | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -940,7 +933,7 @@ export default function ScriptsPage() {
       ...scripts.map((script) => getScriptTopicValue(script)).filter(Boolean),
     ]));
     return [
-      { value: ALL_TOPICS, label: "All topics", Icon: Squares2X2Icon },
+      { value: ALL_TOPICS, label: "All topics" },
       { value: NO_TOPIC, label: "No topic" },
       ...titles.map((title) => ({ value: title, label: title, Icon: getTopicVisual(title).Icon })),
     ];
@@ -958,24 +951,31 @@ export default function ScriptsPage() {
   };
 
   const hasFilters = Boolean(searchQuery.trim()) || statusFilter !== "All" || topicFilter !== ALL_TOPICS;
+  const selecting = selectMode || selectedIds.length > 0;
+
+  const exitSelection = () => {
+    setSelectedIds([]);
+    setSelectMode(false);
+  };
 
   return (
     <div className={`${appPageRootClass} xl:flex`}>
       <ScriptEditorModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} script={editingScript} onSave={handleUpdate} onRefresh={refreshScriptProject} topics={topics} topicsLoading={topicsLoading} topicsError={topicsError} onRetryTopics={retryTopics} />
 
-      <AppSidebar activePage="scripts" hideTabBar={selectedIds.length > 0} />
+      <AppSidebar activePage="scripts" hideTabBar={selecting} />
 
       <main className={`${appPageMainClass} pb-32`}>
-        <div className="app-container">
+        <div className="app-container max-w-6xl">
           <AppPageHeader
             title="Short Projects"
-            description="Track every short from draft to published: topic, source channels, footage and status in one place."
+            description="Every short from draft to published. Open a project to write the script and manage its footage."
             icon={<DocumentTextIcon className="h-5 w-5" />}
             className="mb-4"
             action={
               <Button variant="accent" disabled={creatingProject} onClick={() => void createProject()}>
                 <PlusIcon className="h-5 w-5" />
-                {creatingProject ? "Creating..." : "New project"}
+                <span className="max-sm:hidden">{creatingProject ? "Creating..." : "New project"}</span>
+                <span className="sm:hidden">{creatingProject ? "..." : "New"}</span>
               </Button>
             }
           />
@@ -987,7 +987,8 @@ export default function ScriptsPage() {
             </div>
           )}
 
-          <div className="mb-4 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Filter by status">
+          {/* Status tabs: one quiet segmented row with counts. */}
+          <div className="-mx-1 mb-3 flex gap-1 overflow-x-auto px-1 pb-1" role="tablist" aria-label="Filter by status">
             {(["All", ...PROJECT_STATUSES] as const).map((status) => {
               const active = statusFilter === status;
               return (
@@ -997,49 +998,66 @@ export default function ScriptsPage() {
                   role="tab"
                   aria-selected={active}
                   onClick={() => setStatusFilter(status)}
-                  className={`inline-flex h-10 shrink-0 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm font-semibold transition active:scale-[0.98] ${
-                    active
-                      ? "border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-950"
-                      : "border-line bg-surface text-fg-2 hover:border-line-strong hover:bg-surface-hover"
+                  className={`inline-flex h-10 shrink-0 cursor-pointer items-center gap-2 rounded-xl px-3.5 text-sm font-semibold transition ${
+                    active ? "bg-surface text-fg shadow-sm ring-1 ring-line" : "text-fg-3 hover:bg-surface-sunken hover:text-fg"
                   }`}
                 >
                   {status !== "All" && <span className={`h-2 w-2 rounded-full ${STATUS_META[status].dot}`} aria-hidden="true" />}
-                  {status === "All" ? "All projects" : status}
-                  <span className={`rounded-full px-1.5 text-xs tabular-nums ${active ? "bg-white/15 dark:bg-slate-950/10" : "bg-surface-sunken text-fg-3"}`}>
-                    {statusCounts[status] ?? 0}
-                  </span>
+                  {status === "All" ? "All" : status}
+                  <span className={`text-xs tabular-nums ${active ? "text-fg-3" : "text-fg-4"}`}>{statusCounts[status] ?? 0}</span>
                 </button>
               );
             })}
           </div>
 
-          <div className="mb-6 grid gap-2 rounded-3xl border border-line bg-surface p-2.5 shadow-sm sm:grid-cols-[minmax(0,1fr)_minmax(0,16rem)]">
-            <div className="relative min-w-0">
-              <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-fg-4" />
+          {/* Search, topic filter and selection toggle on one line. */}
+          <div className="mb-4 flex items-center gap-2">
+            <div className="relative min-w-0 flex-1">
+              <MagnifyingGlassIcon className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-fg-4" />
               <input
-                className="h-10 w-full rounded-full border border-line bg-surface px-11 text-sm font-medium text-fg shadow-sm outline-none transition placeholder:text-fg-4 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10"
-                placeholder="Search titles, summaries, topics, channels..."
+                className="h-11 w-full rounded-xl border border-line bg-surface pl-11 pr-10 text-sm font-medium text-fg outline-none transition placeholder:text-fg-4 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10"
+                placeholder="Search"
                 aria-label="Search projects"
+                type="search"
+                enterKeyHint="search"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
               />
               {searchQuery && (
-                <button type="button" onClick={() => setSearchQuery("")} className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-fg-4 transition hover:bg-surface-sunken hover:text-fg" aria-label="Clear search">
+                <button type="button" onClick={() => setSearchQuery("")} className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-lg text-fg-4 transition hover:bg-surface-sunken hover:text-fg" aria-label="Clear search">
                   <XMarkIcon className="h-4 w-4" />
                 </button>
               )}
             </div>
-            <Dropdown value={topicFilter} options={topicOptions} onChange={setTopicFilter} heading="Topic" ariaLabel="Filter by topic" />
+            <div className="w-[8.75rem] shrink-0 sm:w-56">
+              <Dropdown value={topicFilter} options={topicOptions} onChange={setTopicFilter} heading="Topic" ariaLabel="Filter by topic" />
+            </div>
+            <Button
+              variant={selecting ? "primary" : "secondary"}
+              onClick={() => (selecting ? exitSelection() : setSelectMode(true))}
+              aria-pressed={selecting}
+              className="shrink-0 max-sm:w-11 max-sm:px-0"
+              title={selecting ? "Done selecting" : "Select projects"}
+            >
+              {selecting ? <XMarkIcon className="h-5 w-5" /> : <CheckCircleIcon className="h-5 w-5" />}
+              <span className="max-sm:hidden">{selecting ? "Done" : "Select"}</span>
+            </Button>
           </div>
 
           {loadingScripts ? (
-            <div className="project-grid" aria-hidden="true">
+            <div className="overflow-hidden rounded-2xl border border-line bg-surface" aria-hidden="true">
               {Array.from({ length: 6 }, (_, index) => (
-                <div key={index} className="h-56 animate-pulse rounded-3xl border border-line bg-surface-sunken" />
+                <div key={index} className="flex items-center gap-3 border-b border-line-soft px-4 py-3.5 last:border-0">
+                  <div className="h-9 w-9 animate-pulse rounded-xl bg-surface-sunken" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3.5 w-2/3 animate-pulse rounded-full bg-surface-sunken" />
+                    <div className="h-3 w-1/3 animate-pulse rounded-full bg-surface-sunken" />
+                  </div>
+                </div>
               ))}
             </div>
           ) : filteredScripts.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-line-strong px-6 py-16 text-center">
+            <div className="rounded-2xl border border-dashed border-line-strong px-6 py-16 text-center">
               <DocumentTextIcon className="mx-auto h-10 w-10 text-fg-4" aria-hidden="true" />
               <p className="mt-3 text-base font-semibold text-fg">{scripts.length === 0 ? "No short projects yet" : "No projects match these filters"}</p>
               <p className="mt-1 text-sm text-fg-3">
@@ -1051,84 +1069,110 @@ export default function ScriptsPage() {
               </div>
             </div>
           ) : (
-            <ul className="project-grid">
-              {filteredScripts.map((script) => {
-                const channels = getScriptChannels(script);
-                const status = (script.status || "Draft") as ScriptProject["status"];
-                const selected = selectedIds.includes(script.id);
-                const topic = getScriptTopic(script);
-                const topicVisual = getTopicVisual(topic);
-                const clipCount = analyzeAssetLinks(script.assets || []).uniqueLinkCount;
-                return (
-                  <li
-                    key={script.id}
-                    className={`group relative flex min-w-0 flex-col rounded-3xl border bg-surface p-4 shadow-sm transition hover:shadow-md ${selected ? "border-blue-400 ring-2 ring-blue-500/30" : "border-line hover:border-line-strong"}`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="relative shrink-0">
-                        <span className={`flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br shadow-sm ${topicVisual.gradientClass}`} aria-hidden="true">
-                          <topicVisual.Icon className="h-5 w-5" />
-                        </span>
-                        {/* 44px tap area around a small round checkbox (it sits on the topic icon). */}
-                        <label className={`absolute -left-3 -top-3 flex h-11 w-11 cursor-pointer items-center justify-center transition ${selected || selectedIds.length > 0 ? "opacity-100" : "touch-reveal opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"}`}>
-                          <span className={`flex h-6 w-6 items-center justify-center rounded-full border bg-surface shadow-sm ${selected ? "border-blue-500" : "border-line-strong"}`}>
-                            <input type="checkbox" checked={selected} onChange={() => toggleSelected(script.id)} aria-label={`Select ${script.title}`} className="h-4 w-4 cursor-pointer accent-blue-600" />
-                          </span>
-                        </label>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <button type="button" onClick={() => openProject(script)} className="block min-h-11 w-full cursor-pointer text-left">
-                          <h2 className="line-clamp-2 break-words text-base font-semibold leading-snug text-fg group-hover:text-accent">{script.title || "Untitled project"}</h2>
-                        </button>
-                        <p className="mt-1 text-xs text-fg-4">{new Date(script.created_at).toLocaleDateString("vi-VN")}</p>
-                      </div>
-                      <StatusMenu value={status} onChange={(next) => void changeProjectStatus(script, next)} label={script.title} />
-                    </div>
+            <div className="rounded-2xl border border-line bg-surface shadow-sm">
+              {/* Column labels on wide screens only. */}
+              <div className="shorts-row shorts-head hidden border-b border-line-soft px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-fg-4 lg:grid" aria-hidden="true">
+                <span />
+                <span>Project</span>
+                <span>Topic</span>
+                <span>Source</span>
+                <span className="text-right">Clips</span>
+                <span>Created</span>
+                <span>Status</span>
+                <span />
+              </div>
+              <ul>
+                {filteredScripts.map((script) => {
+                  const channels = getScriptChannels(script);
+                  const status = (script.status || "Draft") as ScriptProject["status"];
+                  const selected = selectedIds.includes(script.id);
+                  const topicValue = getScriptTopicValue(script);
+                  const topicVisual = getTopicVisual(topicValue || "No topic");
+                  const clipCount = analyzeAssetLinks(script.assets || []).uniqueLinkCount;
+                  const created = new Date(script.created_at).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+                  const channelLabel = channels.length ? `${channels[0]}${channels.length > 1 ? ` +${channels.length - 1}` : ""}` : "";
+                  const meta = [topicValue || "No topic", channelLabel, `${clipCount} ${clipCount === 1 ? "clip" : "clips"}`, created].filter(Boolean);
 
-                    <p className="mt-3 line-clamp-2 break-words text-sm leading-6 text-fg-3">{getScriptSummary(script)}</p>
+                  return (
+                    <li
+                      key={script.id}
+                      className={`shorts-row group relative border-b border-line-soft px-3 py-2.5 last:border-0 has-[[aria-expanded=true]]:z-30 sm:px-4 ${selected ? "bg-accent-soft" : "hover:bg-surface-hover"}`}
+                    >
+                      {/* Leading: topic icon; becomes a checkbox when selecting (or on hover with a mouse). */}
+                      <div className="relative z-10 flex h-11 w-11 shrink-0 items-center justify-center">
+                        {selecting ? (
+                          <label className="flex h-11 w-11 cursor-pointer items-center justify-center">
+                            <input type="checkbox" checked={selected} onChange={() => toggleSelected(script.id)} aria-label={`Select ${script.title}`} className="h-5 w-5 cursor-pointer accent-blue-600" />
+                          </label>
+                        ) : (
+                          <>
+                            <span className={`flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br transition pointer-fine:group-hover:opacity-0 ${topicVisual.gradientClass}`} aria-hidden="true">
+                              <topicVisual.Icon className="h-[18px] w-[18px]" />
+                            </span>
+                            <label className="absolute inset-0 hidden cursor-pointer items-center justify-center pointer-fine:group-hover:flex">
+                              <input type="checkbox" checked={selected} onChange={() => toggleSelected(script.id)} aria-label={`Select ${script.title}`} className="h-5 w-5 cursor-pointer accent-blue-600" />
+                            </label>
+                          </>
+                        )}
+                      </div>
 
-                    <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs font-medium">
-                      <span className={`inline-flex min-w-0 max-w-full items-center gap-1 rounded-lg px-2 py-1 ${channels.length > 0 ? "bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-200" : "bg-surface-sunken text-fg-4"}`} title={channels.join(" · ") || "No source channel saved"}>
-                        <VideoCameraIcon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                        <span className="truncate">{channels[0] || "No channel"}</span>
-                        {channels.length > 1 && <span className="shrink-0 opacity-70">+{channels.length - 1}</span>}
+                      {/* Title + one muted meta line (meta collapses into columns on wide screens). */}
+                      <button
+                        type="button"
+                        onClick={() => (selecting ? toggleSelected(script.id) : openProject(script))}
+                        className="min-w-0 cursor-pointer py-1 text-left after:absolute after:inset-0 after:content-['']"
+                      >
+                        <span className="line-clamp-2 break-words text-[15px] font-semibold leading-snug text-fg group-hover:text-accent lg:line-clamp-1">{script.title || "Untitled project"}</span>
+                        <span className="mt-0.5 block truncate text-xs text-fg-3 lg:hidden">{meta.join(" · ")}</span>
+                      </button>
+
+                      <span className="hidden min-w-0 items-center gap-1.5 truncate text-sm text-fg-2 lg:flex">
+                        <span className={`h-2 w-2 shrink-0 rounded-full bg-gradient-to-br ${topicVisual.gradientClass}`} aria-hidden="true" />
+                        <span className={`truncate ${topicValue ? "" : "text-fg-4"}`}>{topicValue || "No topic"}</span>
                       </span>
-                      <span className="inline-flex items-center gap-1 rounded-lg bg-surface-sunken px-2 py-1 text-fg-3">
-                        <LinkIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                        {clipCount} {clipCount === 1 ? "clip" : "clips"}
-                      </span>
-                    </div>
+                      <span className={`hidden truncate text-sm lg:block ${channels.length ? "text-fg-2" : "text-fg-4"}`} title={channels.join(" · ") || undefined}>{channelLabel || "—"}</span>
+                      <span className="hidden text-right text-sm tabular-nums text-fg-2 lg:block">{clipCount}</span>
+                      <span className="hidden text-sm tabular-nums text-fg-3 lg:block">{created}</span>
 
-                    <div className="mt-auto flex items-end gap-2 pt-4">
-                      <div className="min-w-0 flex-1">
-                        <ProjectTopicSelect ariaLabel={`Topic for ${script.title}`} value={getScriptTopicValue(script)} topics={topics} loading={topicsLoading} saving={savingTopicIds.has(script.id)} onChange={(nextTopic) => void changeProjectTopic(script, nextTopic)} />
+                      <div className="relative z-10 shrink-0">
+                        <StatusMenu value={status} onChange={(next) => void changeProjectStatus(script, next)} label={script.title} />
                       </div>
-                      <Button variant="secondary" size="icon" onClick={() => openProject(script)} aria-label={`Open ${script.title}`} title="Open project">
-                        <PencilSquareIcon className="h-4 w-4" />
-                      </Button>
-                      <Button variant="secondary" size="icon" onClick={() => void handleDelete(script.id)} aria-label={`Delete ${script.title}`} title="Delete project" className="text-rose-500 hover:text-rose-600">
-                        <TrashIcon className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+                      <div className="relative z-10 shrink-0">
+                        <ProjectRowMenu
+                          title={script.title}
+                          topicValue={topicValue}
+                          topics={topics}
+                          savingTopic={savingTopicIds.has(script.id)}
+                          onOpen={() => openProject(script)}
+                          onTopic={(nextTopic) => void changeProjectTopic(script, nextTopic)}
+                          onSelect={() => { setSelectMode(true); toggleSelected(script.id); }}
+                          onDelete={() => void handleDelete(script.id)}
+                        />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           )}
         </div>
       </main>
 
-      {selectedIds.length > 0 && (
-        <div className="app-selection-bar fixed inset-x-0 bottom-0 z-[80] border-t border-line bg-surface/95 p-4 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] backdrop-blur animate-in fade-in slide-in-from-bottom-2 duration-150">
-          <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
+      {selecting && (
+        <div className="app-selection-bar fixed inset-x-0 bottom-0 z-[80] border-t border-line bg-surface/95 p-3 shadow-[0_-5px_20px_rgba(0,0,0,0.08)] backdrop-blur animate-in fade-in slide-in-from-bottom-2 duration-150 sm:p-4">
+          <div className="mx-auto flex max-w-5xl items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-3">
               <span className="flex h-9 min-w-9 items-center justify-center rounded-full bg-blue-600 px-2 text-sm font-semibold text-white">{selectedIds.length}</span>
-              <p className="text-sm font-semibold text-fg">project{selectedIds.length === 1 ? "" : "s"} selected</p>
+              <p className="truncate text-sm font-semibold text-fg max-sm:hidden">selected</p>
             </div>
-            <div className="selection-actions">
-              <Button variant="ghost" size="md" onClick={toggleSelectAllVisible}>{allVisibleSelected ? "Unselect visible" : "Select all visible"}</Button>
-              <Button variant="secondary" size="md" onClick={() => setSelectedIds([])}><XMarkIcon className="h-4 w-4" /> Clear</Button>
-              <Button size="md" onClick={() => void handleBulkDelete()} className="bg-rose-600 text-white hover:bg-rose-700"><TrashIcon className="h-4 w-4" /> Delete selected</Button>
+            <div className="flex min-w-0 items-center gap-2">
+              <Button variant="ghost" onClick={toggleSelectAllVisible}>{allVisibleSelected ? "Unselect all" : "Select all"}</Button>
+              <Button variant="secondary" onClick={exitSelection} aria-label="Done selecting" className="max-sm:w-11 max-sm:px-0">
+                <XMarkIcon className="h-4 w-4" /> <span className="max-sm:hidden">Done</span>
+              </Button>
+              <Button variant="destructive" disabled={selectedIds.length === 0} onClick={() => void handleBulkDelete()}>
+                <TrashIcon className="h-4 w-4" /> Delete
+              </Button>
             </div>
           </div>
         </div>
@@ -1148,18 +1192,28 @@ const STATUS_META: Record<(typeof PROJECT_STATUSES)[number], { dot: string; pill
   Published: { dot: "bg-emerald-500", pill: "bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300" },
 };
 
+/** Should a popover open upward? True when the trigger sits too close to the bottom of the screen. */
+function shouldOpenUp(el: HTMLElement | null, menuHeight: number) {
+  if (!el) return false;
+  const rect = el.getBoundingClientRect();
+  // Leave room for the phone tab bar / selection bar at the bottom.
+  const bottomChrome = window.innerWidth < 1024 ? 140 : 24;
+  return rect.bottom + menuHeight > window.innerHeight - bottomChrome && rect.top > menuHeight;
+}
+
 function StatusMenu({ value, onChange, label }: { value: ScriptProject["status"]; onChange: (status: ScriptProject["status"]) => void; label: string }) {
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setOpen(false), []);
   useDismiss(boxRef, open, close);
+  const [up, setUp] = useState(false);
   const meta = STATUS_META[value] ?? STATUS_META.Draft;
 
   return (
-    <div ref={boxRef} className={`relative shrink-0 ${open ? "z-20" : ""}`}>
+    <div ref={boxRef} className={`relative shrink-0 ${open ? "z-30" : ""}`}>
       <button
         type="button"
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => { if (!open) setUp(shouldOpenUp(boxRef.current, 200)); setOpen(!open); }}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={`Status for ${label}: ${value}. Change status`}
@@ -1170,7 +1224,7 @@ function StatusMenu({ value, onChange, label }: { value: ScriptProject["status"]
         <ChevronDownIcon className={`h-3.5 w-3.5 transition ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1.5 w-40 rounded-2xl border border-line bg-surface p-1.5 shadow-2xl ring-1 ring-black/5 animate-in fade-in slide-in-from-top-1 duration-150 dark:ring-white/10" role="listbox" aria-label="Project status">
+        <div className={`absolute right-0 w-40 rounded-2xl border border-line bg-surface p-1.5 shadow-2xl ring-1 ring-black/5 animate-in fade-in duration-150 dark:ring-white/10 ${up ? "bottom-full mb-1.5 slide-in-from-bottom-1" : "top-full mt-1.5 slide-in-from-top-1"}`} role="listbox" aria-label="Project status">
           {PROJECT_STATUSES.map((status) => (
             <button
               key={status}
@@ -1184,6 +1238,92 @@ function StatusMenu({ value, onChange, label }: { value: ScriptProject["status"]
               {status === value && <CheckIcon className="h-4 w-4" />}
             </button>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** "⋯" menu on each project row: open, change topic, select, delete. */
+function ProjectRowMenu({
+  title,
+  topicValue,
+  topics,
+  savingTopic,
+  onOpen,
+  onTopic,
+  onSelect,
+  onDelete,
+}: {
+  title: string;
+  topicValue: string;
+  topics: VideoTheme[];
+  savingTopic: boolean;
+  onOpen: () => void;
+  onTopic: (topic: string) => void;
+  onSelect: () => void;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(boxRef, open, close);
+  const [up, setUp] = useState(false);
+  const choices = Array.from(new Set(topics.map((topic) => topic.title.trim()).filter(Boolean)));
+  if (topicValue && !choices.includes(topicValue)) choices.unshift(topicValue);
+  const item = "flex min-h-10 w-full cursor-pointer items-center gap-2.5 rounded-xl px-2.5 text-left text-sm font-medium transition pointer-coarse:min-h-11";
+
+  return (
+    <div ref={boxRef} className={`relative ${open ? "z-30" : ""}`}>
+      <button
+        type="button"
+        onClick={() => { if (!open) setUp(shouldOpenUp(boxRef.current, 380)); setOpen(!open); }}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`More actions for ${title}`}
+        className="touch-target flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-fg-4 transition hover:bg-surface-sunken hover:text-fg"
+      >
+        {savingTopic ? <ArrowPathIcon className="h-4 w-4 animate-spin" /> : <EllipsisHorizontalIcon className="h-5 w-5" />}
+      </button>
+      {open && (
+        <div
+          role="menu"
+          aria-label={`Actions for ${title}`}
+          className={`absolute right-0 w-64 rounded-2xl border border-line bg-surface p-1.5 shadow-2xl ring-1 ring-black/5 animate-in fade-in duration-150 dark:ring-white/10 ${up ? "bottom-full mb-1.5 slide-in-from-bottom-1" : "top-full mt-1.5 slide-in-from-top-1"}`}
+        >
+          <button type="button" role="menuitem" onClick={() => { setOpen(false); onOpen(); }} className={`${item} text-fg hover:bg-surface-sunken`}>
+            <PencilSquareIcon className="h-4 w-4 text-fg-3" /> Open project
+          </button>
+          <button type="button" role="menuitem" onClick={() => { setOpen(false); onSelect(); }} className={`${item} text-fg hover:bg-surface-sunken`}>
+            <CheckCircleIcon className="h-4 w-4 text-fg-3" /> Select
+          </button>
+          <div className="my-1.5 border-t border-line-soft" />
+          <p className="px-2.5 pb-1 pt-0.5 text-[11px] font-semibold uppercase tracking-wider text-fg-4">Topic</p>
+          <div className="max-h-48 overflow-y-auto">
+            {["", ...choices].map((choice) => {
+              const active = choice === topicValue;
+              const visual = getTopicVisual(choice || "No topic");
+              return (
+                <button
+                  key={choice || "none"}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={active}
+                  disabled={savingTopic}
+                  onClick={() => { setOpen(false); if (!active) onTopic(choice); }}
+                  className={`${item} ${active ? "bg-surface-sunken text-fg" : "text-fg-2 hover:bg-surface-sunken"} disabled:cursor-wait disabled:opacity-60`}
+                >
+                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full bg-gradient-to-br ${visual.gradientClass}`} aria-hidden="true" />
+                  <span className={`min-w-0 flex-1 truncate ${choice ? "" : "text-fg-3"}`}>{choice || "No topic"}</span>
+                  {active && <CheckIcon className="h-4 w-4 shrink-0" />}
+                </button>
+              );
+            })}
+          </div>
+          <div className="my-1.5 border-t border-line-soft" />
+          <button type="button" role="menuitem" onClick={() => { setOpen(false); onDelete(); }} className={`${item} text-rose-600 hover:bg-danger-soft dark:text-rose-300`}>
+            <TrashIcon className="h-4 w-4" /> Delete project
+          </button>
         </div>
       )}
     </div>

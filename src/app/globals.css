@@ -419,10 +419,23 @@ html[data-tabbar="on"] .app-selection-bar {
   :root { --app-sticky-top: 8px; }
 }
 
-.project-grid {
+/* Short Projects list: icon · title(+meta) · status · menu on phones and tablets;
+   aligned columns (topic, source, clips, created) on wide screens. */
+.shorts-row {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
-  gap: 16px;
+  grid-template-columns: 44px minmax(0, 1fr) auto auto;
+  align-items: center;
+  column-gap: 10px;
+}
+
+.shorts-head { display: none; }
+
+@media (min-width: 1024px) {
+  .shorts-head { display: grid; }
+  .shorts-row {
+    grid-template-columns: 44px minmax(0, 2.6fr) minmax(0, 1.3fr) minmax(0, 1.1fr) 3rem 4.25rem 7.25rem 2.75rem;
+    column-gap: 16px;
+  }
 }
 
 .touch-reveal:focus-within {
