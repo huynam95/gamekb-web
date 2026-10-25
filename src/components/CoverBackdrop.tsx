@@ -17,7 +17,7 @@ type CoverBackdropProps = {
 
 const fallbackStyle = {
   background:
-    "radial-gradient(circle at 28% 18%, rgba(148, 163, 184, 0.22), transparent 30%), linear-gradient(135deg, #0f172a 0%, #111827 48%, #020617 100%)",
+    "radial-gradient(circle at 28% 18%, rgba(96, 95, 215, 0.28), transparent 34%), linear-gradient(135deg, #17162d 0%, #1a1932 48%, #0b0a1c 100%)",
 };
 
 export function CoverBackdrop({

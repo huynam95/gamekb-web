@@ -19,6 +19,6 @@ export const config = {
   matcher: [
     // _next/image is deliberately NOT excluded: only signed-in users may use the image optimiser.
     // The web-app manifest and home-screen icons must load before signing in.
-    "/((?!login|api/auth|_next/static|favicon.ico|manifest.webmanifest|apple-icon.png|icon-192.png|icon-512.png).*)",
+    "/((?!login|api/auth|_next/static|favicon.ico|manifest.webmanifest|apple-icon.png|icon-192.png|icon-512.png|icon-maskable-512.png).*)",
   ],
 };

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState, type ComponentType, type SVGProps } from "react";
 import {
@@ -22,6 +23,7 @@ import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Modal, ModalBody, ModalHeader } from "@/components/ui/Modal";
 import type { Group } from "@/types/gamekb";
+import logoImage from "@/assets/ninjaplay-logo.webp";
 
 type ActivePage = "ideas" | "dashboard" | "scripts" | "audienceRequests" | "longVideos" | "addGame" | "addIdea" | "migrate";
 
@@ -75,15 +77,27 @@ function navClass(active: boolean, compact: boolean) {
     ? "min-h-11 rounded-xl border px-3 py-2 text-sm"
     : "rounded-xl px-3.5 py-2.5 text-sm";
   const state = active
-    ? `bg-slate-900 text-white shadow-sm dark:bg-white dark:text-slate-950 ${compact ? "border-slate-900 dark:border-white" : ""}`
+    ? `bg-blue-600 text-white shadow-sm shadow-blue-600/25 ${compact ? "border-blue-600" : ""}`
     : `text-fg-3 hover:bg-surface-sunken hover:text-fg ${compact ? "border-line bg-surface" : ""}`;
   return `flex w-full min-w-0 cursor-pointer items-center gap-3 text-left font-semibold transition ${shape} ${state}`;
 }
 
-function Logo({ className = "" }: { className?: string }) {
+function Logo({ size = "md" }: { size?: "sm" | "md" }) {
+  const small = size === "sm";
   return (
-    <Link href="/" className={`shrink-0 font-black tracking-tighter text-fg ${className}`}>
-      GameKB<span className="text-blue-500">.</span>
+    <Link href="/" className="flex shrink-0 items-center gap-2.5 rounded-full" aria-label="NinjaPlay home">
+      <Image
+        src={logoImage}
+        alt=""
+        width={small ? 32 : 40}
+        height={small ? 32 : 40}
+        priority
+        unoptimized
+        className={`${small ? "h-8 w-8" : "h-10 w-10"} rounded-full ring-2 ring-blue-600/25 dark:ring-brand-cyan/40`}
+      />
+      <span className={`${small ? "text-lg" : "text-xl"} font-black tracking-tight text-fg`}>
+        Ninja<span className="text-blue-600 dark:text-brand-cyan">Play</span>
+      </span>
     </Link>
   );
 }
@@ -311,8 +325,8 @@ export function AppSidebar({
       {/* Phone and tablet: slim top bar for orientation; navigation lives in the bottom tab bar. */}
       <header className="app-mobile-nav sticky top-0 z-50 border-b border-line bg-surface/90 backdrop-blur-md">
         <div className="flex h-14 items-center justify-between gap-3 px-4">
-          <div className="flex min-w-0 items-baseline gap-2">
-            <Logo className="text-xl" />
+          <div className="flex min-w-0 items-center gap-2">
+            <Logo size="sm" />
             {currentLabel && <span className="min-w-0 truncate text-sm font-medium text-fg-3">/ {currentLabel}</span>}
           </div>
           {showThemeToggle && <ThemeToggle variant="compact" />}
@@ -378,7 +392,7 @@ export function AppSidebar({
 
       <aside className="app-sidebar fixed inset-y-0 left-0 z-20 flex-col border-r border-line bg-surface">
         <div className="flex h-20 shrink-0 items-center px-6">
-          <Logo className="text-2xl" />
+          <Logo />
         </div>
 
         <div className="flex-1 space-y-6 overflow-y-auto px-4 pb-4">

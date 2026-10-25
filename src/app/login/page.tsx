@@ -2,8 +2,10 @@
 "use client";
 
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import logoImage from "@/assets/ninjaplay-logo-lg.webp";
 
 export default function LoginPage() {
   const [pass, setPass] = useState("");
@@ -33,49 +35,51 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-900 p-4">
-      {/* Background Pattern */}
-      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20" />
-      <div className="absolute inset-0 bg-gradient-to-b from-slate-900/50 to-slate-900 pointer-events-none" />
+    <main className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-[#0b0a1c] p-4">
+      {/* Indigo and cyan glow, the colours of the channel avatar. */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_30%,rgba(96,95,215,0.45),transparent_55%),radial-gradient(circle_at_80%_90%,rgba(46,250,254,0.12),transparent_45%)]" />
 
-      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-xl animate-in zoom-in-95 duration-500">
-        
-        <div className="mb-8 text-center">
-          <h1 className="bg-gradient-to-r from-slate-100 to-slate-500 bg-clip-text text-3xl font-black text-transparent">
-            Restricted Area
+      <div className="relative z-10 w-full max-w-sm rounded-3xl border border-white/10 bg-white/5 p-8 shadow-2xl shadow-black/40 backdrop-blur-xl animate-in zoom-in-95 duration-500">
+        <div className="mb-8 flex flex-col items-center text-center">
+          <Image
+            src={logoImage}
+            alt="NinjaPlay"
+            width={112}
+            height={112}
+            priority
+            unoptimized
+            className="h-28 w-28 rounded-full shadow-[0_0_0_3px_rgba(46,250,254,0.55),0_0_40px_rgba(96,95,215,0.6)]"
+          />
+          <h1 className="mt-5 text-3xl font-black tracking-tight text-white">
+            Ninja<span className="text-brand-cyan">Play</span>
           </h1>
-          <p className="mt-2 text-sm text-fg-4">Enter access code to continue.</p>
+          <p className="mt-2 text-sm text-[#9a9aba]">Enter your access code to continue.</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <input
-              type="password"
-              value={pass}
-              onChange={(e) => setPass(e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-center text-lg font-bold text-white placeholder:text-slate-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition tracking-wider"
-              placeholder="••••••••"
-              autoFocus
-            />
-          </div>
+          <input
+            type="password"
+            value={pass}
+            onChange={(e) => setPass(e.target.value)}
+            className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-center text-lg font-bold tracking-wider text-white outline-none transition placeholder:text-[#4f4f70] focus:border-brand-cyan focus:ring-1 focus:ring-brand-cyan"
+            placeholder="••••••••"
+            aria-label="Access code"
+            autoFocus
+          />
 
           {err && (
-            <div className="rounded-lg bg-rose-500/20 p-3 text-center text-xs font-bold text-rose-300 border border-rose-500/30">
+            <div className="rounded-lg border border-rose-500/30 bg-rose-500/20 p-3 text-center text-xs font-bold text-rose-300">
               <ExclamationTriangleIcon className="mr-1 inline h-4 w-4 align-[-3px]" aria-hidden="true" />{err}
             </div>
           )}
 
           <button
             disabled={loading}
-            className="w-full rounded-xl bg-surface-sunken py-3 text-sm font-bold text-fg shadow-lg hover:bg-white dark:hover:bg-surface-sunken hover:scale-[1.02] disabled:opacity-70 disabled:hover:scale-100 transition active:scale-[0.98]"
+            className="w-full cursor-pointer rounded-xl bg-gradient-to-r from-[#605fd7] to-[#4f4ec0] py-3 text-sm font-bold text-white shadow-lg shadow-[#605fd7]/30 transition hover:brightness-110 active:scale-[0.98] disabled:opacity-70"
           >
-            {loading ? "Verifying..." : "Unlock System"}
+            {loading ? "Verifying..." : "Unlock"}
           </button>
         </form>
-
-        <div className="mt-6 text-center text-[11px] text-fg-2 uppercase tracking-wider">
-          GameKB Secure Server
-        </div>
       </div>
     </main>
   );

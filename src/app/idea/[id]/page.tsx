@@ -450,7 +450,7 @@ export default function IdeaDetailPage() {
   }
 
   useEffect(() => { loadAll(); }, [id]);
-  useEffect(() => { if (detail) document.title = `${detail.title} | GameKB`; }, [detail]);
+  useEffect(() => { if (detail) document.title = `${detail.title} | NinjaPlay`; }, [detail]);
 
   // Actions 
   async function togglePin() { if (!detail) return; const newPinned = !detail.pinned; await supabase.from("details").update({ pinned: newPinned, pinned_at: newPinned ? new Date().toISOString() : null }).eq("id", detail.id); await loadAll(); }

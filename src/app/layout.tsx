@@ -19,12 +19,12 @@ const appMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "GameKB",
-  description: "Gaming idea database for NinjaPlay",
-  // "Add to Home Screen" on iPhone opens GameKB full-screen like an app.
+  title: { default: "NinjaPlay", template: "%s | NinjaPlay" },
+  description: "Video idea database for the NinjaPlay channel",
+  // "Add to Home Screen" on iPhone opens NinjaPlay full-screen like an app.
   appleWebApp: {
     capable: true,
-    title: "GameKB",
+    title: "NinjaPlay",
     statusBarStyle: "default",
   },
   formatDetection: { telephone: false, date: false, address: false, email: false },
@@ -36,8 +36,8 @@ export const viewport: Viewport = {
   viewportFit: "cover",
   // Safari's status bar and toolbar tint follow the page background.
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f8fafc" },
-    { media: "(prefers-color-scheme: dark)", color: "#020617" },
+    { media: "(prefers-color-scheme: light)", color: "#f4f4fb" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b0a1c" },
   ],
 };
 

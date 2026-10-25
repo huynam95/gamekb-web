@@ -5,52 +5,89 @@
 /* Semantic colour tokens. Components use these (bg-surface, text-fg-3,
    border-line, ...) so light and dark mode switch from one place instead of
    overriding individual Tailwind classes with !important. */
+/* NinjaPlay palette, taken from the channel avatar: indigo #605fd7,
+   lavender #b0afeb, deep indigo #3a3981, neon cyan #2efafe and ink. */
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --background: #f4f4fb;
+  --foreground: #17162d;
   --surface: #ffffff;
-  --surface-muted: #f8fafc;
-  --surface-hover: #f8fafc;
-  --surface-sunken: #f1f5f9;
-  --surface-strong: #e2e8f0;
-  --fg: #0f172a;
-  --fg-2: #334155;
-  --fg-3: #64748b;
-  --fg-4: #94a3b8;
-  --line-soft: #f1f5f9;
-  --line: #e2e8f0;
-  --line-strong: #cbd5e1;
-  --accent: #2563eb;
-  --accent-soft: #eff6ff;
-  --accent-line: #bfdbfe;
+  --surface-muted: #f7f7fc;
+  --surface-hover: #f5f5fc;
+  --surface-sunken: #eeeef8;
+  --surface-strong: #e1e1ef;
+  --fg: #17162d;
+  --fg-2: #3b3a59;
+  --fg-3: #67678a;
+  --fg-4: #9696b6;
+  --line-soft: #eeeef8;
+  --line: #e1e1ef;
+  --line-strong: #c9c9df;
+  --accent: #5352cc;
+  --accent-soft: #f0f0fd;
+  --accent-line: #cdccf6;
+  --brand-glow: #0bb8c9;
   --danger-soft: #fff1f2;
-  --scrollbar: #cbd5e1;
-  --selection: rgba(37, 99, 235, 0.18);
+  --scrollbar: #c9c9df;
+  --selection: rgba(96, 95, 215, 0.2);
   color-scheme: light;
 }
 
 .dark {
-  --background: #020617;
-  --foreground: #e2e8f0;
-  --surface: #0f172a;
-  --surface-muted: #111827;
-  --surface-hover: #1e293b;
-  --surface-sunken: #1e293b;
-  --surface-strong: #334155;
-  --fg: #f8fafc;
-  --fg-2: #cbd5e1;
-  --fg-3: #94a3b8;
-  --fg-4: #64748b;
-  --line-soft: #1e293b;
-  --line: #334155;
-  --line-strong: #475569;
-  --accent: #60a5fa;
-  --accent-soft: rgba(37, 99, 235, 0.16);
-  --accent-line: rgba(96, 165, 250, 0.35);
+  --background: #0b0a1c;
+  --foreground: #e1e1ef;
+  --surface: #16152c;
+  --surface-muted: #1a1932;
+  --surface-hover: #24233f;
+  --surface-sunken: #22213c;
+  --surface-strong: #383758;
+  --fg: #f6f6fc;
+  --fg-2: #c9c9df;
+  --fg-3: #9a9aba;
+  --fg-4: #6b6b8f;
+  --line-soft: #22213c;
+  --line: #34335a;
+  --line-strong: #4a4970;
+  --accent: #a5a4f3;
+  --accent-soft: rgba(96, 95, 215, 0.2);
+  --accent-line: rgba(165, 164, 243, 0.35);
+  --brand-glow: #2efafe;
   --danger-soft: rgba(225, 29, 72, 0.16);
-  --scrollbar: #334155;
-  --selection: rgba(96, 165, 250, 0.22);
+  --scrollbar: #383758;
+  --selection: rgba(46, 250, 254, 0.18);
   color-scheme: dark;
+}
+
+/* Re-tint Tailwind's blue and slate scales so every existing blue-* / slate-*
+   class picks up the brand without touching each component. */
+@theme {
+  --color-blue-50: #f2f2fd;
+  --color-blue-100: #e5e5fb;
+  --color-blue-200: #cdccf6;
+  --color-blue-300: #b0afeb;
+  --color-blue-400: #8f8ee6;
+  --color-blue-500: #6f6edd;
+  --color-blue-600: #605fd7;
+  --color-blue-700: #4f4ec0;
+  --color-blue-800: #41409f;
+  --color-blue-900: #3a3981;
+  --color-blue-950: #21204b;
+
+  --color-slate-50: #f7f7fc;
+  --color-slate-100: #eeeef8;
+  --color-slate-200: #e1e1ef;
+  --color-slate-300: #c9c9df;
+  --color-slate-400: #9a9aba;
+  --color-slate-500: #67678a;
+  --color-slate-600: #4f4f70;
+  --color-slate-700: #3b3a59;
+  --color-slate-800: #26253f;
+  --color-slate-900: #17162d;
+  --color-slate-950: #0b0a1c;
+
+  --color-brand: #605fd7;
+  --color-brand-lavender: #b0afeb;
+  --color-brand-deep: #3a3981;
+  --color-brand-cyan: #2efafe;
 }
 
 @theme inline {
@@ -71,6 +108,7 @@
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
   --color-accent-line: var(--accent-line);
+  --color-brand-glow: var(--brand-glow);
   --color-danger-soft: var(--danger-soft);
   --font-sans: var(--font-app-sans, Inter), Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   --font-mono: var(--font-app-mono, ui-monospace), ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -236,7 +274,7 @@ input[type="search"]::-webkit-search-decoration {
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--fg-2);
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 1px 3px rgba(23, 22, 45, 0.12);
   transition: background-color 150ms, color 150ms;
 }
 
@@ -306,6 +344,7 @@ html[data-tabbar="on"] .app-selection-bar {
 
 .app-tab:active { background: var(--surface-sunken); }
 .app-tab.is-active { color: var(--accent); }
+.dark .app-tab.is-active { color: var(--brand-glow); }
 
 .app-tab-add {
   display: flex;
@@ -314,12 +353,12 @@ html[data-tabbar="on"] .app-selection-bar {
   align-items: center;
   justify-content: center;
   border-radius: 12px;
-  background: var(--fg);
-  color: var(--surface);
-  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.18);
+  background: linear-gradient(135deg, #605fd7, #3a3981);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(96, 95, 215, 0.35);
 }
 
-.app-tab.is-add.is-active .app-tab-add { background: var(--accent); color: #fff; }
+.app-tab.is-add.is-active .app-tab-add { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--brand-glow); }
 
 /* ---------- Dialogs become bottom sheets on phones ---------- */
 .sheet-handle { display: none; }
@@ -406,7 +445,7 @@ html[data-tabbar="on"] .app-selection-bar {
   z-index: 30;
   flex-wrap: wrap;
   padding-block: 8px;
-  background: #020617;
+  background: #0b0a1c;
 }
 
 
