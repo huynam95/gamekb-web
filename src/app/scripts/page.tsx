@@ -643,7 +643,7 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh, topics,
                   <button
                     type="button"
                     onClick={copyWholeScript}
-                    className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-black dark:bg-blue-600 dark:hover:bg-blue-700"
+                    className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white pointer-coarse:min-h-11 shadow-sm transition hover:bg-black dark:bg-blue-600 dark:hover:bg-blue-700"
                   >
                     <DocumentDuplicateIcon className="h-4 w-4" /> Copy Script
                   </button>
@@ -963,7 +963,7 @@ export default function ScriptsPage() {
     <div className={`${appPageRootClass} xl:flex`}>
       <ScriptEditorModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} script={editingScript} onSave={handleUpdate} onRefresh={refreshScriptProject} topics={topics} topicsLoading={topicsLoading} topicsError={topicsError} onRetryTopics={retryTopics} />
 
-      <AppSidebar activePage="scripts" />
+      <AppSidebar activePage="scripts" hideTabBar={selectedIds.length > 0} />
 
       <main className={`${appPageMainClass} pb-32`}>
         <div className="app-container">
@@ -1069,12 +1069,15 @@ export default function ScriptsPage() {
                         <span className={`flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br shadow-sm ${topicVisual.gradientClass}`} aria-hidden="true">
                           <topicVisual.Icon className="h-5 w-5" />
                         </span>
-                        <label className={`absolute -left-1.5 -top-1.5 flex h-6 w-6 cursor-pointer items-center justify-center rounded-full border bg-surface shadow-sm transition ${selected || selectedIds.length > 0 ? "opacity-100" : "touch-reveal opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"} ${selected ? "border-blue-500" : "border-line-strong"}`}>
-                          <input type="checkbox" checked={selected} onChange={() => toggleSelected(script.id)} aria-label={`Select ${script.title}`} className="h-3.5 w-3.5 cursor-pointer accent-blue-600" />
+                        {/* 44px tap area around a small round checkbox (it sits on the topic icon). */}
+                        <label className={`absolute -left-3 -top-3 flex h-11 w-11 cursor-pointer items-center justify-center transition ${selected || selectedIds.length > 0 ? "opacity-100" : "touch-reveal opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"}`}>
+                          <span className={`flex h-6 w-6 items-center justify-center rounded-full border bg-surface shadow-sm ${selected ? "border-blue-500" : "border-line-strong"}`}>
+                            <input type="checkbox" checked={selected} onChange={() => toggleSelected(script.id)} aria-label={`Select ${script.title}`} className="h-4 w-4 cursor-pointer accent-blue-600" />
+                          </span>
                         </label>
                       </div>
                       <div className="min-w-0 flex-1">
-                        <button type="button" onClick={() => openProject(script)} className="block w-full cursor-pointer text-left">
+                        <button type="button" onClick={() => openProject(script)} className="block min-h-11 w-full cursor-pointer text-left">
                           <h2 className="line-clamp-2 break-words text-base font-semibold leading-snug text-fg group-hover:text-accent">{script.title || "Untitled project"}</h2>
                         </button>
                         <p className="mt-1 text-xs text-fg-4">{new Date(script.created_at).toLocaleDateString("vi-VN")}</p>
@@ -1160,7 +1163,7 @@ function StatusMenu({ value, onChange, label }: { value: ScriptProject["status"]
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={`Status for ${label}: ${value}. Change status`}
-        className={`inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full pl-2.5 pr-2 text-xs font-semibold transition hover:brightness-95 ${meta.pill}`}
+        className={`inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full pl-2.5 pr-2 text-xs font-semibold transition hover:brightness-95 pointer-coarse:h-10 pointer-coarse:pl-3 ${meta.pill}`}
       >
         <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} aria-hidden="true" />
         {value}
@@ -1175,7 +1178,7 @@ function StatusMenu({ value, onChange, label }: { value: ScriptProject["status"]
               role="option"
               aria-selected={status === value}
               onClick={() => { onChange(status); setOpen(false); }}
-              className={`flex h-9 w-full cursor-pointer items-center justify-between rounded-xl px-2.5 text-left text-sm font-medium transition ${status === value ? "bg-surface-sunken text-fg" : "text-fg-2 hover:bg-surface-sunken"}`}
+              className={`flex h-9 w-full cursor-pointer items-center justify-between rounded-xl px-2.5 text-left text-sm font-medium transition pointer-coarse:h-11 ${status === value ? "bg-surface-sunken text-fg" : "text-fg-2 hover:bg-surface-sunken"}`}
             >
               <span className="flex items-center gap-2"><span className={`h-2 w-2 rounded-full ${STATUS_META[status].dot}`} aria-hidden="true" />{status}</span>
               {status === value && <CheckIcon className="h-4 w-4" />}

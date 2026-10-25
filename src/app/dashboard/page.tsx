@@ -12,15 +12,21 @@ import type { DetailRow, Game, ScriptProject } from "@/types/gamekb";
 
 /* ================= COMPONENTS ================= */
 
+const STAT_TONES: Record<string, string> = {
+  "bg-blue-500": "bg-blue-500/10 text-blue-600 dark:text-blue-300",
+  "bg-emerald-500": "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300",
+  "bg-purple-500": "bg-purple-500/10 text-purple-600 dark:text-purple-300",
+};
+
 function StatCard({ title, value, icon: Icon, color }: { title: string, value: number, icon: any, color: string }) {
   return (
-    <div className="flex items-center gap-4 rounded-[1.5rem] border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700">
-      <div className={`p-4 rounded-xl ${color} bg-opacity-10`}>
-         <Icon className={`w-8 h-8 ${color.replace('bg-', 'text-')}`} />
+    <div className="flex min-w-0 flex-col gap-2 rounded-2xl border border-line bg-surface p-3 shadow-sm transition hover:border-line-strong sm:flex-row sm:items-center sm:gap-4 sm:rounded-[1.5rem] sm:p-5">
+      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl sm:h-14 sm:w-14 ${STAT_TONES[color] ?? "bg-surface-sunken text-fg-2"}`}>
+         <Icon className="h-5 w-5 sm:h-7 sm:w-7" aria-hidden="true" />
       </div>
-      <div>
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-fg-4">{title}</p>
-        <h4 className="text-3xl font-black text-slate-900 dark:text-slate-100">{value}</h4>
+      <div className="flex min-w-0 flex-col">
+        <h4 className="text-2xl font-black tabular-nums text-fg sm:order-2 sm:text-3xl">{value}</h4>
+        <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-fg-4 sm:order-1">{title}</p>
       </div>
     </div>
   );
@@ -107,7 +113,7 @@ export default function Dashboard() {
          </div>
       )}
 
-      <AppSidebar activePage="dashboard" />
+      <AppSidebar activePage="dashboard" hideTabBar={isSelectMode} />
 
       <main className={`${appPageMainClass} pb-32`}>
         <div className={appPageContainerClass}>
@@ -118,10 +124,10 @@ export default function Dashboard() {
              action={<button onClick={() => { setIsSelectMode(!isSelectMode); setSelectedIds([]); }} className={`h-10 cursor-pointer rounded-xl border px-4 text-sm font-bold transition ${isSelectMode ? "border-blue-200 bg-blue-50 text-blue-600 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-300 dark:hover:bg-slate-800"}`}>{isSelectMode ? "Exit Select" : "Select Mode"}</button>}
            />
 
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+           <div className="mb-8 grid grid-cols-3 gap-2 sm:mb-12 sm:gap-6">
               <StatCard title="Total Ideas" value={stats.total} icon={DocumentTextIcon} color="bg-blue-500" />
               <StatCard title="Total Games" value={stats.games} icon={PuzzlePieceIcon} color="bg-emerald-500" />
-              <StatCard title="Scripts Drafted" value={stats.scripts} icon={ChartBarIcon} color="bg-purple-500" />
+              <StatCard title="Scripts" value={stats.scripts} icon={ChartBarIcon} color="bg-purple-500" />
            </div>
 
            {pinnedIdeas.length > 0 && (

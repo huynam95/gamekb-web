@@ -18,6 +18,7 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     // _next/image is deliberately NOT excluded: only signed-in users may use the image optimiser.
-    "/((?!login|api/auth|_next/static|favicon.ico).*)",
+    // The web-app manifest and home-screen icons must load before signing in.
+    "/((?!login|api/auth|_next/static|favicon.ico|manifest.webmanifest|apple-icon.png|icon-192.png|icon-512.png).*)",
   ],
 };

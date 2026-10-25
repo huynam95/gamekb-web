@@ -109,8 +109,10 @@ body {
 /* Layout follows the available CSS viewport, including display scaling and zoom.
    iPad portrait uses the compact header; landscape has room for a slim sidebar. */
 :root {
-  /* Where sticky toolbars stop: below the compact top bar (68px + border) on phone/tablet. */
-  --app-sticky-top: calc(77px + env(safe-area-inset-top, 0px));
+  /* Where sticky toolbars stop: below the compact top bar (56px + border) on phone/tablet. */
+  --app-sticky-top: calc(64px + env(safe-area-inset-top, 0px));
+  /* Bottom tab bar on phone/tablet: 60px of buttons plus the iPhone home-indicator area. */
+  --app-tabbar-h: calc(60px + env(safe-area-inset-bottom, 0px));
   --app-sidebar-width: 0px;
   --app-content-max: 1600px;
   --app-library-max: 2400px;
@@ -120,6 +122,8 @@ body {
 html {
   -webkit-text-size-adjust: 100%;
   scroll-padding-top: 9rem;
+  /* No grey flash on tap in iOS Safari; buttons show their own pressed state. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 .app-shell {
@@ -129,7 +133,7 @@ html {
 .app-main {
   width: 100%;
   padding-left: var(--app-sidebar-width);
-  padding-bottom: calc(11rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(6rem + var(--app-tabbar-h));
 }
 
 .app-container {
@@ -162,10 +166,23 @@ html {
   gap: 20px;
 }
 
-/* Library toolbar: phone stacks, tablet uses two rows, wide screens one row. */
+@media (max-width: 639px) {
+  .idea-grid { gap: 12px; }
+}
+
+/* Library toolbar: phone is one row (search + Filters), tablet two rows, wide screens one row.
+   It stays stuck under the top bar while scrolling. */
 .library-toolbar {
-  position: relative;
+  position: sticky;
+  top: var(--app-sticky-top);
   z-index: 40;
+}
+
+/* Safari draws its own clear button in search fields; the app shows one already. */
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .library-filter-fields {
@@ -240,6 +257,101 @@ html {
   left: var(--app-sidebar-width);
   padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
   padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px));
+}
+
+/* When the bottom tab bar is showing, bottom action bars sit on top of it. */
+html[data-tabbar="on"] .app-selection-bar {
+  bottom: var(--app-tabbar-h);
+  padding-bottom: 12px;
+}
+
+/* ---------- Phone / tablet bottom tab bar ---------- */
+.app-tabbar {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 70;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  height: var(--app-tabbar-h);
+  padding: 4px max(8px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(8px, env(safe-area-inset-left, 0px));
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  backdrop-filter: saturate(180%) blur(16px);
+}
+
+.app-tab {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-radius: 14px;
+  color: var(--fg-4);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.1;
+  cursor: pointer;
+  transition: color 150ms, background-color 150ms;
+}
+
+.app-tab > span:last-child {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-tab:active { background: var(--surface-sunken); }
+.app-tab.is-active { color: var(--accent); }
+
+.app-tab-add {
+  display: flex;
+  height: 34px;
+  width: 46px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: var(--fg);
+  color: var(--surface);
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.18);
+}
+
+.app-tab.is-add.is-active .app-tab-add { background: var(--accent); color: #fff; }
+
+/* ---------- Dialogs become bottom sheets on phones ---------- */
+.sheet-handle { display: none; }
+
+@media (max-width: 639px) {
+  .modal-sheet.modal-overlay {
+    align-items: flex-end;
+    padding: env(safe-area-inset-top, 0px) 0 0;
+  }
+  .modal-sheet .modal-panel {
+    max-width: none;
+    margin: 0;
+    border-inline: 0;
+    border-bottom: 0;
+    border-radius: 24px 24px 0 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .modal-sheet .modal-panel.scroll-dialog { max-height: 92dvh; }
+  .modal-sheet .modal-panel.is-editor {
+    height: calc(100dvh - env(safe-area-inset-top, 0px));
+    border-radius: 20px 20px 0 0;
+  }
+  .modal-sheet .modal-panel .modal-footer > * { min-height: 44px; }
+  .sheet-handle {
+    display: block;
+    flex-shrink: 0;
+    width: 40px;
+    height: 5px;
+    margin: 8px auto -4px;
+    border-radius: 9999px;
+    background: var(--line-strong);
+  }
 }
 
 .selection-actions {
@@ -321,11 +433,15 @@ html {
   :root { --app-page-gutter: 24px; }
 }
 
+@media (max-width: 639px) {
+  .app-container { padding-top: 16px; }
+  /* iOS zooms the page when a focused field is under 16px. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  textarea,
+  select { font-size: max(1em, 16px); }
+}
+
 @media (min-width: 768px) {
-  .library-toolbar {
-    position: sticky;
-    top: var(--app-sticky-top);
-  }
   .library-filter-fields {
     grid-template-columns: repeat(12, minmax(0, 1fr));
   }
@@ -336,10 +452,11 @@ html {
 }
 
 @media (min-width: 1024px) {
-  :root { --app-sidebar-width: 224px; --app-page-gutter: 32px; --app-sticky-top: 12px; }
+  :root { --app-sidebar-width: 224px; --app-page-gutter: 32px; --app-sticky-top: 12px; --app-tabbar-h: 0px; }
   html { scroll-padding-top: 2rem; }
   .app-sidebar { display: flex; }
-  .app-mobile-nav { display: none; }
+  .app-mobile-nav, .app-tabbar { display: none; }
+  html[data-tabbar="on"] .app-selection-bar { bottom: 0; padding-bottom: max(16px, env(safe-area-inset-bottom, 0px)); }
   .app-container { padding-block: 32px; }
 }
 
@@ -361,8 +478,12 @@ html {
 @media (max-width: 639px) {
   .selection-actions { width: 100%; }
   .selection-actions > button { flex: 1 1 auto; justify-content: center; padding-inline: 12px; }
-  .detail-hero-nav { position: relative; flex-wrap: wrap; gap: 12px; padding: 16px; }
-  .detail-hero-actions { flex-wrap: wrap; }
+  .detail-hero-nav {
+    position: relative;
+    gap: 8px;
+    padding: max(12px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 12px max(16px, env(safe-area-inset-left, 0px));
+  }
+  .detail-hero-actions { flex-wrap: nowrap; gap: 8px; }
   .detail-hero-content { padding-top: 24px; }
 }
 
@@ -373,6 +494,6 @@ html {
   textarea,
   select { font-size: max(1em, 16px); }
   .touch-reveal { opacity: 1; }
-  .collection-action { display: flex; min-width: 36px; min-height: 36px; }
+  .collection-action { display: flex; min-width: 44px; min-height: 44px; }
   .touch-target { min-width: 44px; min-height: 44px; }
 }

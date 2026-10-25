@@ -25,24 +25,25 @@ export const appPagePrimaryActionClass = buttonClass({ variant: "primary", size:
 export function AppPageHeader({ title, description, icon, action, className = "" }: AppPageHeaderProps) {
   return (
     <header
-      className={`mb-7 flex flex-wrap gap-4 rounded-[1.75rem] border border-slate-200 bg-white/90 p-4 shadow-sm backdrop-blur sm:items-center sm:justify-between sm:p-5 dark:border-slate-800 dark:bg-slate-900/90 ${className}`}
+      className={`mb-5 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-line bg-surface/90 p-3.5 shadow-sm backdrop-blur sm:mb-7 sm:gap-4 sm:p-5 ${className}`}
     >
-      <div className="flex min-w-0 flex-[1_1_24rem] items-start gap-3.5">
+      <div className="flex min-w-0 flex-[1_1_14rem] items-center gap-3 sm:items-start sm:gap-3.5">
         {icon ? (
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 ring-1 ring-blue-100 dark:bg-blue-500/10 dark:text-blue-300 dark:ring-blue-500/20">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 ring-1 ring-blue-100 sm:h-11 sm:w-11 dark:bg-blue-500/10 dark:text-blue-300 dark:ring-blue-500/20">
             {icon}
           </div>
         ) : null}
         <div className="min-w-0">
-          <h1 className="break-words text-2xl font-black tracking-tight text-slate-950 sm:text-3xl dark:text-white">{title}</h1>
+          <h1 className="break-words text-[1.4rem] font-black leading-tight tracking-tight text-fg sm:text-3xl">{title}</h1>
+          {/* Phones show just the title; the description is context for larger screens. */}
           {description ? (
-            <div className="mt-1.5 max-w-3xl text-sm font-medium leading-6 text-slate-500 dark:text-slate-400">
+            <div className="mt-1.5 hidden max-w-3xl text-sm font-medium leading-6 text-fg-3 sm:block">
               {description}
             </div>
           ) : null}
         </div>
       </div>
-      {action ? <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">{action}</div> : null}
+      {action ? <div className="flex min-w-0 max-w-full shrink-0 flex-wrap items-center gap-2">{action}</div> : null}
     </header>
   );
 }

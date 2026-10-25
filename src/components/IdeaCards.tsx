@@ -347,7 +347,7 @@ export function ScriptEditorModal({
                           draggable={false}
                           onPointerDown={(event) => event.stopPropagation()}
                           onClick={(event) => { event.stopPropagation(); removeIdea(idea.id); }}
-                          className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-xl text-slate-300 transition hover:bg-rose-50 hover:text-rose-500 dark:text-slate-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-300"
+                          className="touch-target flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-xl text-slate-300 transition hover:bg-rose-50 hover:text-rose-500 dark:text-slate-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-300"
                           title="Remove idea, script, and footage links"
                           aria-label={`Remove ${idea.title} from script`}
                         >
@@ -368,7 +368,7 @@ export function ScriptEditorModal({
                   <button
                     type="button"
                     onClick={copyWholeScript}
-                    className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-black dark:bg-blue-600 dark:hover:bg-blue-700"
+                    className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white pointer-coarse:min-h-11 shadow-sm transition hover:bg-black dark:bg-blue-600 dark:hover:bg-blue-700"
                   >
                     <DocumentDuplicateIcon className="h-4 w-4" /> Copy Script
                   </button>
@@ -529,7 +529,7 @@ export function IdeaItem({
   const primaryChannel = channelNames[0];
 
   return (
-    <li onClick={() => isSelectMode && onToggleSelect(r)} className={`group relative h-64 w-full overflow-hidden rounded-2xl border bg-slate-900 shadow-sm transition-shadow duration-150 ${isSelectMode ? "cursor-pointer active:scale-[0.99]" : "hover:shadow-xl"} ${isSelected ? "border-blue-500 ring-2 ring-blue-500 ring-offset-2 ring-offset-background" : "border-line"}`}>
+    <li onClick={() => isSelectMode && onToggleSelect(r)} className={`group relative h-56 w-full overflow-hidden rounded-2xl border bg-slate-900 sm:h-64 shadow-sm transition-shadow duration-150 ${isSelectMode ? "cursor-pointer active:scale-[0.99]" : "hover:shadow-xl"} ${isSelected ? "border-blue-500 ring-2 ring-blue-500 ring-offset-2 ring-offset-background" : "border-line"}`}>
       <div className={`absolute inset-0 transition-opacity duration-150 ${isSelectMode ? "" : "group-hover:opacity-75"}`}>
         <CoverBackdrop src={game?.cover_url} alt="" imageClassName="opacity-60" priority={priority} />
       </div>
@@ -570,7 +570,7 @@ export function IdeaItem({
           <div className="relative z-20 mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-white/65">
             <span className="truncate max-w-[80%]">{game?.title}</span>
             {!isSelectMode && game && (
-              <button onClick={(event) => { event.stopPropagation(); onEditGame(game); }} className="touch-reveal cursor-pointer rounded p-1 text-white/60 opacity-0 transition-opacity hover:bg-white/20 hover:text-white group-hover:opacity-100 group-focus-within:opacity-100" type="button" aria-label={`Edit ${game.title}`} title="Edit game info">
+              <button onClick={(event) => { event.stopPropagation(); onEditGame(game); }} className="touch-reveal -my-2 cursor-pointer rounded-lg p-1 text-white/60 opacity-0 transition-opacity hover:bg-white/20 hover:text-white group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:p-2.5" type="button" aria-label={`Edit ${game.title}`} title="Edit game info">
                 <PencilSquareIcon className="h-3 w-3" />
               </button>
             )}

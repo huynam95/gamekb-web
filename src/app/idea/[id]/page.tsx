@@ -10,7 +10,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { fetchYoutubeMetadata } from "@/lib/youtube";
 import { useNotifications } from "@/components/NotificationCenter";
 import { buildScriptGuide } from "@/lib/scriptGuide";
-import { CheckIcon, CloudArrowDownIcon, DocumentDuplicateIcon, DocumentPlusIcon, FilmIcon, FolderPlusIcon, GlobeAltIcon, HashtagIcon, PencilSquareIcon, PuzzlePieceIcon, StarIcon, TagIcon, VideoCameraIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { ArrowLeftIcon, CheckIcon, CloudArrowDownIcon, DocumentDuplicateIcon, DocumentPlusIcon, FilmIcon, FolderPlusIcon, GlobeAltIcon, HashtagIcon, PencilSquareIcon, PuzzlePieceIcon, StarIcon, TagIcon, TrashIcon, VideoCameraIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
 /* ================= TYPES ================= */
 
@@ -103,8 +103,8 @@ const btnBase =
 const btnGhost =
   btnBase + " border border-line bg-surface text-fg-2 shadow-sm hover:bg-surface-hover hover:text-fg";
 
-const btnGlass = 
-  "inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-white/10 bg-black/30 px-4 text-sm font-semibold text-white backdrop-blur-md hover:bg-black/50 transition shadow-sm";
+const btnGlass =
+  "inline-flex h-9 min-w-9 items-center justify-center gap-2 rounded-lg border border-white/10 bg-black/30 px-4 text-sm font-semibold text-white backdrop-blur-md hover:bg-black/50 transition shadow-sm max-sm:h-11 max-sm:min-w-11 max-sm:px-3";
 
 const cardClass = "rounded-2xl border border-line bg-surface p-6 shadow-sm";
 
@@ -149,7 +149,7 @@ function GroupAddPicker({ groups, onAdd, onCreate }: { groups: Group[]; onAdd: (
   }, []);
   return (
     <div ref={boxRef} className="relative">
-      <button type="button" className="text-xs font-semibold text-accent hover:underline uppercase tracking-wide" onClick={() => setOpen((v) => !v)}>+ Add Group</button>
+      <button type="button" className="-my-2 inline-flex min-h-10 cursor-pointer items-center rounded-lg px-2 text-xs font-semibold uppercase tracking-wide text-accent hover:bg-accent-soft" onClick={() => setOpen((v) => !v)}>+ Add Group</button>
       {open && (
         <div className="absolute right-0 top-full z-20 mt-2 w-64 rounded-xl border border-line bg-surface shadow-xl">
           <div className="p-2"><input className={inputClass} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search groups..." autoFocus /></div>
@@ -590,23 +590,23 @@ export default function IdeaDetailPage() {
 
          {/* Navigation Top */}
          <div className="detail-hero-nav absolute top-0 left-0 w-full p-6 flex justify-between items-start z-30">
-            <Link href="/" className={btnGlass}>← Home</Link>
+            <Link href="/" className={btnGlass} aria-label="Back to all ideas"><ArrowLeftIcon className="h-4 w-4" aria-hidden="true" /> <span className="max-sm:hidden">Home</span></Link>
             
             <div className="detail-hero-actions flex gap-2">
               {!editingCore && (
                 <>
                   <button onClick={() => setShowScriptModal(true)} className={btnGlass}>
-                    <FilmIcon className="h-4 w-4" aria-hidden="true" /> Add to Script
+                    <FilmIcon className="h-4 w-4" aria-hidden="true" /> <span className="max-sm:hidden">Add to Script</span><span className="sm:hidden">Script</span>
                   </button>
 
-                  <button onClick={togglePin} className={btnGlass}>
-                    {detail.pinned ? <><StarSolidIcon className="h-4 w-4 text-amber-300" aria-hidden="true" /> Pinned</> : <><StarIcon className="h-4 w-4" aria-hidden="true" /> Pin</>}
+                  <button onClick={togglePin} className={btnGlass} aria-pressed={!!detail.pinned} aria-label={detail.pinned ? "Unpin idea" : "Pin idea"}>
+                    {detail.pinned ? <><StarSolidIcon className="h-4 w-4 text-amber-300" aria-hidden="true" /> <span className="max-sm:hidden">Pinned</span></> : <><StarIcon className="h-4 w-4" aria-hidden="true" /> <span className="max-sm:hidden">Pin</span></>}
                   </button>
-                  <button onClick={() => setEditingCore(true)} className={btnGlass}>
-                    <PencilSquareIcon className="h-4 w-4" aria-hidden="true" /> Edit
+                  <button onClick={() => setEditingCore(true)} className={btnGlass} aria-label="Edit idea">
+                    <PencilSquareIcon className="h-4 w-4" aria-hidden="true" /> <span className="max-sm:hidden">Edit</span>
                   </button>
-                  <button onClick={deleteIdea} className="inline-flex h-9 items-center justify-center rounded-lg bg-rose-500/20 border border-rose-500/50 backdrop-blur-md px-4 text-sm font-semibold text-rose-100 hover:bg-rose-500 hover:text-white transition">
-                    Delete
+                  <button onClick={deleteIdea} aria-label="Delete idea" className="inline-flex h-9 min-w-9 items-center justify-center gap-2 rounded-lg bg-rose-500/20 border border-rose-500/50 backdrop-blur-md px-4 text-sm font-semibold text-rose-100 hover:bg-rose-500 hover:text-white transition max-sm:h-11 max-sm:min-w-11 max-sm:px-3">
+                    <TrashIcon className="h-4 w-4 sm:hidden" aria-hidden="true" /> <span className="max-sm:hidden">Delete</span>
                   </button>
                 </>
               )}
@@ -625,11 +625,11 @@ export default function IdeaDetailPage() {
 
          {/* Hero Content Container */}
          <div className="detail-hero-content relative z-20 mx-auto max-w-6xl px-6 pt-24 pb-12 md:pt-32">
-            <div className="flex flex-col gap-8 md:flex-row md:items-end">
+            <div className="flex flex-row items-end gap-4 sm:flex-col sm:items-stretch sm:gap-8 md:flex-row md:items-end">
                
                {/* 1. POSTER IMAGE (Điểm nhấn chính) */}
                <div className="shrink-0">
-                  <div className="relative h-64 w-44 md:h-80 md:w-56 overflow-hidden rounded-xl border border-white/10 shadow-2xl shadow-black/50 rotate-[-2deg] transition hover:rotate-0">
+                  <div className="relative h-36 w-24 overflow-hidden rounded-xl border border-white/10 shadow-2xl shadow-black/50 rotate-[-2deg] transition hover:rotate-0 sm:h-64 sm:w-44 md:h-80 md:w-56">
                      {game?.cover_url ? (
                         <CoverImage src={game.cover_url} alt={`${game.title} cover`} sizes="(min-width: 768px) 224px, 176px" priority />
                      ) : (
@@ -642,7 +642,7 @@ export default function IdeaDetailPage() {
 
                {/* 2. TEXT CONTENT */}
                <div className="min-w-0 flex-1 pb-2">
-                  <div className="mb-3 flex flex-wrap items-center gap-3 text-sm font-semibold uppercase tracking-wider text-blue-300">
+                  <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold uppercase tracking-wider text-blue-300 sm:mb-3 sm:text-sm">
                      <span>{game?.title}</span>
                      <span className="text-fg-3">•</span>
                      <span>{game?.release_year || "N/A"}</span>
@@ -665,7 +665,7 @@ export default function IdeaDetailPage() {
                      </div>
                   ) : (
                      <>
-                        <h1 className="text-3xl md:text-5xl font-black text-white drop-shadow-lg leading-tight mb-4">
+                        <h1 className="mb-3 text-2xl font-black leading-tight text-white drop-shadow-lg sm:mb-4 sm:text-3xl md:text-5xl">
                            {detail.title}
                         </h1>
 
@@ -719,7 +719,7 @@ export default function IdeaDetailPage() {
                             <div className="truncate text-xs text-fg-3">{renderLinkOrText(f.file_path)}</div>
                           </div>
                         </div>
-                        <button onClick={() => deleteFootage(f.id)} className="text-slate-300 hover:text-rose-500">×</button>
+                        <button onClick={() => deleteFootage(f.id)} className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-fg-4 hover:bg-danger-soft hover:text-rose-500 pointer-coarse:h-11 pointer-coarse:w-11" aria-label="Remove footage"><XMarkIcon className="h-4 w-4" /></button>
                       </div>
                       {/* Download Status */}
                       <div className="mt-2 pl-11">
@@ -747,7 +747,7 @@ export default function IdeaDetailPage() {
                         <GlobeAltIcon className="h-4 w-4 shrink-0 text-blue-500" aria-hidden="true" />
                         <div className="min-w-0 truncate font-medium text-fg-2">{renderLinkOrText(s.url)}</div>
                       </div>
-                      <button onClick={() => deleteSource(s.id)} className="text-slate-300 hover:text-rose-500">×</button>
+                      <button onClick={() => deleteSource(s.id)} className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-fg-4 hover:bg-danger-soft hover:text-rose-500 pointer-coarse:h-11 pointer-coarse:w-11" aria-label="Remove source"><XMarkIcon className="h-4 w-4" /></button>
                     </li>
                   ))}
               </ul>
@@ -767,7 +767,7 @@ export default function IdeaDetailPage() {
                    {ideaGroups.map(g => (
                      <span key={g.id} className="group inline-flex items-center gap-1 rounded-lg border border-line bg-surface-muted px-2 py-1 text-xs font-bold text-fg-2 hover:border-blue-300 hover:bg-accent-soft hover:text-blue-700 transition">
                        {g.name}
-                       <button onClick={() => removeFromGroup(g.id)} className="ml-1 text-slate-300 hover:text-rose-500">×</button>
+                       <button onClick={() => removeFromGroup(g.id)} className="-my-1 -mr-1 ml-0.5 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-fg-4 hover:text-rose-500 pointer-coarse:h-9 pointer-coarse:w-9" aria-label={`Remove from ${g.name}`}><XMarkIcon className="h-3.5 w-3.5" /></button>
                      </span>
                    ))}
                  </div>

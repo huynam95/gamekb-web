@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useRef, useState, type ComponentType, type SVGProps } from "react";
+import { useEffect, useState, type ComponentType, type SVGProps } from "react";
 import {
   Bars3Icon,
+  EllipsisHorizontalIcon,
   ChartBarIcon,
   ChatBubbleLeftRightIcon,
   CheckIcon,
@@ -19,7 +20,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { useDismiss } from "@/components/ui/useDismiss";
+import { Modal, ModalBody, ModalHeader } from "@/components/ui/Modal";
 import type { Group } from "@/types/gamekb";
 
 type ActivePage = "ideas" | "dashboard" | "scripts" | "audienceRequests" | "longVideos" | "addGame" | "addIdea" | "migrate";
@@ -44,6 +45,8 @@ type AppSidebarProps = {
   pinnedSelected?: boolean;
   pinnedCount?: number | null;
   showThemeToggle?: boolean;
+  /** Hide the phone/tablet bottom tab bar, e.g. while a selection bar takes its place. */
+  hideTabBar?: boolean;
 };
 
 type NavIconType = ComponentType<SVGProps<SVGSVGElement>>;
@@ -56,6 +59,15 @@ const navItems: Array<{ key: ActivePage; href: string; Icon: NavIconType; label:
   { key: "scripts", href: "/scripts", Icon: DocumentTextIcon, label: "Short Projects" },
   { key: "longVideos", href: "/long-videos", Icon: FilmIcon, label: "Long Video Studio" },
   { key: "audienceRequests", href: "/audience-requests", Icon: ChatBubbleLeftRightIcon, label: "Audience Requests" },
+];
+
+/** Bottom tab bar on phones and tablets; everything else is under "More". */
+const tabItems: Array<{ key: ActivePage | "more"; href: string; Icon: NavIconType; label: string }> = [
+  { key: "ideas", href: "/", Icon: Squares2X2Icon, label: "Ideas" },
+  { key: "scripts", href: "/scripts", Icon: DocumentTextIcon, label: "Shorts" },
+  { key: "addIdea", href: "/add", Icon: PlusIcon, label: "Add" },
+  { key: "longVideos", href: "/long-videos", Icon: FilmIcon, label: "Long video" },
+  { key: "more", href: "#", Icon: Bars3Icon, label: "More" },
 ];
 
 function navClass(active: boolean, compact: boolean) {
@@ -95,13 +107,22 @@ export function AppSidebar({
   pinnedSelected = false,
   pinnedCount = null,
   showThemeToggle = true,
+  hideTabBar = false,
 }: AppSidebarProps) {
   const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
   const [editingGroupName, setEditingGroupName] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
-  const mobileNavRef = useRef<HTMLDivElement>(null);
-  const closeMenu = useCallback(() => setMenuOpen(false), []);
-  useDismiss(mobileNavRef, menuOpen, closeMenu);
+
+  // Tell the page whether the bottom tab bar is showing, so fixed bottom bars
+  // (selection bar, save bar) sit above it instead of underneath.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (hideTabBar) delete root.dataset.tabbar;
+    else root.dataset.tabbar = "on";
+    return () => {
+      delete root.dataset.tabbar;
+    };
+  }, [hideTabBar]);
 
   const startRenameGroup = (group: Group) => {
     setEditingGroupId(group.id);
@@ -162,7 +183,7 @@ export function AppSidebar({
           <span className="text-[11px] font-semibold uppercase tracking-wider text-fg-4">Collections</span>
           <button
             onClick={onToggleCreateGroup}
-            className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-fg-4 transition hover:bg-surface-sunken hover:text-accent"
+            className="touch-target flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-fg-4 transition hover:bg-surface-sunken hover:text-accent"
             type="button"
             aria-label="Create collection"
             aria-expanded={showCreateGroup}
@@ -174,7 +195,7 @@ export function AppSidebar({
         {showCreateGroup && (
           <div className="mb-2">
             <input
-              className="h-9 w-full rounded-lg border border-line bg-surface px-3 text-sm text-fg outline-none placeholder:text-fg-4 focus:border-blue-500"
+              className="h-11 w-full rounded-lg border border-line bg-surface px-3 text-sm text-fg outline-none placeholder:text-fg-4 focus:border-blue-500 lg:h-9"
               value={newGroupName}
               onChange={(event) => onNewGroupNameChange?.(event.target.value)}
               onKeyDown={(event) => event.key === "Enter" && onCreateGroup?.()}
@@ -185,14 +206,14 @@ export function AppSidebar({
           </div>
         )}
 
-        <div className={compact ? "grid grid-cols-1 gap-1 sm:grid-cols-2 md:grid-cols-3" : "space-y-0.5"}>
+        <div className={compact ? "space-y-1" : "space-y-0.5"}>
           {onSelectPinned && (
             <div className={`relative flex w-full min-w-0 items-center justify-between rounded-lg px-2 transition ${pinnedSelected ? "bg-amber-50 dark:bg-amber-500/10" : "hover:bg-surface-hover"}`}>
               <button
                 type="button"
                 onClick={() => { onSelectPinned(); setMenuOpen(false); }}
                 aria-current={pinnedSelected ? "true" : undefined}
-                className={`flex min-h-9 min-w-0 flex-1 cursor-pointer items-center gap-2 py-2 text-left text-sm ${pinnedSelected ? "font-semibold text-amber-700 dark:text-amber-300" : "font-medium text-fg-3 hover:text-fg"}`}
+                className={`flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 py-2 text-left text-sm lg:min-h-9 ${pinnedSelected ? "font-semibold text-amber-700 dark:text-amber-300" : "font-medium text-fg-3 hover:text-fg"}`}
               >
                 <StarSolidIcon className={`h-4 w-4 shrink-0 ${pinnedSelected ? "text-amber-500" : "text-amber-400"}`} aria-hidden="true" />
                 <span className="truncate">Pinned</span>
@@ -234,7 +255,7 @@ export function AppSidebar({
                 ) : (
                   <button
                     onClick={() => { onSelectGroup?.(group.id); setMenuOpen(false); }}
-                    className={`flex min-h-9 min-w-0 flex-1 cursor-pointer items-center gap-2 py-2 text-left text-sm ${
+                    className={`flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 py-2 text-left text-sm lg:min-h-9 ${
                       selected ? "font-semibold text-accent" : "font-medium text-fg-3 hover:text-fg"
                     }`}
                     aria-current={selected ? "true" : undefined}
@@ -287,39 +308,73 @@ export function AppSidebar({
 
   return (
     <>
-      {/* Phone and tablet: one compact bar; navigation and collections open from the Menu button. */}
-      <div
-        ref={mobileNavRef}
-        className="app-mobile-nav sticky top-0 z-50 border-b border-line bg-surface/95 backdrop-blur"
-        onKeyDown={(event) => { if (event.key === "Escape") { setMenuOpen(false); document.getElementById("navigation-toggle")?.focus(); } }}
-      >
-        <div className="flex h-[68px] items-center justify-between gap-3 px-3 sm:px-4">
+      {/* Phone and tablet: slim top bar for orientation; navigation lives in the bottom tab bar. */}
+      <header className="app-mobile-nav sticky top-0 z-50 border-b border-line bg-surface/90 backdrop-blur-md">
+        <div className="flex h-14 items-center justify-between gap-3 px-4">
           <div className="flex min-w-0 items-baseline gap-2">
             <Logo className="text-xl" />
-            {currentLabel && <span className="hidden min-w-0 truncate text-sm font-medium text-fg-3 sm:inline">/ {currentLabel}</span>}
+            {currentLabel && <span className="min-w-0 truncate text-sm font-medium text-fg-3">/ {currentLabel}</span>}
           </div>
-          <div className="flex min-w-0 items-center gap-2">
-            {showThemeToggle && <ThemeToggle variant="compact" />}
-            <button
-              id="navigation-toggle"
-              type="button"
-              className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-line bg-surface px-3 text-sm font-semibold text-fg-2 transition hover:bg-surface-hover"
-              aria-expanded={menuOpen}
-              aria-controls="compact-navigation"
-              onClick={() => setMenuOpen((current) => !current)}
-            >
-              {menuOpen ? <XMarkIcon className="h-5 w-5" /> : <Bars3Icon className="h-5 w-5" />}
-              Menu
-            </button>
-          </div>
+          {showThemeToggle && <ThemeToggle variant="compact" />}
         </div>
-        <div id="compact-navigation" className={`${menuOpen ? "block" : "hidden"} max-h-[75dvh] overflow-y-auto border-t border-line-soft px-3 pb-3 pt-3 animate-in fade-in slide-in-from-top-1 duration-150 sm:px-4`}>
-          <nav aria-label="Main navigation" className="grid grid-cols-2 gap-2 md:grid-cols-4">
+      </header>
+
+      {!hideTabBar && (
+        <nav className="app-tabbar" aria-label="Main navigation">
+          {tabItems.map((tab) => {
+            if (tab.key === "more") {
+              return (
+                <button
+                  key="more"
+                  type="button"
+                  onClick={() => setMenuOpen(true)}
+                  className={`app-tab ${menuOpen || !tabItems.some((t) => t.key === activePage) ? "is-active" : ""}`}
+                  aria-haspopup="dialog"
+                  aria-expanded={menuOpen}
+                >
+                  <EllipsisHorizontalIcon className="h-6 w-6" aria-hidden="true" />
+                  <span>More</span>
+                </button>
+              );
+            }
+            const active = tab.key === activePage && (tab.key !== "ideas" || (!selectedGroupId && !pinnedSelected) || !onSelectAllIdeas);
+            const isAdd = tab.key === "addIdea";
+            const body = (
+              <>
+                {isAdd ? (
+                  <span className="app-tab-add" aria-hidden="true"><PlusIcon className="h-6 w-6" strokeWidth={2.2} /></span>
+                ) : (
+                  <tab.Icon className="h-6 w-6" aria-hidden="true" />
+                )}
+                <span>{tab.label}</span>
+              </>
+            );
+            if (tab.key === "ideas" && onSelectAllIdeas && activePage === "ideas") {
+              return (
+                <button key={tab.key} type="button" onClick={() => onSelectAllIdeas()} className={`app-tab ${active ? "is-active" : ""}`} aria-current={active ? "page" : undefined}>
+                  {body}
+                </button>
+              );
+            }
+            return (
+              <Link key={tab.key} href={tab.href} className={`app-tab ${active ? "is-active" : ""} ${isAdd ? "is-add" : ""}`} aria-current={active ? "page" : undefined}>
+                {body}
+              </Link>
+            );
+          })}
+        </nav>
+      )}
+
+      <Modal open={menuOpen} onClose={() => setMenuOpen(false)} size="md" zClass="z-[160]" labelledBy="mobile-menu-title">
+        <ModalHeader id="mobile-menu-title" title="Menu" onClose={() => setMenuOpen(false)} />
+        <ModalBody className="space-y-4 px-4 py-4 sm:px-6">
+          <nav aria-label="All pages" className="grid grid-cols-2 gap-2">
             {navItems.map((item) => renderNavItem(item, true))}
           </nav>
-          {collectionsBlock(true) && <div className="mt-3">{collectionsBlock(true)}</div>}
-        </div>
-      </div>
+          {collectionsBlock(true)}
+          {showThemeToggle && <ThemeToggle />}
+        </ModalBody>
+      </Modal>
 
       <aside className="app-sidebar fixed inset-y-0 left-0 z-20 flex-col border-r border-line bg-surface">
         <div className="flex h-20 shrink-0 items-center px-6">

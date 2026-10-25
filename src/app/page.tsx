@@ -8,14 +8,14 @@ import { supabase } from "@/lib/supabaseClient";
 import { ACTIVE_VIDEO_THEME_STORAGE_KEY, DEFAULT_VIDEO_THEMES, VIDEO_THEMES_STORAGE_KEY, VIDEO_TOPICS_TABLE, getVideoThemeById, makeVideoThemeId, normalizeVideoTheme, parseVideoThemes, rowToVideoTheme, videoThemeToRow } from "@/lib/videoThemes";
 import type { VideoTheme } from "@/lib/videoThemes";
 import { PlayCircleIcon, StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
-import { ArrowDownIcon, ArrowPathIcon, ArrowUpIcon, CalendarDaysIcon, CheckIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, FilmIcon, MagnifyingGlassIcon, PencilSquareIcon, PlusIcon, PuzzlePieceIcon, Squares2X2Icon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { AdjustmentsHorizontalIcon, ArrowDownIcon, ArrowPathIcon, ArrowUpIcon, CalendarDaysIcon, CheckIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, FilmIcon, MagnifyingGlassIcon, PencilSquareIcon, PlusIcon, PuzzlePieceIcon, Squares2X2Icon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppPageHeader, appPageMainClass, appPageRootClass } from "@/components/AppPage";
 import { GameEditorModal, IdeaItem, QuickViewModal, ScriptEditorModal } from "@/components/IdeaCards";
 import { useNotifications } from "@/components/NotificationCenter";
 import { Button } from "@/components/ui/Button";
 import { Dropdown, menuItemClass, menuPanelClass, pillTriggerClass, type DropdownOption } from "@/components/ui/Dropdown";
-import { Field, Input, Textarea } from "@/components/ui/Field";
+import { Field, FieldLabel, Input, Textarea } from "@/components/ui/Field";
 import { Modal, ModalBody, ModalFooter, ModalHeader } from "@/components/ui/Modal";
 import { useDismiss } from "@/components/ui/useDismiss";
 import { useHorizontalScroll } from "@/components/ui/useHorizontalScroll";
@@ -387,13 +387,13 @@ function VideoThemeBoard({
             {selectedTheme.hook || <span className="text-fg-4">No opening hook yet. Add one so the script starts strong.</span>}
           </p>
           <div className="flex shrink-0 items-center gap-1">
-            <Button variant="ghost" size="sm" onClick={() => openEdit(selectedTheme)} aria-label={`Edit ${selectedTheme.title}`}>
+            <Button variant="ghost" size="sm" onClick={() => openEdit(selectedTheme)} aria-label={`Edit ${selectedTheme.title}`} className="pointer-coarse:h-11">
               <PencilSquareIcon className="h-4 w-4" /> Edit
             </Button>
-            <Button variant="danger" size="icon-sm" onClick={() => void removeTopic(selectedTheme)} aria-label={`Delete ${selectedTheme.title}`} title="Delete topic">
+            <Button variant="danger" size="icon-sm" onClick={() => void removeTopic(selectedTheme)} aria-label={`Delete ${selectedTheme.title}`} title="Delete topic" className="touch-target">
               <TrashIcon className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon-sm" onClick={() => onChange("")} aria-label="Clear topic" title="Clear topic">
+            <Button variant="ghost" size="icon-sm" onClick={() => onChange("")} aria-label="Clear topic" title="Clear topic" className="touch-target">
               <XMarkIcon className="h-4 w-4" />
             </Button>
           </div>
@@ -458,7 +458,7 @@ function seededShuffle<T>(items: T[], seed: number) {
   return next;
 }
 
-function SortToggle({ value, onChange }: { value: SortOrder; onChange: (value: SortOrder) => void }) {
+function SortToggle({ value, onChange, block = false }: { value: SortOrder; onChange: (value: SortOrder) => void; block?: boolean }) {
   const options: { value: SortOrder; label: string; Icon: typeof ArrowDownIcon; title: string }[] = [
     { value: "newest", label: "Newest", Icon: ArrowDownIcon, title: "Newest ideas first" },
     { value: "oldest", label: "Oldest", Icon: ArrowUpIcon, title: "Oldest ideas first" },
@@ -466,7 +466,7 @@ function SortToggle({ value, onChange }: { value: SortOrder; onChange: (value: S
   ];
 
   return (
-    <div className="inline-flex h-10 items-center rounded-full border border-line bg-surface p-1 shadow-sm" role="group" aria-label="Sort ideas">
+    <div className={`${block ? "grid h-12 w-full grid-cols-3" : "inline-flex h-10"} items-center rounded-full border border-line bg-surface p-1 shadow-sm`} role="group" aria-label="Sort ideas">
       {options.map((option) => {
         const active = value === option.value;
         return (
@@ -474,7 +474,7 @@ function SortToggle({ value, onChange }: { value: SortOrder; onChange: (value: S
             key={option.value}
             type="button"
             onClick={() => onChange(option.value)}
-            className={`flex h-8 cursor-pointer items-center gap-1.5 rounded-full px-3 text-sm font-semibold transition active:scale-[0.98] ${
+            className={`flex ${block ? "h-10 justify-center" : "h-8 pointer-coarse:h-9"} cursor-pointer items-center gap-1.5 rounded-full px-3 text-sm font-semibold transition active:scale-[0.98] ${
               active ? "bg-slate-900 text-white dark:bg-white dark:text-slate-950" : "text-fg-3 hover:bg-surface-sunken hover:text-fg"
             }`}
             title={option.title}
@@ -553,6 +553,8 @@ export default function Home() {
   /** "Pinned" behaves like a built-in collection in the sidebar. */
   const [pinnedOnly, setPinnedOnly] = useState(false);
   const [pinnedCount, setPinnedCount] = useState<number | null>(null);
+  /** Phone filter sheet (collection, game, year, type, sort). */
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [removingGroupItems, setRemovingGroupItems] = useState<Set<string>>(new Set());
   const pendingGroupRemovals = useRef(new Set<string>());
 
@@ -1210,12 +1212,23 @@ export default function Home() {
     if (pinnedOnly && current) setIdeasRevision((revision) => revision + 1);
   };
 
+  const handleSortChange = (nextSort: SortOrder) => {
+    if (nextSort === "random") {
+      setRandomSeed(makeRandomSeed());
+      setSortOrder("random");
+      setCurrentPage(1);
+      return;
+    }
+    setSortOrder(nextSort);
+  };
+
   const selectPinned = () => {
     setGroupId("");
     setPinnedOnly(true);
   };
 
   const activeGroup = groups.find((group) => group.id === groupId);
+  const phoneFilterCount = [Boolean(gameId), releaseYear !== "", Boolean(type), Boolean(groupId) || pinnedOnly, sortOrder !== "newest"].filter(Boolean).length;
 
   const goToPage = (p: number) => {
     setCurrentPage(p);
@@ -1327,23 +1340,25 @@ export default function Home() {
 
       {isSelectMode && (
         <div className="app-selection-bar fixed inset-x-0 bottom-0 z-[80] border-t border-slate-200 bg-white/95 p-4 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
-          <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3">
+          <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 sm:flex-wrap sm:gap-3">
             <div className="flex min-w-0 items-center gap-4">
-              <span className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold text-white ${isLongProjectPickMode ? "bg-violet-600" : "bg-slate-900 dark:bg-slate-800"}`}>{selectedIds.length}</span>
-              <div className="min-w-0">
+              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white ${isLongProjectPickMode ? "bg-violet-600" : "bg-slate-900 dark:bg-slate-800"}`}>{selectedIds.length}</span>
+              <div className="min-w-0 max-sm:hidden">
                 <p className="truncate text-sm font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-200">{isLongProjectPickMode ? "Ideas for long video" : "Ideas selected"}</p>
                 <p className="truncate text-xs font-medium text-slate-400 dark:text-slate-500">{isLongProjectPickMode ? longProjectTitle : selectedTheme ? `Topic: ${selectedTheme.title}` : "Select ideas for your script"}</p>
               </div>
             </div>
-            <div className="selection-actions">
+            <div className="selection-actions max-sm:!w-auto max-sm:!flex-nowrap max-sm:min-w-0 max-sm:flex-1 max-sm:justify-end">
               <button
                 type="button"
                 disabled={selectedIds.length === 0}
                 onClick={() => setShowSelectedReview(true)}
+                aria-label={`Review ${selectedIds.length} selected ideas`}
                 className="flex h-11 cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold uppercase tracking-wider text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800 dark:hover:text-white"
               >
                 <Squares2X2Icon className="h-4 w-4" />
-                Review ({selectedIds.length})
+                <span className="max-sm:hidden">Review ({selectedIds.length})</span>
+                <span className="sm:hidden">Review</span>
               </button>
               <button
                 type="button"
@@ -1354,14 +1369,16 @@ export default function Home() {
                   if (isLongProjectPickMode) router.push(`/long-videos/${longProjectId}`);
                   else handleThemeChange("");
                 }}
-                className="h-11 cursor-pointer rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold uppercase tracking-wider text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                className="flex h-11 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold uppercase tracking-wider text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800 max-sm:!flex-none max-sm:w-11 max-sm:!px-0 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                aria-label="Cancel selection"
               >
-                Cancel
+                <XMarkIcon className="h-5 w-5 sm:hidden" />
+                <span className="max-sm:hidden">Cancel</span>
               </button>
               {isLongProjectPickMode ? (
                 <button disabled={selectedIds.length === 0} onClick={() => void addIdeasToLongProject()} className="flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-violet-600 px-5 text-sm font-bold text-white shadow-lg transition hover:bg-violet-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"><FilmIcon className="h-5 w-5" /> Add to project</button>
               ) : (
-                <button disabled={selectedIds.length === 0} onClick={() => void openScriptEditor()} className="flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-bold text-white shadow-lg transition hover:bg-blue-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"><PlayCircleIcon className="h-5 w-5" /> Create Script</button>
+                <button disabled={selectedIds.length === 0} onClick={() => void openScriptEditor()} className="flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-bold text-white shadow-lg transition hover:bg-blue-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"><PlayCircleIcon className="h-5 w-5" /> <span className="max-sm:hidden">Create Script</span><span className="sm:hidden">Create</span></button>
               )}
             </div>
           </div>
@@ -1369,6 +1386,7 @@ export default function Home() {
       )}
 
       <AppSidebar
+        hideTabBar={isSelectMode}
         activePage="ideas"
         groups={groups}
         groupCounts={groupCounts}
@@ -1432,47 +1450,53 @@ export default function Home() {
 
           <div className="library-toolbar mb-6 rounded-3xl border border-line bg-surface/90 p-2.5 shadow-sm backdrop-blur-md">
             <div className="library-filter-fields">
-              <div className="library-search relative min-w-0">
+              <div className="library-search relative min-w-0 max-sm:flex max-sm:gap-2">
+                <div className="relative min-w-0 flex-1">
                 <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-fg-4" />
                 <input
-                  className="h-10 w-full rounded-full border border-line bg-surface px-11 text-sm font-medium text-fg shadow-sm outline-none transition placeholder:text-fg-4 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10"
+                  className="h-11 w-full rounded-full border border-line bg-surface px-11 text-sm font-medium text-fg shadow-sm outline-none transition placeholder:text-fg-4 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 sm:h-10"
                   placeholder="Search titles, content, or games..."
+                  type="search"
+                  enterKeyHint="search"
                   aria-label="Search ideas"
                   value={q}
                   onChange={e=>setQ(e.target.value)}
                 />
                 {q && (
-                  <button type="button" onClick={() => setQ("")} className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-fg-4 transition hover:bg-surface-sunken hover:text-fg" aria-label="Clear search">
+                  <button type="button" onClick={() => setQ("")} className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-fg-4 transition hover:bg-surface-sunken hover:text-fg" aria-label="Clear search">
                     <XMarkIcon className="h-4 w-4" />
                   </button>
                 )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowFilterSheet(true)}
+                  className={`relative inline-flex h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-4 text-sm font-semibold shadow-sm transition active:scale-[0.98] sm:hidden ${
+                    phoneFilterCount > 0 ? "border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-950" : "border-line bg-surface text-fg-2"
+                  }`}
+                  aria-haspopup="dialog"
+                  aria-label={phoneFilterCount > 0 ? `Filters, ${phoneFilterCount} active` : "Filters"}
+                >
+                  <AdjustmentsHorizontalIcon className="h-5 w-5" />
+                  Filters
+                  {phoneFilterCount > 0 && <span className="rounded-full bg-white/20 px-1.5 text-xs tabular-nums dark:bg-slate-950/10">{phoneFilterCount}</span>}
+                </button>
               </div>
-              <div className="library-game">
+              <div className="library-game max-sm:hidden">
                 <ComboBox placeholder="All games" items={games.map(g=>({id:g.id, name:g.title, coverUrl:g.cover_url}))} selectedId={gameId} onChange={setGameId} />
               </div>
-              <div className="library-year">
+              <div className="library-year max-sm:hidden">
                 <YearFilterDropdown
                   value={releaseYear}
                   years={Array.from(new Set(games.map((game) => game.release_year).filter((year): year is number => typeof year === "number"))).sort((a, b) => b - a)}
                   onChange={setReleaseYear}
                 />
               </div>
-              <div className="library-type">
+              <div className="library-type max-sm:hidden">
                 <TypeFilterDropdown value={type} onChange={setType} />
               </div>
-              <div className="library-sort flex min-w-0 items-center justify-between gap-2">
-                <SortToggle
-                  value={sortOrder}
-                  onChange={(nextSort) => {
-                    if (nextSort === "random") {
-                      setRandomSeed(makeRandomSeed());
-                      setSortOrder("random");
-                      setCurrentPage(1);
-                      return;
-                    }
-                    setSortOrder(nextSort);
-                  }}
-                />
+              <div className="library-sort flex min-w-0 items-center justify-between gap-2 max-sm:hidden">
+                <SortToggle value={sortOrder} onChange={handleSortChange} />
                 {(q||gameId||groupId||type||releaseYear!==""||pinnedOnly) && (
                   <button
                     type="button"
@@ -1485,6 +1509,93 @@ export default function Home() {
               </div>
             </div>
           </div>
+
+          <Modal open={showFilterSheet} onClose={() => setShowFilterSheet(false)} size="md" zClass="z-[150]" labelledBy="filter-sheet-title">
+            <ModalHeader id="filter-sheet-title" title="Filters" onClose={() => setShowFilterSheet(false)} />
+            <ModalBody className="space-y-5">
+              {!isLongProjectPickMode && (
+                <div>
+                  <FieldLabel>Collection</FieldLabel>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { key: "all", label: "All ideas", active: !groupId && !pinnedOnly, onClick: () => { setGroupId(""); setPinnedOnly(false); } },
+                      { key: "pinned", label: `Pinned${typeof pinnedCount === "number" ? ` · ${pinnedCount}` : ""}`, active: pinnedOnly, onClick: selectPinned },
+                      ...groups.map((group) => ({
+                        key: `g${group.id}`,
+                        label: `${group.name} · ${groupCounts.get(group.id) || 0}`,
+                        active: groupId === group.id,
+                        onClick: () => { setPinnedOnly(false); setGroupId(group.id); },
+                      })),
+                    ].map((chip) => (
+                      <button
+                        key={chip.key}
+                        type="button"
+                        onClick={chip.onClick}
+                        aria-pressed={chip.active}
+                        className={`inline-flex h-10 max-w-full cursor-pointer items-center gap-1.5 rounded-full border px-3.5 text-sm font-semibold transition active:scale-[0.98] ${
+                          chip.active ? "border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-950" : "border-line bg-surface text-fg-2"
+                        }`}
+                      >
+                        {chip.key === "pinned" && <StarSolidIcon className={`h-4 w-4 ${chip.active ? "" : "text-amber-400"}`} aria-hidden="true" />}
+                        <span className="truncate">{chip.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div>
+                <FieldLabel>Game</FieldLabel>
+                <ComboBox placeholder="All games" items={games.map(g=>({id:g.id, name:g.title, coverUrl:g.cover_url}))} selectedId={gameId} onChange={setGameId} />
+              </div>
+              <div>
+                <FieldLabel>Type</FieldLabel>
+                <div className="grid grid-cols-2 gap-2">
+                  {TYPE_FILTER_OPTIONS.map((option) => {
+                    const active = type === option.value;
+                    const Icon = option.Icon;
+                    return (
+                      <button
+                        key={option.value || "all"}
+                        type="button"
+                        onClick={() => setType(option.value)}
+                        aria-pressed={active}
+                        className={`flex h-11 cursor-pointer items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition active:scale-[0.98] ${
+                          active ? "border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-950" : "border-line bg-surface text-fg-2"
+                        }`}
+                      >
+                        {Icon && <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />}
+                        <span className="truncate">{option.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                <FieldLabel>Release year</FieldLabel>
+                <YearFilterDropdown
+                  value={releaseYear}
+                  years={Array.from(new Set(games.map((game) => game.release_year).filter((year): year is number => typeof year === "number"))).sort((a, b) => b - a)}
+                  onChange={setReleaseYear}
+                />
+              </div>
+              <div>
+                <FieldLabel>Order</FieldLabel>
+                <SortToggle value={sortOrder} onChange={handleSortChange} block />
+              </div>
+            </ModalBody>
+            <ModalFooter className="flex-nowrap">
+              <Button
+                variant="ghost"
+                disabled={phoneFilterCount === 0}
+                onClick={() => { setGameId(""); setGroupId(""); setType(""); setReleaseYear(""); setPinnedOnly(false); handleSortChange("newest"); }}
+              >
+                Reset
+              </Button>
+              <Button variant="primary" className="flex-1" onClick={() => setShowFilterSheet(false)}>
+                {loading ? "Show ideas" : `Show ${totalCount.toLocaleString()} ${totalCount === 1 ? "idea" : "ideas"}`}
+              </Button>
+            </ModalFooter>
+          </Modal>
 
           {loading && currentIdeas.length === 0 ? (
             <IdeaGridSkeleton />
