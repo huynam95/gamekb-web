@@ -20,6 +20,7 @@ import {
   PencilSquareIcon,
   PlayIcon,
   PlusIcon,
+  VideoCameraIcon,
   PuzzlePieceIcon,
   StarIcon,
   TrashIcon,
@@ -42,6 +43,7 @@ import { Button, buttonClass } from "@/components/ui/Button";
 import { Field, Input, Textarea } from "@/components/ui/Field";
 import { Modal, ModalBody, ModalFooter, ModalHeader } from "@/components/ui/Modal";
 import { useDismiss } from "@/components/ui/useDismiss";
+import { CAPTURE_META, CAPTURE_STATUSES, OWN_FOOTAGE_LABEL, PRIORITY_META, RECORDING_SETUP_MESSAGE, captureStatusPatch, isMissingRecordingColumns, type CaptureStatus } from "@/lib/recording";
 
 /* ================= TYPES ================= */
 
@@ -55,6 +57,11 @@ type Detail = {
   created_at: string | null;
   pinned: boolean;
   pinned_at?: string | null;
+  capture_status?: CaptureStatus | null;
+  capture_notes?: string | null;
+  capture_priority?: number | null;
+  capture_added_at?: string | null;
+  recorded_at?: string | null;
 };
 
 type Game = {
@@ -72,6 +79,7 @@ type FootageRow = {
   title: string | null;
   channel_name: string | null;
   downloaded: boolean;
+  label?: string | null;
   created_at: string | null;
 };
 
@@ -255,6 +263,87 @@ function EditIdeaModal({ detail, onClose, onSave }: { detail: Detail; onClose: (
   );
 }
 
+/* ================= RECORDING CARD ================= */
+
+function RecordingCard({
+  detail,
+  onChange,
+}: {
+  detail: Detail;
+  onChange: (patch: Partial<Detail>) => Promise<boolean>;
+}) {
+  const [notes, setNotes] = useState(detail.capture_notes ?? "");
+  const [notesFor, setNotesFor] = useState(detail.id);
+  if (notesFor !== detail.id) { setNotesFor(detail.id); setNotes(detail.capture_notes ?? ""); }
+  const status = detail.capture_status ?? null;
+  const priority = detail.capture_priority ?? 2;
+
+  if (!status) {
+    return (
+      <section className={cardClass}>
+        <CardTitle icon={<VideoCameraIcon className="h-4 w-4" />} title="Recording" />
+        <p className="text-sm text-fg-3">Want to capture this yourself? Put it on your Recording List with notes on how to get the shot.</p>
+        <Button variant="secondary" size="sm" className="mt-3 w-full" onClick={() => void onChange(captureStatusPatch("to_record"))}>
+          <VideoCameraIcon className="h-4 w-4" /> Record myself
+        </Button>
+      </section>
+    );
+  }
+
+  return (
+    <section className={`${cardClass} border-t-4 ${status === "to_record" ? "border-t-rose-500" : status === "recorded" ? "border-t-emerald-500" : "border-t-slate-400"}`}>
+      <CardTitle
+        icon={<VideoCameraIcon className="h-4 w-4" />}
+        title="Recording"
+        action={<Link href="/recording" className="text-xs font-semibold text-accent hover:underline">Open list</Link>}
+      />
+      <div className="grid grid-cols-3 gap-1 rounded-xl bg-surface-sunken p-1" role="radiogroup" aria-label="Recording status">
+        {CAPTURE_STATUSES.map((value) => (
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={status === value}
+            onClick={() => status !== value && void onChange(captureStatusPatch(value, detail))}
+            className={`flex min-h-9 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-1 text-xs font-semibold transition ${status === value ? "bg-surface text-fg shadow-sm ring-1 ring-line" : "text-fg-3 hover:text-fg"}`}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${CAPTURE_META[value].dot}`} aria-hidden="true" />
+            {CAPTURE_META[value].short}
+          </button>
+        ))}
+      </div>
+
+      <label className="mt-4 block">
+        <span className="mb-1.5 block text-xs font-medium text-fg-3">Priority</span>
+        <select
+          value={priority}
+          onChange={(e) => void onChange({ capture_priority: Number(e.target.value) })}
+          className="h-10 w-full cursor-pointer rounded-xl border border-line bg-surface px-3 text-sm font-semibold text-fg outline-none focus:border-blue-500"
+        >
+          {[1, 2, 3].map((p) => <option key={p} value={p}>{PRIORITY_META[p].label}</option>)}
+        </select>
+      </label>
+
+      <label className="mt-4 block">
+        <span className="mb-1.5 block text-xs font-medium text-fg-3">How to record it</span>
+        <Textarea
+          className="min-h-[96px] resize-y text-sm"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          onBlur={() => { if ((detail.capture_notes ?? "") !== notes.trim()) void onChange({ capture_notes: notes.trim() || null }); }}
+          placeholder="Mission, time of day, location, save file..."
+        />
+        <span className="mt-1 block text-[11px] text-fg-4">Saved when you leave the box.</span>
+      </label>
+
+      <div className="mt-3 flex items-center justify-between gap-2 text-xs text-fg-4">
+        <span>{status === "to_record" ? `Added ${formatDate(detail.capture_added_at)}` : `Recorded ${formatDate(detail.recorded_at)}`}</span>
+        <button type="button" onClick={() => void onChange(captureStatusPatch(null))} className="cursor-pointer font-semibold text-fg-3 hover:text-rose-600">Remove from list</button>
+      </div>
+    </section>
+  );
+}
+
 /* ================= MAIN PAGE ================= */
 
 export default function IdeaDetailPage() {
@@ -361,6 +450,19 @@ export default function IdeaDetailPage() {
     }
     setDetail({ ...detail, ...patch });
     success("Idea updated.", "Saved");
+    return true;
+  }
+
+  async function updateRecording(patch: Partial<Detail>) {
+    if (!detail) return false;
+    const before = detail;
+    setDetail({ ...detail, ...patch });
+    const { error } = await supabase.from("details").update(patch).eq("id", detail.id);
+    if (error) {
+      setDetail(before);
+      notifyError(isMissingRecordingColumns(error) ? RECORDING_SETUP_MESSAGE : error.message, "Recording not updated");
+      return false;
+    }
     return true;
   }
 
@@ -675,7 +777,10 @@ export default function IdeaDetailPage() {
                             )}
                           </Thumb>
                           <div className="min-w-0 flex-1">
-                            <p className="line-clamp-2 text-sm font-semibold leading-5 text-fg">{f.title || fileName || (href ? hostOf(href) : "Clip")}</p>
+                            <p className="line-clamp-2 text-sm font-semibold leading-5 text-fg">
+                              {f.label === OWN_FOOTAGE_LABEL && <span className="mr-1.5 inline-flex translate-y-[-1px] items-center gap-0.5 rounded-md bg-rose-100 px-1.5 py-0.5 align-middle text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:bg-rose-500/15 dark:text-rose-300"><VideoCameraIcon className="h-3 w-3" /> Own</span>}
+                              {f.title || fileName || (href ? hostOf(href) : "Clip")}
+                            </p>
                             <p className="mt-0.5 truncate text-xs text-fg-3">{f.channel_name || (href ? href.replace(/^https?:\/\/(www\.)?/i, "") : f.file_path)}</p>
                             <button
                               type="button"
@@ -735,6 +840,7 @@ export default function IdeaDetailPage() {
 
             {/* ---------- SIDE ---------- */}
             <aside className="space-y-5 lg:sticky lg:top-6 lg:space-y-6">
+              {detail && <RecordingCard detail={detail} onChange={updateRecording} />}
               <section className={cardClass}>
                 <CardTitle
                   icon={<FilmIcon className="h-4 w-4" />}

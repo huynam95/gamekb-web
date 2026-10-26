@@ -19,6 +19,7 @@ import { CoverBackdrop } from "@/components/CoverBackdrop";
 import { analyzeAssetLinks } from "@/lib/assetLinks";
 import { useNotifications } from "@/components/NotificationCenter";
 import { rememberIdeaPreview } from "@/lib/ideaPreviewCache";
+import { CAPTURE_META } from "@/lib/recording";
 
 
 export function QuickViewModal({ idea, isOpen, onClose }: { idea: DetailRow | null; isOpen: boolean; onClose: () => void }) {
@@ -503,6 +504,7 @@ export function IdeaItem({
   isSelected,
   onToggleSelect,
   onTogglePin,
+  onToggleRecord,
   onEditGame,
   onQuickView,
   onRemoveFromGroup,
@@ -516,6 +518,8 @@ export function IdeaItem({
   isSelected: boolean;
   onToggleSelect: (idea: DetailRow) => void;
   onTogglePin: (id: number, current: boolean) => void;
+  /** Add to / take off the Recording List. */
+  onToggleRecord?: (idea: DetailRow) => void;
   onEditGame: (game: Game) => void;
   onQuickView: (idea: DetailRow) => void;
   onRemoveFromGroup?: (idea: DetailRow) => void;
@@ -598,6 +602,11 @@ export function IdeaItem({
           <div className="flex items-center gap-2">
             <TypePill typeKey={r.detail_type} />
             {r.pinned && <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-300"><StarSolidIcon className="h-3 w-3" aria-hidden="true" /> Pinned</span>}
+            {r.capture_status && CAPTURE_META[r.capture_status] && (
+              <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-semibold backdrop-blur-md ${CAPTURE_META[r.capture_status].onDark}`}>
+                <VideoCameraIcon className="h-3 w-3" aria-hidden="true" /> {CAPTURE_META[r.capture_status].short}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -606,6 +615,11 @@ export function IdeaItem({
           <button onClick={(event) => { event.stopPropagation(); onTogglePin(r.id, !!r.pinned); }} className={`touch-target flex h-8 w-8 cursor-pointer items-center justify-center rounded-full shadow-lg backdrop-blur-md transition-colors duration-150 ${r.pinned ? "bg-amber-400 text-white" : "bg-white/10 text-white hover:bg-white/20"}`} type="button" aria-pressed={!!r.pinned} aria-label={r.pinned ? `Unpin ${r.title}` : `Pin ${r.title}`} title={r.pinned ? "Unpin" : "Pin"}>
             {r.pinned ? <StarSolidIcon className="h-4 w-4" /> : <StarIcon className="h-4 w-4" />}
           </button>
+          {onToggleRecord && (
+            <button onClick={(event) => { event.stopPropagation(); onToggleRecord(r); }} className={`touch-target flex h-8 w-8 cursor-pointer items-center justify-center rounded-full shadow-lg backdrop-blur-md transition-colors duration-150 ${r.capture_status ? "bg-rose-500 text-white" : "bg-white/10 text-white hover:bg-white/20"}`} type="button" aria-pressed={Boolean(r.capture_status)} aria-label={r.capture_status ? `Remove ${r.title} from the Recording List` : `Record ${r.title} myself`} title={r.capture_status ? "On your Recording List (click to remove)" : "Record myself"}>
+              <VideoCameraIcon className="h-4 w-4" />
+            </button>
+          )}
           <button onClick={(event) => { event.stopPropagation(); onQuickView(r); }} className="touch-target flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white shadow-lg backdrop-blur-md transition-colors duration-150 hover:bg-emerald-500" title="Quick preview" aria-label={`Quick preview: ${r.title}`} type="button">
             <EyeIcon className="h-4 w-4" />
           </button>

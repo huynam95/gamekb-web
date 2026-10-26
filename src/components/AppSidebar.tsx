@@ -16,6 +16,7 @@ import {
   PlusIcon,
   Squares2X2Icon,
   TrashIcon,
+  VideoCameraIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
@@ -24,7 +25,7 @@ import { Modal, ModalBody, ModalHeader } from "@/components/ui/Modal";
 import type { Group } from "@/types/gamekb";
 import logoImage from "@/assets/ninjaplay-logo.webp";
 
-type ActivePage = "ideas" | "dashboard" | "scripts" | "audienceRequests" | "longVideos" | "addGame" | "addIdea" | "migrate";
+type ActivePage = "ideas" | "dashboard" | "scripts" | "recording" | "audienceRequests" | "longVideos" | "addGame" | "addIdea" | "migrate";
 
 type AppSidebarProps = {
   activePage: ActivePage;
@@ -57,6 +58,7 @@ const navItems: Array<{ key: ActivePage; href: string; Icon: NavIconType; label:
   { key: "dashboard", href: "/dashboard", Icon: ChartBarIcon, label: "Dashboard" },
   { key: "addIdea", href: "/add", Icon: LightBulbIcon, label: "Add Idea" },
   { key: "scripts", href: "/scripts", Icon: DocumentTextIcon, label: "Short Projects" },
+  { key: "recording", href: "/recording", Icon: VideoCameraIcon, label: "Recording List" },
   { key: "longVideos", href: "/long-videos", Icon: FilmIcon, label: "Long Video Studio" },
   { key: "audienceRequests", href: "/audience-requests", Icon: ChatBubbleLeftRightIcon, label: "Audience Requests" },
 ];

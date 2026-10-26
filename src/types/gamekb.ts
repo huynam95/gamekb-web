@@ -27,6 +27,12 @@ export type DetailRow = {
   pinned?: boolean;
   created_at?: string;
   status?: string;
+  /** Recording List (see src/lib/recording.ts). */
+  capture_status?: "to_record" | "recorded" | "used" | null;
+  capture_notes?: string | null;
+  capture_priority?: number | null;
+  capture_added_at?: string | null;
+  recorded_at?: string | null;
   game?: Game;
   footage?: FootageItem[];
   groups?: Group[];

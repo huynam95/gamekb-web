@@ -8,7 +8,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { ACTIVE_VIDEO_THEME_STORAGE_KEY, DEFAULT_VIDEO_THEMES, VIDEO_THEMES_STORAGE_KEY, VIDEO_TOPICS_TABLE, getVideoThemeById, makeVideoThemeId, normalizeVideoTheme, parseVideoThemes, rowToVideoTheme, videoThemeToRow } from "@/lib/videoThemes";
 import type { VideoTheme } from "@/lib/videoThemes";
 import { PlayCircleIcon, StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
-import { AdjustmentsHorizontalIcon, ArrowDownIcon, ArrowPathIcon, ArrowUpIcon, CalendarDaysIcon, CheckIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, FilmIcon, MagnifyingGlassIcon, PencilSquareIcon, PlusIcon, PuzzlePieceIcon, Squares2X2Icon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { AdjustmentsHorizontalIcon, ArrowDownIcon, ArrowPathIcon, ArrowUpIcon, CalendarDaysIcon, CheckIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, FilmIcon, MagnifyingGlassIcon, PencilSquareIcon, PlusIcon, PuzzlePieceIcon, Squares2X2Icon, TrashIcon, VideoCameraIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { captureStatusPatch, isMissingRecordingColumns, RECORDING_SETUP_MESSAGE } from "@/lib/recording";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppPageHeader, appPageMainClass, appPageRootClass } from "@/components/AppPage";
 import { GameEditorModal, IdeaItem, QuickViewModal, ScriptEditorModal } from "@/components/IdeaCards";
@@ -1212,6 +1213,53 @@ export default function Home() {
     if (pinnedOnly && current) setIdeasRevision((revision) => revision + 1);
   };
 
+  const patchIdeaRows = (ids: number[], patch: Partial<DetailRow>) => {
+    const idSet = new Set(ids);
+    const update = (idea: DetailRow) => (idSet.has(idea.id) ? { ...idea, ...patch } : idea);
+    setIdeas((prev) => prev.map(update));
+    setSelectedIdeas((prev) => prev.map(update));
+    patchCachedRows(update);
+  };
+
+  /** Card camera button: put an idea on the Recording List or take it off. */
+  const toggleRecord = async (idea: DetailRow) => {
+    if (idea.capture_status === "recorded" || idea.capture_status === "used") {
+      router.push("/recording");
+      return;
+    }
+    const next = idea.capture_status ? null : "to_record";
+    const patch = captureStatusPatch(next);
+    patchIdeaRows([idea.id], patch);
+    const { error } = await supabase.from("details").update(patch).eq("id", idea.id);
+    if (error) {
+      patchIdeaRows([idea.id], { capture_status: idea.capture_status ?? null, capture_added_at: idea.capture_added_at ?? null, recorded_at: idea.recorded_at ?? null });
+      notifyError(isMissingRecordingColumns(error) ? RECORDING_SETUP_MESSAGE : error.message, "Recording List not updated");
+      return;
+    }
+    success(next ? "Added to your Recording List." : "Removed from your Recording List.", next ? "To record" : "Removed");
+  };
+
+  /** Selection bar: add every selected idea that isn't on the list yet. */
+  const addSelectedToRecording = async () => {
+    const ids = selectedIds.filter((id) => {
+      const row = selectedIdeas.find((idea) => idea.id === id) ?? ideas.find((idea) => idea.id === id);
+      return !row?.capture_status;
+    });
+    if (ids.length === 0) {
+      success("All selected ideas are already on your Recording List.", "Nothing to add");
+      return;
+    }
+    const patch = captureStatusPatch("to_record");
+    const { error } = await supabase.from("details").update(patch).in("id", ids).is("capture_status", null);
+    if (error) {
+      notifyError(isMissingRecordingColumns(error) ? RECORDING_SETUP_MESSAGE : error.message, "Recording List not updated");
+      return;
+    }
+    patchIdeaRows(ids, patch);
+    const skipped = selectedIds.length - ids.length;
+    success(`${ids.length} idea${ids.length === 1 ? "" : "s"} added to your Recording List${skipped ? ` · ${skipped} already there` : ""}.`, "To record");
+  };
+
   const handleSortChange = (nextSort: SortOrder) => {
     if (nextSort === "random") {
       setRandomSeed(makeRandomSeed());
@@ -1378,7 +1426,10 @@ export default function Home() {
               {isLongProjectPickMode ? (
                 <button disabled={selectedIds.length === 0} onClick={() => void addIdeasToLongProject()} className="flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-violet-600 px-5 text-sm font-bold text-white shadow-lg transition hover:bg-violet-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"><FilmIcon className="h-5 w-5" /> Add to project</button>
               ) : (
+                <>
+                <button disabled={selectedIds.length === 0} onClick={() => void addSelectedToRecording()} className="flex h-11 cursor-pointer items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-bold text-rose-700 transition hover:bg-rose-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 max-sm:w-11 max-sm:justify-center max-sm:px-0 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:bg-rose-500/20" aria-label="Add selected ideas to the Recording List" title="Record these myself"><VideoCameraIcon className="h-5 w-5" /> <span className="max-sm:hidden">Record</span></button>
                 <button disabled={selectedIds.length === 0} onClick={() => void openScriptEditor()} className="flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-bold text-white shadow-lg transition hover:bg-blue-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"><PlayCircleIcon className="h-5 w-5" /> <span className="max-sm:hidden">Create Script</span><span className="sm:hidden">Create</span></button>
+                </>
               )}
             </div>
           </div>
@@ -1602,7 +1653,7 @@ export default function Home() {
           ) : (
             <ul className={`idea-grid transition-opacity duration-150 ${loading ? "opacity-60" : ""}`} aria-busy={loading}>
               {currentIdeas.map((r, index) => (
-                 <IdeaItem key={r.id} priority={index < 6} r={r} game={games.find(g => g.id === r.game_id)} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={togglePin} onEditGame={setEditingGame} onQuickView={setPreviewIdea} onRemoveFromGroup={groupId && loadedGroupId === groupId ? removeIdeaFromGroup : undefined} groupName={activeGroup?.name} removingFromGroup={removingGroupItems.has(`${groupId}:${r.id}`)} />
+                 <IdeaItem key={r.id} priority={index < 6} r={r} game={games.find(g => g.id === r.game_id)} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={togglePin} onToggleRecord={isLongProjectPickMode ? undefined : (idea) => void toggleRecord(idea)} onEditGame={setEditingGame} onQuickView={setPreviewIdea} onRemoveFromGroup={groupId && loadedGroupId === groupId ? removeIdeaFromGroup : undefined} groupName={activeGroup?.name} removingFromGroup={removingGroupItems.has(`${groupId}:${r.id}`)} />
               ))}
             </ul>
           )}

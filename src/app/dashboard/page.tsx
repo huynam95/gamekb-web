@@ -3,7 +3,8 @@
 import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { ChartBarIcon, DocumentTextIcon, PlayCircleIcon, PuzzlePieceIcon, SparklesIcon } from "@heroicons/react/24/outline";
+import { ChartBarIcon, ChevronRightIcon, DocumentTextIcon, PlayCircleIcon, PuzzlePieceIcon, SparklesIcon, VideoCameraIcon } from "@heroicons/react/24/outline";
+import Link from "next/link";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppPageHeader, appPageContainerClass, appPageMainClass, appPageRootClass } from "@/components/AppPage";
 import { GameEditorModal, IdeaItem, QuickViewModal, ScriptEditorModal } from "@/components/IdeaCards";
@@ -46,6 +47,7 @@ export default function Dashboard() {
   const [showEditor, setShowEditor] = useState(false);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const [previewIdea, setPreviewIdea] = useState<DetailRow | null>(null);
+  const [recording, setRecording] = useState<{ toRecord: number; thisWeek: number; used: number; next: { id: number; title: string; game: string }[] } | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -69,6 +71,28 @@ export default function Dashboard() {
       setRecentIdeas((recentRes.data || []) as DetailRow[]);
     }
     loadData();
+
+    // Recording List summary (hidden until the recording columns exist).
+    supabase
+      .from("details")
+      .select("id,title,capture_status,capture_priority,capture_added_at,recorded_at,game:games(title)")
+      .not("capture_status", "is", null)
+      .then(({ data, error }) => {
+        if (error || !data) return;
+        type Row = { id: number; title: string; capture_status: string; capture_priority: number | null; capture_added_at: string | null; recorded_at: string | null; game: { title: string } | null };
+        const rows = data as unknown as Row[];
+        const weekAgo = Date.now() - 7 * 86400e3;
+        const toRecord = rows.filter((row) => row.capture_status === "to_record");
+        setRecording({
+          toRecord: toRecord.length,
+          thisWeek: rows.filter((row) => row.recorded_at && new Date(row.recorded_at).getTime() > weekAgo).length,
+          used: rows.filter((row) => row.capture_status === "used").length,
+          next: toRecord
+            .sort((a, b) => (a.capture_priority ?? 2) - (b.capture_priority ?? 2) || String(a.capture_added_at).localeCompare(String(b.capture_added_at)))
+            .slice(0, 3)
+            .map((row) => ({ id: row.id, title: row.title, game: row.game?.title ?? "" })),
+        });
+      });
   }, []);
 
   const toggleSelection = (idea: DetailRow) => {
@@ -129,6 +153,42 @@ export default function Dashboard() {
               <StatCard title="Total Games" value={stats.games} icon={PuzzlePieceIcon} color="bg-emerald-500" />
               <StatCard title="Scripts" value={stats.scripts} icon={ChartBarIcon} color="bg-purple-500" />
            </div>
+
+           {recording && (
+             <section className="mb-8 rounded-[1.5rem] border border-line bg-surface p-4 shadow-sm sm:mb-12 sm:p-5">
+               <div className="flex items-center justify-between gap-3">
+                 <h3 className="flex items-center gap-2 text-base font-bold text-fg">
+                   <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-300"><VideoCameraIcon className="h-5 w-5" /></span>
+                   Recording
+                 </h3>
+                 <Link href="/recording" className="inline-flex items-center gap-1 text-sm font-semibold text-accent hover:underline">Open list <ChevronRightIcon className="h-4 w-4" /></Link>
+               </div>
+               <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
+                 {[["To record", recording.toRecord, "text-rose-600 dark:text-rose-300"], ["Recorded this week", recording.thisWeek, "text-emerald-600 dark:text-emerald-300"], ["Used in videos", recording.used, "text-fg-2"]].map(([label, value, color]) => (
+                   <div key={String(label)} className="rounded-2xl bg-surface-muted px-2 py-3">
+                     <dd className={`text-2xl font-black tabular-nums ${color}`}>{value}</dd>
+                     <dt className="mt-0.5 text-[11px] font-medium text-fg-4">{label}</dt>
+                   </div>
+                 ))}
+               </dl>
+               {recording.next.length > 0 && (
+                 <div className="mt-4">
+                   <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-fg-4">Up next</p>
+                   <ul className="divide-y divide-line-soft">
+                     {recording.next.map((item) => (
+                       <li key={item.id}>
+                         <Link href={`/idea/${item.id}`} className="flex items-center gap-2 py-2 text-sm text-fg-2 hover:text-fg">
+                           <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500" />
+                           <span className="min-w-0 flex-1 truncate font-medium">{item.title}</span>
+                           <span className="shrink-0 text-xs text-fg-4">{item.game}</span>
+                         </Link>
+                       </li>
+                     ))}
+                   </ul>
+                 </div>
+               )}
+             </section>
+           )}
 
            {pinnedIdeas.length > 0 && (
              <div className="mb-12">

@@ -779,6 +779,30 @@ export default function ScriptsPage() {
     load();
   }, []);
 
+  // Ideas still on the Recording List, matched to projects by footage or by their "• Game: title" line.
+  const [toRecordIdeas, setToRecordIdeas] = useState<{ id: number; line: string }[]>([]);
+  useEffect(() => {
+    supabase
+      .from("details")
+      .select("id,title,game:games(title)")
+      .eq("capture_status", "to_record")
+      .then(({ data, error }) => {
+        if (error || !data) return;
+        setToRecordIdeas((data as unknown as { id: number; title: string; game: { title: string } | null }[]).map((row) => ({ id: row.id, line: `• ${row.game?.title || "Unknown Game"}: ${row.title}` })));
+      });
+  }, []);
+  const toRecordByScript = useMemo(() => {
+    const result = new Map<number, number>();
+    if (!toRecordIdeas.length) return result;
+    for (const script of scripts) {
+      const assetIdeaIds = new Set((script.assets || []).map((asset) => asset.idea_id).filter(Boolean));
+      const description = script.description || "";
+      const count = toRecordIdeas.filter((idea) => assetIdeaIds.has(idea.id) || description.includes(idea.line)).length;
+      if (count) result.set(script.id, count);
+    }
+    return result;
+  }, [scripts, toRecordIdeas]);
+
   const filteredScripts = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return scripts.filter((script) => {
@@ -1132,6 +1156,11 @@ export default function ScriptsPage() {
                       >
                         <span className="line-clamp-2 break-words text-[15px] font-semibold leading-snug text-fg group-hover:text-accent lg:line-clamp-1">{script.title || "Untitled project"}</span>
                         <span className="mt-0.5 block truncate text-xs text-fg-3 lg:hidden">{meta.join(" · ")}</span>
+                        {(toRecordByScript.get(script.id) ?? 0) > 0 && (
+                          <span className="mt-1 inline-flex items-center gap-1 rounded-md bg-rose-100 px-1.5 py-0.5 text-[11px] font-semibold text-rose-700 dark:bg-rose-500/15 dark:text-rose-300" title="Ideas in this project that are still on your Recording List">
+                            <VideoCameraIcon className="h-3 w-3" /> {toRecordByScript.get(script.id)} still to record
+                          </span>
+                        )}
                       </button>
 
                       <span className="hidden min-w-0 items-center gap-1.5 truncate text-sm text-fg-2 lg:flex">
