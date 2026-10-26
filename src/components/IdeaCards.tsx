@@ -18,6 +18,7 @@ import { Modal, ModalBody, ModalFooter, ModalHeader } from "@/components/ui/Moda
 import { CoverBackdrop } from "@/components/CoverBackdrop";
 import { analyzeAssetLinks } from "@/lib/assetLinks";
 import { useNotifications } from "@/components/NotificationCenter";
+import { rememberIdeaPreview } from "@/lib/ideaPreviewCache";
 
 
 export function QuickViewModal({ idea, isOpen, onClose }: { idea: DetailRow | null; isOpen: boolean; onClose: () => void }) {
@@ -30,7 +31,7 @@ export function QuickViewModal({ idea, isOpen, onClose }: { idea: DetailRow | nu
             {idea.description || "No description available."}
           </ModalBody>
           <ModalFooter>
-            <Link href={`/idea/${idea.id}`} className={buttonClass({ variant: "secondary", size: "sm" })}>Open detail</Link>
+            <Link href={`/idea/${idea.id}`} onClick={() => rememberIdeaPreview(idea)} className={buttonClass({ variant: "secondary", size: "sm" })}>Open detail</Link>
             <Button variant="primary" size="sm" onClick={onClose}>Close</Button>
           </ModalFooter>
         </>
@@ -610,7 +611,7 @@ export function IdeaItem({
           </button>
         </div>
       )}
-      <Link href={`/idea/${r.id}`} className={`absolute inset-0 z-0 ${isSelectMode ? "hidden" : ""}`} aria-label={`Open idea detail: ${r.title}`} />
+      <Link href={`/idea/${r.id}`} onClick={() => rememberIdeaPreview({ ...r, game: game ?? r.game ?? null })} className={`absolute inset-0 z-0 ${isSelectMode ? "hidden" : ""}`} aria-label={`Open idea detail: ${r.title}`} />
     </li>
   );
 }

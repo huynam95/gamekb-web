@@ -1,16 +1,47 @@
 "use client";
 
-import { CoverImage } from "@/components/CoverImage";
-import { TypeLabel } from "@/components/TypePill";
-import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useParams, useRouter } from "next/navigation";
+import {
+  ArrowLeftIcon,
+  ArrowPathIcon,
+  ArrowTopRightOnSquareIcon,
+  CalendarDaysIcon,
+  CheckIcon,
+  ClipboardDocumentIcon,
+  CloudArrowDownIcon,
+  DocumentTextIcon,
+  EllipsisHorizontalIcon,
+  FilmIcon,
+  FolderIcon,
+  GlobeAltIcon,
+  LinkIcon,
+  PencilSquareIcon,
+  PlayIcon,
+  PlusIcon,
+  PuzzlePieceIcon,
+  StarIcon,
+  TrashIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
+import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchYoutubeMetadata } from "@/lib/youtube";
+import { getYoutubeVideoId } from "@/lib/mediaLinks";
+import { readIdeaPreview } from "@/lib/ideaPreviewCache";
 import { useNotifications } from "@/components/NotificationCenter";
+import { AppSidebar } from "@/components/AppSidebar";
+import { appPageMainClass, appPageRootClass } from "@/components/AppPage";
 import { AddToScriptModal } from "@/components/AddToScriptModal";
-import { ArrowLeftIcon, CheckIcon, CloudArrowDownIcon, DocumentDuplicateIcon, FilmIcon, GlobeAltIcon, HashtagIcon, PencilSquareIcon, PuzzlePieceIcon, StarIcon, TagIcon, TrashIcon, VideoCameraIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { CoverBackdrop } from "@/components/CoverBackdrop";
+import { CoverImage } from "@/components/CoverImage";
+import { TypePill } from "@/components/TypePill";
+import { TypeChips } from "@/components/TypeChips";
+import { Button, buttonClass } from "@/components/ui/Button";
+import { Field, Input, Textarea } from "@/components/ui/Field";
+import { Modal, ModalBody, ModalFooter, ModalHeader } from "@/components/ui/Modal";
+import { useDismiss } from "@/components/ui/useDismiss";
 
 /* ================= TYPES ================= */
 
@@ -19,11 +50,11 @@ type Detail = {
   title: string;
   description: string | null;
   detail_type: string;
-  status: string | null;
+  status?: string | null;
   game_id: number;
   created_at: string | null;
   pinned: boolean;
-  pinned_at: string | null;
+  pinned_at?: string | null;
 };
 
 type Game = {
@@ -41,124 +72,186 @@ type FootageRow = {
   title: string | null;
   channel_name: string | null;
   downloaded: boolean;
-  start_ts: string | null;
-  end_ts: string | null;
-  label: string | null;
-  notes: string | null;
   created_at: string | null;
 };
 
-type SourceRow = {
-  id: number;
-  detail_id: number;
-  url: string;
-  note: string | null;
-  reliability: number;
-  created_at: string | null;
+type SourceRow = { id: number; detail_id: number; url: string; note: string | null; created_at: string | null };
+type Group = { id: number; name: string; description: string | null };
+type ProjectUse = { id: number; title: string; status: string | null };
+
+const STATUS_DOT: Record<string, string> = {
+  Draft: "bg-slate-400",
+  Filming: "bg-amber-500",
+  Edited: "bg-indigo-500",
+  Published: "bg-emerald-500",
 };
-
-type Group = {
-  id: number;
-  name: string;
-  description: string | null;
-};
-
-type ScriptProject = { 
-  id?: number; 
-  title: string; 
-  content: string; 
-  assets: {
-    url: string;
-    name: string;
-    channel_name?: string | null;
-    idea_id?: number | null;
-    idea_title?: string | null;
-    game_title?: string | null;
-    idea_order?: number | null;
-  }[];
-  description: string; 
-  hashtags: string[]; 
-  tags: string[];
-  publish_date: string | null; 
-  status: string;
-};
-
-/* ================= STYLES ================= */
-
-const inputClass =
-  "h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm text-fg placeholder:text-fg-4 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition";
-
-const heroInputClass = 
-  "w-full bg-transparent text-3xl md:text-4xl font-extrabold text-white placeholder:text-white/50 border-b-2 border-white/20 px-0 py-2 focus:border-white focus:outline-none transition mb-2";
-
-const textareaClass =
-  "min-h-[120px] w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-fg placeholder:text-fg-4 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition resize-y";
-
-const selectClass =
-  "h-10 w-full rounded-xl border border-line bg-surface px-3 text-sm text-fg outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 transition cursor-pointer";
-
-const btnBase =
-  "inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold whitespace-nowrap cursor-pointer transition active:scale-[0.98]";
-
-const btnGhost =
-  btnBase + " border border-line bg-surface text-fg-2 shadow-sm hover:bg-surface-hover hover:text-fg";
-
-const btnGlass =
-  "inline-flex h-9 min-w-9 items-center justify-center gap-2 rounded-lg border border-white/10 bg-black/30 px-4 text-sm font-semibold text-white backdrop-blur-md hover:bg-black/50 transition shadow-sm max-sm:h-11 max-sm:min-w-11 max-sm:px-3";
-
-const cardClass = "rounded-2xl border border-line bg-surface p-6 shadow-sm";
 
 /* ================= HELPERS ================= */
 
-function renderLinkOrText(text: string | null) {
-  if (!text) return null;
-  const isUrl = text.startsWith("http://") || text.startsWith("https://");
-  if (isUrl) {
-    return (
-      <a 
-        href={text} 
-        target="_blank" 
-        rel="noopener noreferrer" 
-        className="break-all text-accent hover:text-blue-800 hover:underline font-medium"
-        onClick={(e) => e.stopPropagation()} 
-      >
-        {text}
-      </a>
-    );
-  }
-  return <span className="break-all font-mono text-fg-2">{text}</span>;
+const cardClass = "rounded-3xl border border-line bg-surface p-5 shadow-sm sm:p-6";
+
+function isUrl(text: string | null | undefined): text is string {
+  return Boolean(text && /^https?:\/\//i.test(text));
 }
 
-function TypeBadge({ t }: { t: string }) {
+function hostOf(url: string) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function CardTitle({ icon, title, count, action }: { icon: ReactNode; title: string; count?: ReactNode; action?: ReactNode }) {
   return (
-    <span className="inline-flex items-center rounded-lg border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white shadow-sm backdrop-blur-md">
-      <TypeLabel typeKey={t} />
-    </span>
+    <div className="mb-4 flex items-center justify-between gap-3">
+      <h2 className="flex min-w-0 items-center gap-2 text-sm font-semibold text-fg">
+        <span className="text-fg-4">{icon}</span>
+        {title}
+        {count !== undefined && <span className="rounded-full bg-surface-sunken px-2 py-0.5 text-[11px] font-semibold tabular-nums text-fg-3">{count}</span>}
+      </h2>
+      {action}
+    </div>
   );
 }
 
-/* ================= COMPONENT: GROUP PICKER ================= */
-function GroupAddPicker({ groups, onAdd, onCreate }: { groups: Group[]; onAdd: (id: number) => void; onCreate: (n: string) => void; }) {
+function Skeleton({ className = "" }: { className?: string }) {
+  return <div className={`animate-pulse rounded-xl bg-surface-sunken ${className}`} />;
+}
+
+/* ================= COLLECTION PICKER ================= */
+
+function CollectionAdd({ groups, onAdd, onCreate }: { groups: Group[]; onAdd: (id: number) => void; onCreate: (name: string) => void }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const boxRef = useRef<HTMLDivElement | null>(null);
-  const filtered = useMemo(() => groups.filter((g) => g.name.toLowerCase().includes(q.trim().toLowerCase())).slice(0, 50), [groups, q]);
-  useEffect(() => {
-    function onDocClick(e: MouseEvent) { if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false); }
-    document.addEventListener("mousedown", onDocClick); return () => document.removeEventListener("mousedown", onDocClick);
-  }, []);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(boxRef, open, close);
+  const query = q.trim().toLowerCase();
+  const filtered = useMemo(() => groups.filter((g) => g.name.toLowerCase().includes(query)).slice(0, 50), [groups, query]);
+  const exact = groups.some((g) => g.name.trim().toLowerCase() === query);
+  const finish = () => { setOpen(false); setQ(""); };
+
   return (
-    <div ref={boxRef} className="relative">
-      <button type="button" className="-my-2 inline-flex min-h-10 cursor-pointer items-center rounded-lg px-2 text-xs font-semibold uppercase tracking-wide text-accent hover:bg-accent-soft" onClick={() => setOpen((v) => !v)}>+ Add Group</button>
+    <div ref={boxRef} className={`relative ${open ? "z-30" : ""}`}>
+      <Button variant="ghost" size="sm" className="text-accent" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+        <PlusIcon className="h-4 w-4" /> Add
+      </Button>
       {open && (
-        <div className="absolute right-0 top-full z-20 mt-2 w-64 rounded-xl border border-line bg-surface shadow-xl">
-          <div className="p-2"><input className={inputClass} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search groups..." autoFocus /></div>
-          <div className="max-h-48 overflow-auto p-1 pt-0">
-            {filtered.length === 0 ? <div className="p-2 text-center"><button type="button" className="w-full rounded-lg bg-surface-sunken px-3 py-1.5 text-xs font-semibold text-fg hover:bg-slate-200" onClick={() => { if (q.trim()) onCreate(q.trim()); setOpen(false); setQ(""); }}>+ Create "{q}"</button></div> : <ul>{filtered.map((g) => <li key={g.id}><button type="button" className="w-full rounded-lg px-3 py-2 text-left text-sm text-fg hover:bg-surface-sunken" onClick={() => { onAdd(g.id); setOpen(false); setQ(""); }}>{g.name}</button></li>)}</ul>}
-          </div>
+        <div className="absolute right-0 top-full z-30 mt-2 w-64 rounded-2xl border border-line bg-surface p-2 shadow-2xl animate-in fade-in slide-in-from-top-1 duration-150">
+          <Input
+            className="h-10"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              e.preventDefault();
+              if (filtered[0]) { onAdd(filtered[0].id); finish(); }
+              else if (q.trim()) { onCreate(q.trim()); finish(); }
+            }}
+            placeholder="Find or create..."
+            aria-label="Find or create a collection"
+            autoFocus
+          />
+          <ul className="mt-1.5 max-h-56 overflow-auto">
+            {filtered.map((g) => (
+              <li key={g.id}>
+                <button type="button" className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-left text-sm text-fg-2 hover:bg-surface-sunken hover:text-fg" onClick={() => { onAdd(g.id); finish(); }}>
+                  <FolderIcon className="h-4 w-4 shrink-0 text-fg-4" /> <span className="truncate">{g.name}</span>
+                </button>
+              </li>
+            ))}
+            {query && !exact && (
+              <li>
+                <button type="button" className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-semibold text-accent hover:bg-accent-soft" onClick={() => { onCreate(q.trim()); finish(); }}>
+                  <PlusIcon className="h-4 w-4" /> Create “{q.trim()}”
+                </button>
+              </li>
+            )}
+            {!query && filtered.length === 0 && <li className="px-3 py-3 text-center text-xs text-fg-4">Type a name to create a collection.</li>}
+          </ul>
         </div>
       )}
     </div>
+  );
+}
+
+/* ================= OVERFLOW MENU ================= */
+
+function MoreMenu({ onDelete, onEditGame }: { onDelete: () => void; onEditGame?: () => void }) {
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef<HTMLDivElement | null>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useDismiss(boxRef, open, close);
+  const item = "flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition";
+  return (
+    <div ref={boxRef} className={`relative ${open ? "z-40" : ""}`}>
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-haspopup="menu" aria-label="More actions" className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white backdrop-blur-md transition hover:bg-white/20">
+        <EllipsisHorizontalIcon className="h-5 w-5" />
+      </button>
+      {open && (
+        <div role="menu" className="absolute right-0 top-full z-40 mt-2 w-52 rounded-2xl border border-line bg-surface p-1.5 shadow-2xl animate-in fade-in slide-in-from-top-1 duration-150">
+          {onEditGame && (
+            <button type="button" role="menuitem" className={`${item} text-fg-2 hover:bg-surface-sunken hover:text-fg`} onClick={() => { setOpen(false); onEditGame(); }}>
+              <PuzzlePieceIcon className="h-4 w-4" /> Edit game info
+            </button>
+          )}
+          <button type="button" role="menuitem" className={`${item} text-rose-600 hover:bg-danger-soft dark:text-rose-300`} onClick={() => { setOpen(false); onDelete(); }}>
+            <TrashIcon className="h-4 w-4" /> Delete idea
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ================= EDIT DIALOG ================= */
+
+function EditIdeaModal({ detail, onClose, onSave }: { detail: Detail; onClose: () => void; onSave: (patch: Pick<Detail, "title" | "description" | "detail_type">) => Promise<boolean> }) {
+  const [title, setTitle] = useState(detail.title);
+  const [description, setDescription] = useState(detail.description ?? "");
+  const [type, setType] = useState(detail.detail_type);
+  const [saving, setSaving] = useState(false);
+  const canSave = Boolean(title.trim()) && !saving;
+
+  const submit = async (event?: FormEvent) => {
+    event?.preventDefault();
+    if (!canSave) return;
+    setSaving(true);
+    const ok = await onSave({ title: title.trim(), description: description.trim(), detail_type: type });
+    setSaving(false);
+    if (ok) onClose();
+  };
+
+  return (
+    <Modal open onClose={() => !saving && onClose()} size="lg" onSubmit={submit} labelledBy="edit-idea-title">
+      <ModalHeader id="edit-idea-title" title="Edit idea" onClose={onClose} />
+      <ModalBody className="space-y-5" >
+        <div onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void submit(); } }} className="space-y-5">
+          <Field label="Title">
+            <Input className="h-12 text-base font-semibold" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
+          </Field>
+          <div>
+            <p className="mb-1.5 text-xs font-medium text-fg-3">Type</p>
+            <TypeChips value={type} onChange={setType} />
+          </div>
+          <Field label="Description">
+            <Textarea className="min-h-[200px] resize-y" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="How do you trigger it, what happens, and why is it interesting?" />
+          </Field>
+        </div>
+      </ModalBody>
+      <ModalFooter className="items-center">
+        <span className="mr-auto hidden text-xs text-fg-4 sm:block">Ctrl + Enter to save</span>
+        <Button variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
+        <Button type="submit" variant="primary" disabled={!canSave}>{saving ? "Saving..." : "Save changes"}</Button>
+      </ModalFooter>
+    </Modal>
   );
 }
 
@@ -168,79 +261,113 @@ export default function IdeaDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { success, error: notifyError, confirm } = useNotifications();
-  const rawId = params?.id;
-  const id = useMemo(() => Number(rawId), [rawId]);
+  const id = Number(params?.id);
 
-  const [detail, setDetail] = useState<Detail | null>(null);
-  const [game, setGame] = useState<Game | null>(null);
-  const [footage, setFootage] = useState<FootageRow[]>([]);
-  const [sources, setSources] = useState<SourceRow[]>([]);
+  // What the library card already knew, shown at once while the rest loads.
+  const [preview] = useState(() => (Number.isFinite(id) ? readIdeaPreview(id) : null));
+
+  const [detail, setDetail] = useState<Detail | null>(preview ? { ...preview, created_at: preview.created_at ?? null, pinned: Boolean(preview.pinned) } : null);
+  const [game, setGame] = useState<Game | null>(preview?.game ? { ...preview.game, release_year: preview.game.release_year ?? null } : null);
+  const [footage, setFootage] = useState<FootageRow[] | null>(null);
+  const [sources, setSources] = useState<SourceRow[] | null>(null);
   const [allGroups, setAllGroups] = useState<Group[]>([]);
-  const [ideaGroups, setIdeaGroups] = useState<Group[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [ideaGroups, setIdeaGroups] = useState<Group[] | null>(null);
+  const [projects, setProjects] = useState<ProjectUse[] | null>(null);
+  const [notFound, setNotFound] = useState(false);
 
-  /* Script State */
   const [showScriptModal, setShowScriptModal] = useState(false);
+  const [editing, setEditing] = useState(false);
 
-  /* Edit States */
-  const [editingCore, setEditingCore] = useState(false);
-  const [savingCore, setSavingCore] = useState(false);
-  const [draftTitle, setDraftTitle] = useState("");
-  const [draftDesc, setDraftDesc] = useState("");
-  const [draftType, setDraftType] = useState("small_detail");
-
-  /* Forms */
   const [fp, setFp] = useState("");
+  const [addingFootage, setAddingFootage] = useState(false);
+  const [failedThumbs, setFailedThumbs] = useState<Set<number>>(() => new Set());
   const [srcUrl, setSrcUrl] = useState("");
-  const [savingItem, setSavingItem] = useState(false);
-  const [fetchingTitle, setFetchingTitle] = useState(false);
+  const [addingSource, setAddingSource] = useState(false);
 
-  // Load Data
-  async function loadAll() {
-    setLoading(true);
-    if (!Number.isFinite(id)) {
-      setDetail(null);
-      setLoading(false);
-      return;
-    }
-    const { data: gs } = await supabase.from("idea_groups").select("*").order("name");
-    setAllGroups((gs ?? []) as Group[]);
+  const notifyErrorRef = useRef(notifyError);
+  useEffect(() => { notifyErrorRef.current = notifyError; }, [notifyError]);
 
-    const { data: d, error } = await supabase.from("details").select("*").eq("id", id).single();
-    if (error) { setLoading(false); return; }
-    setDetail(d as Detail);
+  // Everything loads in parallel; sections fill in as their data arrives.
+  useEffect(() => {
+    if (!Number.isFinite(id)) return;
+    let active = true;
 
-    setDraftTitle(d.title); setDraftDesc(d.description ?? ""); setDraftType(d.detail_type);
+    (async () => {
+      const { data: d, error } = await supabase.from("details").select("*").eq("id", id).single();
+      if (!active) return;
+      if (error || !d) {
+        setNotFound(true);
+        return;
+      }
+      setDetail(d as Detail);
+      const { data: g } = await supabase.from("games").select("*").eq("id", (d as Detail).game_id).single();
+      if (active && g) setGame(g as Game);
+    })();
 
-    const { data: g } = await supabase.from("games").select("*").eq("id", d.game_id).single();
-    setGame(g as Game);
+    supabase.from("footage").select("*").eq("detail_id", id).order("created_at", { ascending: false })
+      .then(({ data }) => { if (active) setFootage((data ?? []) as FootageRow[]); });
+    supabase.from("sources").select("*").eq("detail_id", id).order("created_at", { ascending: false })
+      .then(({ data }) => { if (active) setSources((data ?? []) as SourceRow[]); });
 
-    const { data: f } = await supabase.from("footage").select("*").eq("detail_id", id).order("created_at", { ascending: false });
-    setFootage((f ?? []) as FootageRow[]);
+    Promise.all([
+      supabase.from("idea_groups").select("*").order("name"),
+      supabase.from("idea_group_items").select("group_id").eq("detail_id", id),
+    ]).then(([groupsResult, linksResult]) => {
+      if (!active) return;
+      const groups = (groupsResult.data ?? []) as Group[];
+      const linked = new Set(((linksResult.data ?? []) as { group_id: number }[]).map((link) => link.group_id));
+      setAllGroups(groups);
+      setIdeaGroups(groups.filter((group) => linked.has(group.id)));
+    });
 
-    const { data: s } = await supabase.from("sources").select("*").eq("detail_id", id).order("created_at", { ascending: false });
-    setSources((s ?? []) as SourceRow[]);
+    supabase.from("scripts").select("id,title,status,assets").order("id", { ascending: false })
+      .then(({ data }) => {
+        if (!active) return;
+        const rows = (data ?? []) as (ProjectUse & { assets: { idea_id?: number | null }[] | null })[];
+        setProjects(rows.filter((row) => (row.assets || []).some((asset) => asset.idea_id === id)).map(({ id: pid, title, status }) => ({ id: pid, title, status })));
+      });
 
-    const { data: links } = await supabase.from("idea_group_items").select("group_id").eq("detail_id", id);
-    if (links && links.length > 0) {
-      const ids = links.map((x: any) => x.group_id);
-      const { data: myGs } = await supabase.from("idea_groups").select("*").in("id", ids).order("name");
-      setIdeaGroups((myGs ?? []) as Group[]);
-    } else {
-      setIdeaGroups([]);
-    }
-    setLoading(false);
-  }
+    return () => { active = false; };
+  }, [id]);
 
-  useEffect(() => { loadAll(); }, [id]);
   useEffect(() => { if (detail) document.title = `${detail.title} | NinjaPlay`; }, [detail]);
 
-  // Actions 
-  async function togglePin() { if (!detail) return; const newPinned = !detail.pinned; await supabase.from("details").update({ pinned: newPinned, pinned_at: newPinned ? new Date().toISOString() : null }).eq("id", detail.id); await loadAll(); }
+  const goBack = () => {
+    // Coming from the library: go back so its filters and scroll position are kept.
+    if (preview && window.history.length > 1) router.back();
+    else router.push("/");
+  };
+
+  /* ---------- Actions (all update the page in place) ---------- */
+
+  async function togglePin() {
+    if (!detail) return;
+    const pinned = !detail.pinned;
+    const pinned_at = pinned ? new Date().toISOString() : null;
+    setDetail({ ...detail, pinned, pinned_at });
+    const { error } = await supabase.from("details").update({ pinned, pinned_at }).eq("id", detail.id);
+    if (error) {
+      setDetail((current) => (current ? { ...current, pinned: !pinned } : current));
+      notifyError(error.message, "Could not update pin");
+    }
+  }
+
+  async function saveCore(patch: Pick<Detail, "title" | "description" | "detail_type">) {
+    if (!detail) return false;
+    const { error } = await supabase.from("details").update(patch).eq("id", detail.id);
+    if (error) {
+      notifyError(error.message, "Could not save idea");
+      return false;
+    }
+    setDetail({ ...detail, ...patch });
+    success("Idea updated.", "Saved");
+    return true;
+  }
+
   async function deleteIdea() {
     if (!detail) return;
-    const shouldDelete = await confirm({ kind: "warning", title: "Delete idea?", message: "Delete this idea?", confirmText: "Delete" });
-    if (!shouldDelete) return;
+    const ok = await confirm({ kind: "warning", title: "Delete idea?", message: "This removes the idea, its footage and sources.", confirmText: "Delete" });
+    if (!ok) return;
     const { error } = await supabase.from("details").delete().eq("id", detail.id);
     if (error) {
       notifyError(error.message, "Could not delete idea");
@@ -249,338 +376,443 @@ export default function IdeaDetailPage() {
     success("Idea deleted.", "Deleted");
     router.push("/");
   }
-  async function saveCore() { if (!detail) return; setSavingCore(true); const { error } = await supabase.from("details").update({ title: draftTitle.trim(), description: draftDesc.trim(), detail_type: draftType }).eq("id", detail.id); setSavingCore(false); if (!error) { setEditingCore(false); await loadAll(); } }
+
+  async function copyDescription() {
+    const text = [detail?.title, detail?.description].filter(Boolean).join("\n\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      success("Title and description copied.", "Copied");
+    } catch {
+      notifyError("The browser could not copy the text.", "Copy failed");
+    }
+  }
+
   async function addFootage() {
-    if (!detail || !fp.trim()) return;
-    setFetchingTitle(true);
     const link = fp.trim();
+    if (!detail || !link || addingFootage) return;
+    setAddingFootage(true);
     const metadata = await fetchYoutubeMetadata(link);
-    const isLocalFile = !link.startsWith("http");
     const { data, error } = await supabase
       .from("footage")
-      .insert({
-        detail_id: detail.id,
-        file_path: link,
-        title: metadata.title || null,
-        channel_name: metadata.channelName || null,
-        downloaded: isLocalFile,
-      })
+      .insert({ detail_id: detail.id, file_path: link, title: metadata.title || null, channel_name: metadata.channelName || null, downloaded: !link.startsWith("http") })
       .select("*")
       .single();
-    setFetchingTitle(false);
-    if (error) {
-      notifyError(error.message, "Could not add footage");
+    setAddingFootage(false);
+    if (error || !data) {
+      notifyError(error?.message || "Could not add footage", "Could not add footage");
       return;
     }
-    if (data) setFootage((current) => [data as FootageRow, ...current]);
+    setFootage((current) => [data as FootageRow, ...(current ?? [])]);
     setFp("");
   }
-  async function toggleDownloaded(fid: number, currentStatus: boolean) { setFootage(prev => prev.map(f => f.id === fid ? { ...f, downloaded: !currentStatus } : f)); await supabase.from("footage").update({ downloaded: !currentStatus }).eq("id", fid); }
-  async function deleteFootage(fid: number) {
-    const shouldDelete = await confirm({ kind: "warning", title: "Remove footage?", message: "Remove this footage?", confirmText: "Remove" });
-    if (!shouldDelete) return;
-    const { error } = await supabase.from("footage").delete().eq("id", fid);
-    if (error) notifyError(error.message, "Could not remove footage");
-    else success("Footage removed.", "Removed");
-    await loadAll();
-  }
-  async function addSource() { if (!detail || !srcUrl.trim()) return; setSavingItem(true); await supabase.from("sources").insert({ detail_id: detail.id, url: srcUrl.trim(), reliability: 3 }); setSrcUrl(""); setSavingItem(false); await loadAll(); }
-  async function deleteSource(sid: number) {
-    const shouldDelete = await confirm({ kind: "warning", title: "Remove source?", message: "Remove this source?", confirmText: "Remove" });
-    if (!shouldDelete) return;
-    const { error } = await supabase.from("sources").delete().eq("id", sid);
-    if (error) notifyError(error.message, "Could not remove source");
-    else success("Source removed.", "Removed");
-    await loadAll();
-  }
-  async function addToGroup(gid: number) {
-    if (!detail || ideaGroups.some((group) => group.id === gid)) return;
-    const group = allGroups.find((item) => item.id === gid);
-    const { error } = await supabase
-      .from("idea_group_items")
-      .insert({ group_id: gid, detail_id: detail.id, position: 0 });
+
+  async function toggleDownloaded(row: FootageRow) {
+    const downloaded = !row.downloaded;
+    setFootage((current) => (current ?? []).map((f) => (f.id === row.id ? { ...f, downloaded } : f)));
+    const { error } = await supabase.from("footage").update({ downloaded }).eq("id", row.id);
     if (error) {
-      notifyError(error.message, "Could not add collection");
+      setFootage((current) => (current ?? []).map((f) => (f.id === row.id ? { ...f, downloaded: row.downloaded } : f)));
+      notifyError(error.message, "Could not update clip");
+    }
+  }
+
+  async function deleteFootage(row: FootageRow) {
+    const ok = await confirm({ kind: "warning", title: "Remove clip?", message: row.title || row.file_path || "Remove this clip?", confirmText: "Remove" });
+    if (!ok) return;
+    const { error } = await supabase.from("footage").delete().eq("id", row.id);
+    if (error) {
+      notifyError(error.message, "Could not remove clip");
       return;
     }
-    if (group) {
-      setIdeaGroups((current) => [...current, group].sort((a, b) => a.name.localeCompare(b.name)));
+    setFootage((current) => (current ?? []).filter((f) => f.id !== row.id));
+  }
+
+  async function addSource() {
+    const url = srcUrl.trim();
+    if (!detail || !url || addingSource) return;
+    setAddingSource(true);
+    const { data, error } = await supabase.from("sources").insert({ detail_id: detail.id, url, reliability: 3 }).select("*").single();
+    setAddingSource(false);
+    if (error || !data) {
+      notifyError(error?.message || "Could not add source", "Could not add source");
+      return;
+    }
+    setSources((current) => [data as SourceRow, ...(current ?? [])]);
+    setSrcUrl("");
+  }
+
+  async function deleteSource(row: SourceRow) {
+    const ok = await confirm({ kind: "warning", title: "Remove source?", message: row.url, confirmText: "Remove" });
+    if (!ok) return;
+    const { error } = await supabase.from("sources").delete().eq("id", row.id);
+    if (error) {
+      notifyError(error.message, "Could not remove source");
+      return;
+    }
+    setSources((current) => (current ?? []).filter((s) => s.id !== row.id));
+  }
+
+  async function addToGroup(gid: number) {
+    if (!detail || ideaGroups?.some((group) => group.id === gid)) return;
+    const group = allGroups.find((item) => item.id === gid);
+    if (group) setIdeaGroups((current) => [...(current ?? []), group].sort((a, b) => a.name.localeCompare(b.name)));
+    const { error } = await supabase.from("idea_group_items").insert({ group_id: gid, detail_id: detail.id, position: 0 });
+    if (error) {
+      setIdeaGroups((current) => (current ?? []).filter((g) => g.id !== gid));
+      notifyError(error.message, "Could not add to collection");
     }
   }
+
   async function removeFromGroup(gid: number) {
     if (!detail) return;
-    const { error } = await supabase
-      .from("idea_group_items")
-      .delete()
-      .eq("group_id", gid)
-      .eq("detail_id", detail.id);
+    const previous = ideaGroups;
+    setIdeaGroups((current) => (current ?? []).filter((group) => group.id !== gid));
+    const { error } = await supabase.from("idea_group_items").delete().eq("group_id", gid).eq("detail_id", detail.id);
     if (error) {
-      notifyError(error.message, "Could not remove collection");
-      return;
+      setIdeaGroups(previous);
+      notifyError(error.message, "Could not remove from collection");
     }
-    setIdeaGroups((current) => current.filter((group) => group.id !== gid));
   }
+
   async function createGroup(name: string) {
-    const trimmedName = name.trim();
-    if (!trimmedName || !detail) return;
-    const { data, error } = await supabase
-      .from("idea_groups")
-      .insert({ name: trimmedName })
-      .select()
-      .single();
+    if (!detail || !name.trim()) return;
+    const { data, error } = await supabase.from("idea_groups").insert({ name: name.trim() }).select().single();
     if (error || !data) {
       notifyError(error?.message || "Could not create collection", "Could not create collection");
       return;
     }
-    const newGroup = data as Group;
-    setAllGroups((current) => [...current, newGroup].sort((a, b) => a.name.localeCompare(b.name)));
-    const { error: linkError } = await supabase
-      .from("idea_group_items")
-      .insert({ group_id: newGroup.id, detail_id: detail.id, position: 0 });
-    if (linkError) {
-      notifyError(linkError.message, "Collection created, but idea was not added");
-      return;
-    }
-    setIdeaGroups((current) => [...current, newGroup].sort((a, b) => a.name.localeCompare(b.name)));
+    const group = data as Group;
+    setAllGroups((current) => [...current, group].sort((a, b) => a.name.localeCompare(b.name)));
+    await addToGroup(group.id);
+    setIdeaGroups((current) => (current?.some((g) => g.id === group.id) ? current : [...(current ?? []), group].sort((a, b) => a.name.localeCompare(b.name))));
   }
 
-  if (loading) return <div className="flex h-screen items-center justify-center text-fg-4">Loading mission...</div>;
-  if (!detail) return <div className="p-8 text-center text-fg-3">Idea not found.</div>;
+  /* ---------- Render ---------- */
+
+  if (notFound || !Number.isFinite(id)) {
+    return (
+      <div className={`${appPageRootClass} xl:flex`}>
+        <AppSidebar activePage="ideas" />
+        <main className={appPageMainClass}>
+          <div className="app-container max-w-6xl">
+            <div className={`${cardClass} mt-6 text-center`}>
+              <p className="text-lg font-bold text-fg">Idea not found</p>
+              <p className="mt-1 text-sm text-fg-3">It may have been deleted.</p>
+              <Link href="/" className={`${buttonClass({ variant: "secondary" })} mt-4`}>Back to All Ideas</Link>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  const downloadedCount = (footage ?? []).filter((f) => f.downloaded).length;
+  const descriptionLength = detail?.description?.trim().length ?? 0;
 
   return (
-    <main className="min-h-screen bg-surface-muted pb-20">
-      
-      {/* ADD TO SCRIPT MODAL */}
-      {showScriptModal && <AddToScriptModal
-        isOpen
-        onClose={() => setShowScriptModal(false)} 
-        detail={detail} 
-        game={game} 
-        footage={footage}
-      />}
-      
-      {/* ================= NEW HERO HEADER (POSTER STYLE) ================= */}
-      <div className="relative w-full bg-slate-900 shadow-xl overflow-hidden">
-         
-         {/* Background Layer (Blur) */}
-         {game?.cover_url ? (
-            <div className="absolute inset-0 scale-110 opacity-40 blur-xl"><CoverImage src={game.cover_url} sizes="256px" priority /></div>
-         ) : (
-            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20" />
-         )}
-         {/* Gradient Overlay đậm hơn để text nổi bật */}
-         <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-slate-900/80 to-slate-900" />
+    <div className={`${appPageRootClass} xl:flex`}>
+      <AppSidebar activePage="ideas" />
 
-         {/* Navigation Top */}
-         <div className="detail-hero-nav absolute top-0 left-0 w-full p-6 flex justify-between items-start z-30">
-            <Link href="/" className={btnGlass} aria-label="Back to all ideas"><ArrowLeftIcon className="h-4 w-4" aria-hidden="true" /> <span className="max-sm:hidden">Home</span></Link>
-            
-            <div className="detail-hero-actions flex gap-2">
-              {!editingCore && (
-                <>
-                  <button onClick={() => setShowScriptModal(true)} className={btnGlass}>
-                    <FilmIcon className="h-4 w-4" aria-hidden="true" /> <span className="max-sm:hidden">Add to Script</span><span className="sm:hidden">Script</span>
-                  </button>
+      {showScriptModal && detail && (
+        <AddToScriptModal isOpen onClose={() => setShowScriptModal(false)} detail={detail} game={game} footage={footage ?? []} />
+      )}
+      {editing && detail && <EditIdeaModal detail={detail} onClose={() => setEditing(false)} onSave={saveCore} />}
 
-                  <button onClick={togglePin} className={btnGlass} aria-pressed={!!detail.pinned} aria-label={detail.pinned ? "Unpin idea" : "Pin idea"}>
-                    {detail.pinned ? <><StarSolidIcon className="h-4 w-4 text-amber-300" aria-hidden="true" /> <span className="max-sm:hidden">Pinned</span></> : <><StarIcon className="h-4 w-4" aria-hidden="true" /> <span className="max-sm:hidden">Pin</span></>}
-                  </button>
-                  <button onClick={() => setEditingCore(true)} className={btnGlass} aria-label="Edit idea">
-                    <PencilSquareIcon className="h-4 w-4" aria-hidden="true" /> <span className="max-sm:hidden">Edit</span>
-                  </button>
-                  <button onClick={deleteIdea} aria-label="Delete idea" className="inline-flex h-9 min-w-9 items-center justify-center gap-2 rounded-lg bg-rose-500/20 border border-rose-500/50 backdrop-blur-md px-4 text-sm font-semibold text-rose-100 hover:bg-rose-500 hover:text-white transition max-sm:h-11 max-sm:min-w-11 max-sm:px-3">
-                    <TrashIcon className="h-4 w-4 sm:hidden" aria-hidden="true" /> <span className="max-sm:hidden">Delete</span>
-                  </button>
-                </>
-              )}
-              {editingCore && (
-                <>
-                  <button onClick={saveCore} disabled={savingCore} className="inline-flex h-9 items-center justify-center rounded-lg bg-emerald-500 px-4 text-sm font-bold text-white shadow-lg hover:bg-emerald-600">
-                    {savingCore ? "Saving..." : "Save Changes"}
-                  </button>
-                  <button onClick={() => setEditingCore(false)} className={btnGlass}>
-                    Cancel
-                  </button>
-                </>
-              )}
-            </div>
-         </div>
+      <main className={appPageMainClass}>
+        <div className="app-container max-w-6xl">
+          {/* ---------- HERO ---------- */}
+          <section className="relative mb-5 overflow-hidden rounded-[1.75rem] border border-line bg-slate-900 shadow-sm sm:mb-6">
+            <CoverBackdrop src={game?.cover_url} alt="" sizes="(min-width: 1024px) 1100px, 100vw" imageClassName="scale-110 opacity-45 blur-2xl" priority />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/75 to-slate-950/40" />
 
-         {/* Hero Content Container */}
-         <div className="detail-hero-content relative z-20 mx-auto max-w-6xl px-6 pt-24 pb-12 md:pt-32">
-            <div className="flex flex-row items-end gap-4 sm:flex-col sm:items-stretch sm:gap-8 md:flex-row md:items-end">
-               
-               {/* 1. POSTER IMAGE (Điểm nhấn chính) */}
-               <div className="shrink-0">
-                  <div className="relative h-36 w-24 overflow-hidden rounded-xl border border-white/10 shadow-2xl shadow-black/50 rotate-[-2deg] transition hover:rotate-0 sm:h-64 sm:w-44 md:h-80 md:w-56">
-                     {game?.cover_url ? (
-                        <CoverImage src={game.cover_url} alt={`${game.title} cover`} sizes="(min-width: 768px) 224px, 176px" priority />
-                     ) : (
-                        <div className="flex h-full w-full items-center justify-center bg-slate-800 text-fg-3"><PuzzlePieceIcon className="h-12 w-12" aria-hidden="true" /></div>
-                     )}
-                     {/* Phản chiếu nhẹ */}
-                     <div className="absolute inset-0 bg-gradient-to-tr from-black/40 to-transparent pointer-events-none" />
-                  </div>
-               </div>
+            <div className="relative z-10 p-4 sm:p-6 lg:p-8">
+              <div className="flex items-center justify-between gap-2">
+                <button type="button" onClick={goBack} className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3.5 text-sm font-semibold text-white backdrop-blur-md transition hover:bg-white/20">
+                  <ArrowLeftIcon className="h-4 w-4" /> <span>All Ideas</span>
+                </button>
+                {detail && (
+                  <MoreMenu onDelete={() => void deleteIdea()} onEditGame={game ? () => router.push(`/games/${game.id}/edit`) : undefined} />
+                )}
+              </div>
 
-               {/* 2. TEXT CONTENT */}
-               <div className="min-w-0 flex-1 pb-2">
-                  <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-semibold uppercase tracking-wider text-blue-300 sm:mb-3 sm:text-sm">
-                     <span>{game?.title}</span>
-                     <span className="text-fg-3">•</span>
-                     <span>{game?.release_year || "N/A"}</span>
-                  </div>
-
-                  {editingCore ? (
-                     <div className="space-y-4 rounded-xl bg-black/40 p-4 border border-white/10 backdrop-blur-md">
-                        <input className={heroInputClass} value={draftTitle} onChange={e => setDraftTitle(e.target.value)} autoFocus />
-                        <div>
-                           <label className="text-xs text-fg-4 uppercase font-semibold">Type</label>
-                           <select className="w-full bg-slate-800 text-white rounded p-2 mt-1 border border-slate-600" value={draftType} onChange={e => setDraftType(e.target.value)}>
-                              <option value="small_detail">Small Detail</option>
-                              <option value="easter_egg">Easter Egg</option>
-                              <option value="npc_reaction">NPC Reaction</option>
-                              <option value="physics">Physics</option>
-                              <option value="troll">Troll</option>
-                              <option value="punish">Punish</option>
-                           </select>
-                        </div>
-                     </div>
+              <div className="mt-5 flex items-end gap-4 sm:mt-8 sm:gap-6">
+                <div className="relative aspect-[3/4] w-24 shrink-0 overflow-hidden rounded-2xl border border-white/15 bg-slate-800 shadow-2xl shadow-black/50 sm:w-36 lg:w-44">
+                  {game?.cover_url ? (
+                    <CoverImage src={game.cover_url} alt={`${game.title} cover`} sizes="(min-width: 1024px) 176px, (min-width: 640px) 144px, 96px" priority />
                   ) : (
-                     <>
-                        <h1 className="mb-3 text-2xl font-black leading-tight text-white drop-shadow-lg sm:mb-4 sm:text-3xl md:text-5xl">
-                           {detail.title}
-                        </h1>
-
-                        <div className="flex flex-wrap items-center gap-4">
-                           <TypeBadge t={detail.detail_type} />
-                        </div>
-                     </>
+                    <span className="absolute inset-0 flex items-center justify-center text-white/30"><PuzzlePieceIcon className="h-10 w-10" /></span>
                   )}
-               </div>
-            </div>
-         </div>
-      </div>
-
-      {/* ================= CONTENT BODY (OVERLAPPING LAYOUT) ================= */}
-      <div className="mx-auto max-w-6xl px-4 md:px-6 relative z-30 -mt-8">
-        <div className="grid gap-6 lg:grid-cols-3">
-          
-          {/* LEFT COLUMN */}
-          <div className="space-y-6 lg:col-span-2">
-            
-            {/* DESCRIPTION */}
-            <div className={cardClass}>
-              <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-fg-4 border-b border-line-soft pb-2">Detail Description</h3>
-              {editingCore ? (
-                 <textarea className={textareaClass} value={draftDesc} onChange={e => setDraftDesc(e.target.value)} />
-              ) : (
-                <div className="whitespace-pre-wrap break-words text-base leading-relaxed text-fg">
-                   {detail.description || <span className="italic text-fg-4">No description provided.</span>}
                 </div>
-              )}
-            </div>
 
-            {/* FOOTAGE */}
-            <div className={cardClass}>
-              <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-fg-4 border-b border-line-soft pb-2">Evidence / Footage</h3>
-              
-              <div className="mb-4 flex gap-2">
-                <input className={inputClass} placeholder="YouTube link..." value={fp} onChange={e => setFp(e.target.value)} disabled={fetchingTitle} onKeyDown={e => e.key === 'Enter' && addFootage()} />
-                <button onClick={addFootage} disabled={fetchingTitle} className={btnGhost}>{fetchingTitle ? "..." : "+"}</button>
-              </div>
-
-              {footage.length === 0 ? <p className="text-sm text-fg-4 italic">No footage added.</p> : (
-                <ul className="space-y-3">
-                  {footage.map(f => (
-                    <li key={f.id} className="group relative overflow-hidden rounded-xl border border-line-soft bg-surface-muted p-3 hover:border-blue-200 hover:shadow-md transition">
-                      <div className="flex items-start justify-between gap-3 relative z-10">
-                        <div className="flex items-start gap-3 min-w-0">
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface text-rose-500 shadow-sm text-xs">▶</span>
-                          <div className="min-w-0 pt-0.5">
-                            {f.title && <div className="font-bold text-sm text-fg line-clamp-1 hover:text-blue-600"><a href={f.file_path || "#"} target="_blank">{f.title}</a></div>}
-                            <div className="truncate text-xs text-fg-3">{renderLinkOrText(f.file_path)}</div>
-                          </div>
-                        </div>
-                        <button onClick={() => deleteFootage(f.id)} className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-fg-4 hover:bg-danger-soft hover:text-rose-500 pointer-coarse:h-11 pointer-coarse:w-11" aria-label="Remove footage"><XMarkIcon className="h-4 w-4" /></button>
+                <div className="min-w-0 flex-1 pb-1">
+                  {detail ? (
+                    <>
+                      <p className="flex flex-wrap items-center gap-x-2 text-xs font-semibold uppercase tracking-wider text-white/70 sm:text-sm">
+                        <span className="truncate">{game?.title ?? " "}</span>
+                        {game?.release_year && <><span className="text-white/35">•</span><span>{game.release_year}</span></>}
+                      </p>
+                      <h1 className="mt-1.5 line-clamp-4 break-words text-xl font-black leading-tight text-white drop-shadow sm:text-3xl lg:text-4xl">{detail.title}</h1>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <TypePill typeKey={detail.detail_type} />
+                        {detail.pinned && <span className="inline-flex items-center gap-1 rounded-md bg-amber-400/15 px-1.5 py-0.5 text-[11px] font-semibold text-amber-300"><StarSolidIcon className="h-3 w-3" /> Pinned</span>}
+                        {detail.created_at && <span className="inline-flex items-center gap-1 text-[11px] font-medium text-white/55"><CalendarDaysIcon className="h-3.5 w-3.5" /> {formatDate(detail.created_at)}</span>}
                       </div>
-                      {/* Download Status */}
-                      <div className="mt-2 pl-11">
-                         <button onClick={() => toggleDownloaded(f.id, f.downloaded)} className={`inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider px-2 py-1 rounded transition ${f.downloaded ? "bg-emerald-100 text-emerald-700" : "bg-surface-strong text-fg-3 hover:bg-slate-300"}`}>
-                           {f.downloaded ? <><CheckIcon className="h-3.5 w-3.5" aria-hidden="true" /> Downloaded</> : <><CloudArrowDownIcon className="h-3.5 w-3.5" aria-hidden="true" /> Need download</>}
-                         </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            {/* SOURCES */}
-            <div className={cardClass}>
-              <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-fg-4 border-b border-line-soft pb-2">References</h3>
-              <div className="mb-4 flex gap-2">
-                <input className={inputClass} placeholder="Source URL..." value={srcUrl} onChange={e => setSrcUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && addSource()} />
-                <button onClick={addSource} disabled={savingItem} className={btnGhost}>+</button>
-              </div>
-              <ul className="space-y-2">
-                  {sources.map(s => (
-                    <li key={s.id} className="flex items-center justify-between rounded-lg border border-line-soft bg-surface-muted px-3 py-2 text-sm hover:bg-white dark:hover:bg-surface-sunken transition">
-                      <div className="flex items-center gap-3 overflow-hidden">
-                        <GlobeAltIcon className="h-4 w-4 shrink-0 text-blue-500" aria-hidden="true" />
-                        <div className="min-w-0 truncate font-medium text-fg-2">{renderLinkOrText(s.url)}</div>
-                      </div>
-                      <button onClick={() => deleteSource(s.id)} className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-fg-4 hover:bg-danger-soft hover:text-rose-500 pointer-coarse:h-11 pointer-coarse:w-11" aria-label="Remove source"><XMarkIcon className="h-4 w-4" /></button>
-                    </li>
-                  ))}
-              </ul>
-            </div>
-          </div>
-
-          {/* RIGHT COLUMN */}
-          <div className="space-y-6 lg:col-span-1">
-             {/* GROUP CARD */}
-             <div className={`${cardClass} border-t-4 border-t-blue-500`}>
-               <div className="mb-4 flex items-center justify-between">
-                 <h3 className="text-xs font-semibold uppercase tracking-wider text-fg-3">Collections</h3>
-                 <GroupAddPicker groups={allGroups.filter((group) => !ideaGroups.some((current) => current.id === group.id))} onAdd={addToGroup} onCreate={createGroup} />
-               </div>
-               {ideaGroups.length === 0 ? <p className="text-sm text-fg-4">Uncategorized</p> : (
-                 <div className="flex flex-wrap gap-2">
-                   {ideaGroups.map(g => (
-                     <span key={g.id} className="group inline-flex items-center gap-1 rounded-lg border border-line bg-surface-muted px-2 py-1 text-xs font-bold text-fg-2 hover:border-blue-300 hover:bg-accent-soft hover:text-blue-700 transition">
-                       {g.name}
-                       <button onClick={() => removeFromGroup(g.id)} className="-my-1 -mr-1 ml-0.5 flex h-7 w-7 cursor-pointer items-center justify-center rounded-md text-fg-4 hover:text-rose-500 pointer-coarse:h-9 pointer-coarse:w-9" aria-label={`Remove from ${g.name}`}><XMarkIcon className="h-3.5 w-3.5" /></button>
-                     </span>
-                   ))}
-                 </div>
-               )}
-             </div>
-
-             {/* META CARD */}
-             <div className={cardClass}>
-               <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-fg-4">Meta Info</h3>
-               <div className="space-y-3 text-sm">
-                  <div className="flex justify-between">
-                     <span className="text-fg-3">Created</span>
-                     <span className="font-medium">{new Date(detail.created_at || "").toLocaleDateString()}</span>
-                  </div>
-                  {detail.pinned_at && (
-                     <div className="flex justify-between">
-                        <span className="text-fg-3">Pinned</span>
-                        <span className="font-medium">{new Date(detail.pinned_at).toLocaleDateString()}</span>
-                     </div>
+                    </>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="h-3 w-32 animate-pulse rounded bg-white/15" />
+                      <div className="h-8 w-3/4 animate-pulse rounded-lg bg-white/15" />
+                      <div className="h-5 w-24 animate-pulse rounded bg-white/15" />
+                    </div>
                   )}
-                  <div className="flex justify-between">
-                     <span className="text-fg-3">Game Genre</span>
-                     <span className="font-medium max-w-[150px] truncate text-right">{game?.genres_text || "-"}</span>
-                  </div>
-               </div>
-             </div>
-          </div>
+                </div>
+              </div>
 
+              {/* Main actions */}
+              <div className="mt-5 flex flex-wrap items-center gap-2 sm:mt-6">
+                <Button variant="accent" onClick={() => setShowScriptModal(true)} disabled={!detail} className="max-sm:flex-1">
+                  <FilmIcon className="h-4 w-4" /> Add to Script
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => void togglePin()}
+                  disabled={!detail}
+                  aria-pressed={Boolean(detail?.pinned)}
+                  className={`inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl border px-4 text-sm font-semibold backdrop-blur-md transition disabled:opacity-50 ${detail?.pinned ? "border-amber-300/40 bg-amber-400/20 text-amber-200 hover:bg-amber-400/30" : "border-white/15 bg-white/10 text-white hover:bg-white/20"}`}
+                >
+                  {detail?.pinned ? <StarSolidIcon className="h-4 w-4 text-amber-300" /> : <StarIcon className="h-4 w-4" />}
+                  {detail?.pinned ? "Pinned" : "Pin"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  disabled={!detail}
+                  className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 text-sm font-semibold text-white backdrop-blur-md transition hover:bg-white/20 disabled:opacity-50"
+                >
+                  <PencilSquareIcon className="h-4 w-4" /> Edit
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {/* ---------- BODY ---------- */}
+          <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-6">
+            <div className="min-w-0 space-y-5 lg:space-y-6">
+              {/* Description */}
+              <section className={cardClass}>
+                <CardTitle
+                  icon={<DocumentTextIcon className="h-4 w-4" />}
+                  title="Description"
+                  action={detail && (
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => void copyDescription()} aria-label="Copy title and description"><ClipboardDocumentIcon className="h-4 w-4" /> <span className="max-sm:hidden">Copy</span></Button>
+                      <Button variant="ghost" size="sm" onClick={() => setEditing(true)} aria-label="Edit description"><PencilSquareIcon className="h-4 w-4" /> <span className="max-sm:hidden">Edit</span></Button>
+                    </div>
+                  )}
+                />
+                {detail ? (
+                  detail.description?.trim() ? (
+                    <>
+                      <p className="whitespace-pre-wrap break-words text-[15px] leading-7 text-fg-2">{detail.description}</p>
+                      <p className="mt-3 text-right text-xs tabular-nums text-fg-4">{descriptionLength} characters</p>
+                    </>
+                  ) : (
+                    <button type="button" onClick={() => setEditing(true)} className="w-full cursor-pointer rounded-2xl border border-dashed border-line-strong p-5 text-sm text-fg-3 transition hover:border-blue-400 hover:text-accent">
+                      No description yet — add one
+                    </button>
+                  )
+                ) : (
+                  <div className="space-y-2"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-11/12" /><Skeleton className="h-4 w-2/3" /></div>
+                )}
+              </section>
+
+              {/* Footage */}
+              <section className={cardClass}>
+                <CardTitle
+                  icon={<FilmIcon className="h-4 w-4" />}
+                  title="Footage"
+                  count={footage ? footage.length : undefined}
+                  action={footage && footage.length > 0 && (
+                    <span className={`text-xs font-medium ${downloadedCount === footage.length ? "text-emerald-600 dark:text-emerald-300" : "text-fg-3"}`}>
+                      {downloadedCount}/{footage.length} downloaded
+                    </span>
+                  )}
+                />
+                <form className="mb-4 flex gap-2" onSubmit={(e) => { e.preventDefault(); void addFootage(); }}>
+                  <Input placeholder="Paste a YouTube link or file path" value={fp} onChange={(e) => setFp(e.target.value)} disabled={addingFootage} aria-label="Footage link or file path" />
+                  <Button type="submit" variant="secondary" size="icon" disabled={addingFootage || !fp.trim()} aria-label="Add footage">
+                    {addingFootage ? <ArrowPathIcon className="h-4 w-4 animate-spin" /> : <PlusIcon className="h-4 w-4" />}
+                  </Button>
+                </form>
+
+                {footage === null ? (
+                  <div className="space-y-2"><Skeleton className="h-20" /><Skeleton className="h-20" /></div>
+                ) : footage.length === 0 ? (
+                  <p className="rounded-2xl bg-surface-muted p-4 text-center text-sm text-fg-4">No clips yet. Paste a link above.</p>
+                ) : (
+                  <ul className="space-y-2.5">
+                    {footage.map((f) => {
+                      const ytId = f.file_path ? getYoutubeVideoId(f.file_path) : null;
+                      const href = isUrl(f.file_path) ? f.file_path : null;
+                      const fileName = !href && f.file_path ? f.file_path.split(/[\\/]/).pop() : null;
+                      const showThumb = Boolean(ytId) && !failedThumbs.has(f.id);
+                      const Thumb = href ? "a" : "span";
+                      return (
+                        <li key={f.id} className="group flex items-center gap-3 rounded-2xl border border-line-soft bg-surface-muted p-2 pr-1.5 sm:gap-4">
+                          <Thumb
+                            {...(href ? { href, target: "_blank", rel: "noopener noreferrer", "aria-label": `Open ${f.title || "clip"}` } : {})}
+                            className="relative aspect-video w-28 shrink-0 overflow-hidden rounded-xl bg-slate-900 sm:w-36"
+                          >
+                            {showThumb ? (
+                              <CoverImage src={`https://i.ytimg.com/vi/${ytId}/mqdefault.jpg`} alt="" sizes="144px" onError={() => setFailedThumbs((current) => new Set(current).add(f.id))} />
+                            ) : (
+                              <span className="absolute inset-0 flex items-center justify-center text-white/35"><FilmIcon className="h-6 w-6" /></span>
+                            )}
+                            {href && (
+                              <span className="absolute inset-0 flex items-center justify-center bg-black/10 transition group-hover:bg-black/30">
+                                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur"><PlayIcon className="ml-0.5 h-4 w-4" /></span>
+                              </span>
+                            )}
+                          </Thumb>
+                          <div className="min-w-0 flex-1">
+                            <p className="line-clamp-2 text-sm font-semibold leading-5 text-fg">{f.title || fileName || (href ? hostOf(href) : "Clip")}</p>
+                            <p className="mt-0.5 truncate text-xs text-fg-3">{f.channel_name || (href ? href.replace(/^https?:\/\/(www\.)?/i, "") : f.file_path)}</p>
+                            <button
+                              type="button"
+                              onClick={() => void toggleDownloaded(f)}
+                              aria-pressed={f.downloaded}
+                              className={`mt-1.5 inline-flex h-7 cursor-pointer items-center gap-1 rounded-lg px-2 text-[11px] font-semibold transition pointer-coarse:h-9 ${f.downloaded ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : "bg-surface-strong text-fg-3 hover:text-fg"}`}
+                            >
+                              {f.downloaded ? <><CheckIcon className="h-3.5 w-3.5" /> Downloaded</> : <><CloudArrowDownIcon className="h-3.5 w-3.5" /> Need download</>}
+                            </button>
+                          </div>
+                          <button type="button" onClick={() => void deleteFootage(f)} className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center self-start rounded-lg text-fg-4 transition hover:bg-danger-soft hover:text-rose-500 pointer-coarse:h-11 pointer-coarse:w-11" aria-label="Remove clip">
+                            <XMarkIcon className="h-4 w-4" />
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+
+              {/* Sources */}
+              <section className={cardClass}>
+                <CardTitle icon={<GlobeAltIcon className="h-4 w-4" />} title="References" count={sources ? sources.length : undefined} />
+                <form className="mb-4 flex gap-2" onSubmit={(e) => { e.preventDefault(); void addSource(); }}>
+                  <Input placeholder="Article, wiki or Reddit URL" value={srcUrl} onChange={(e) => setSrcUrl(e.target.value)} disabled={addingSource} aria-label="Source URL" />
+                  <Button type="submit" variant="secondary" size="icon" disabled={addingSource || !srcUrl.trim()} aria-label="Add source">
+                    {addingSource ? <ArrowPathIcon className="h-4 w-4 animate-spin" /> : <PlusIcon className="h-4 w-4" />}
+                  </Button>
+                </form>
+                {sources === null ? (
+                  <div className="space-y-2"><Skeleton className="h-12" /></div>
+                ) : sources.length === 0 ? (
+                  <p className="rounded-2xl bg-surface-muted p-4 text-center text-sm text-fg-4">No references yet.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {sources.map((s) => (
+                      <li key={s.id} className="group flex items-center gap-3 rounded-2xl border border-line-soft bg-surface-muted py-2 pl-3 pr-1.5">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface text-fg-4 ring-1 ring-line"><LinkIcon className="h-4 w-4" /></span>
+                        {isUrl(s.url) ? (
+                          <a href={s.url} target="_blank" rel="noopener noreferrer" className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-semibold text-fg group-hover:text-accent">{hostOf(s.url)}</span>
+                            <span className="block truncate text-xs text-fg-4">{s.url}</span>
+                          </a>
+                        ) : (
+                          <span className="min-w-0 flex-1 truncate font-mono text-sm text-fg-2">{s.url}</span>
+                        )}
+                        {isUrl(s.url) && <ArrowTopRightOnSquareIcon className="h-4 w-4 shrink-0 text-fg-4" aria-hidden="true" />}
+                        <button type="button" onClick={() => void deleteSource(s)} className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-fg-4 transition hover:bg-danger-soft hover:text-rose-500" aria-label="Remove source">
+                          <XMarkIcon className="h-4 w-4" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </div>
+
+            {/* ---------- SIDE ---------- */}
+            <aside className="space-y-5 lg:sticky lg:top-6 lg:space-y-6">
+              <section className={cardClass}>
+                <CardTitle
+                  icon={<FilmIcon className="h-4 w-4" />}
+                  title="In script projects"
+                  count={projects ? projects.length : undefined}
+                />
+                {projects === null ? (
+                  <Skeleton className="h-11" />
+                ) : projects.length === 0 ? (
+                  <p className="text-sm text-fg-4">Not used in a short project yet.</p>
+                ) : (
+                  <ul className="-mx-2 space-y-0.5">
+                    {projects.map((p) => (
+                      <li key={p.id}>
+                        <Link href={`/scripts?open=${p.id}`} className="flex items-center gap-2.5 rounded-xl px-2 py-2 text-sm text-fg-2 transition hover:bg-surface-sunken hover:text-fg">
+                          <span className={`h-2 w-2 shrink-0 rounded-full ${STATUS_DOT[p.status || "Draft"] ?? STATUS_DOT.Draft}`} title={p.status || "Draft"} />
+                          <span className="min-w-0 flex-1 truncate font-medium">{p.title}</span>
+                          <span className="shrink-0 text-xs text-fg-4">{p.status || "Draft"}</span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <Button variant="secondary" size="sm" className="mt-3 w-full" onClick={() => setShowScriptModal(true)} disabled={!detail}>
+                  <PlusIcon className="h-4 w-4" /> Add to a project
+                </Button>
+              </section>
+
+              <section className={cardClass}>
+                <CardTitle
+                  icon={<FolderIcon className="h-4 w-4" />}
+                  title="Collections"
+                  action={ideaGroups && <CollectionAdd groups={allGroups.filter((g) => !ideaGroups.some((c) => c.id === g.id))} onAdd={(gid) => void addToGroup(gid)} onCreate={(name) => void createGroup(name)} />}
+                />
+                {ideaGroups === null ? (
+                  <Skeleton className="h-8 w-2/3" />
+                ) : ideaGroups.length === 0 ? (
+                  <p className="text-sm text-fg-4">Not in any collection.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {ideaGroups.map((g) => (
+                      <span key={g.id} className="inline-flex h-8 max-w-full items-center gap-1 rounded-full border border-line bg-surface-muted pl-3 pr-1 text-xs font-semibold text-fg-2">
+                        <span className="truncate">{g.name}</span>
+                        <button type="button" onClick={() => void removeFromGroup(g.id)} className="flex h-6 w-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-fg-4 transition hover:bg-danger-soft hover:text-rose-500 pointer-coarse:h-7 pointer-coarse:w-7" aria-label={`Remove from ${g.name}`}>
+                          <XMarkIcon className="h-3.5 w-3.5" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <section className={cardClass}>
+                <CardTitle icon={<PuzzlePieceIcon className="h-4 w-4" />} title="Details" />
+                <dl className="space-y-2.5 text-sm">
+                  {[
+                    ["Game", game?.title ?? "—"],
+                    ["Released", game?.release_year ? String(game.release_year) : "—"],
+                    ["Genre", game?.genres_text || "—"],
+                    ["Added", formatDate(detail?.created_at)],
+                    ...(detail?.pinned && detail.pinned_at ? [["Pinned", formatDate(detail.pinned_at)]] : []),
+                  ].map(([label, value]) => (
+                    <div key={label} className="flex items-baseline justify-between gap-3">
+                      <dt className="shrink-0 text-fg-3">{label}</dt>
+                      <dd className="min-w-0 truncate text-right font-medium text-fg-2" title={value}>{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+                {game && (
+                  <Link href={`/games/${game.id}/edit`} className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-accent hover:underline">
+                    <PencilSquareIcon className="h-3.5 w-3.5" /> Edit game info
+                  </Link>
+                )}
+              </section>
+            </aside>
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
