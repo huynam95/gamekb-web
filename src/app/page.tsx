@@ -10,7 +10,7 @@ import type { VideoTheme } from "@/lib/videoThemes";
 import { PlayCircleIcon, StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import { AdjustmentsHorizontalIcon, ArrowDownIcon, ArrowPathIcon, ArrowUpIcon, CalendarDaysIcon, CheckIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, FilmIcon, MagnifyingGlassIcon, PencilSquareIcon, PlusIcon, PuzzlePieceIcon, Squares2X2Icon, TrashIcon, VideoCameraIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { captureStatusPatch, isMissingRecordingColumns, RECORDING_SETUP_MESSAGE } from "@/lib/recording";
-import { buildUsageIndex, invalidateUsage, linkIdeasToScript, loadUsage, useIdeaUsage } from "@/lib/ideaUsage";
+import { buildUsageIndex, linkIdeasToScript, loadUsage, useIdeaUsage } from "@/lib/ideaUsage";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppPageHeader, appPageMainClass, appPageRootClass } from "@/components/AppPage";
 import { GameEditorModal, IdeaItem, QuickViewModal, ScriptEditorModal } from "@/components/IdeaCards";
@@ -527,10 +527,6 @@ function IdeaGridSkeleton({ count = 8 }: { count?: number }) {
 export default function Home() {
   const router = useRouter();
   const { success, error: notifyError, warning, confirm: confirmNotice } = useNotifications();
-  const [longPickTarget, setLongPickTarget] = useState<{ id: number; title: string } | null>(null);
-  const longProjectId = longPickTarget?.id ?? Number.NaN;
-  const longProjectTitle = longPickTarget?.title || "Long video project";
-  const isLongProjectPickMode = Boolean(longPickTarget);
   const [games, setGames] = useState<Game[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupCounts, setGroupCounts] = useState<Map<number, number>>(new Map());
@@ -741,24 +737,6 @@ export default function Home() {
     else window.localStorage.removeItem(ACTIVE_VIDEO_THEME_STORAGE_KEY);
   }, [selectedThemeId]);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const id = Number(params.get("longProject"));
-    if (Number.isFinite(id) && id > 0) {
-      setLongPickTarget({ id, title: params.get("longProjectTitle")?.trim() || "Long video project" });
-    } else {
-      setLongPickTarget(null);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!isLongProjectPickMode) return;
-    setSelectedThemeId("");
-    setIsSelectMode(true);
-    setSelectedIds([]);
-    setSelectedIdeas([]);
-  }, [isLongProjectPickMode, longProjectId, themesLoaded]);
-
   useEffect(() => { const t = setTimeout(() => setDebouncedQ(q), 300); return () => clearTimeout(t); }, [q]);
 
   useEffect(() => {
@@ -806,7 +784,7 @@ export default function Home() {
       if (groupDetailIds.length === 0) return { kind: "empty" };
     }
 
-    // Usage filter: ids come from /api/usage (Short + Long video links).
+    // Usage filter: ids come from /api/usage (Short Project links).
     let usageIds: number[] | null = null;
     if (usageFilter) {
       const usage = buildUsageIndex(await loadUsage());
@@ -1076,38 +1054,6 @@ export default function Home() {
     if (nextIdeas.length === 0) return;
     setProjectIdeas(nextIdeas);
     setShowEditor(true);
-  };
-
-  const addIdeasToLongProject = async (sourceIdeas?: DetailRow[]) => {
-    if (!isLongProjectPickMode) return;
-    const ids = sourceIdeas ? sourceIdeas.map((idea) => idea.id) : selectedIds;
-    if (ids.length === 0) return;
-
-    try {
-      const response = await fetch(`/api/long-videos/${longProjectId}/ideas`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ detail_ids: ids }),
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Could not add ideas");
-
-      invalidateUsage();
-      const added = Number(payload.added ?? 0);
-      const skipped = Number(payload.skipped ?? 0);
-      success(
-        added > 0
-          ? `${added} idea${added === 1 ? "" : "s"} added${skipped ? ` · ${skipped} already in project` : ""}.`
-          : "All selected ideas were already in this project.",
-        "Recording list updated",
-      );
-      setSelectedIds([]);
-      setSelectedIdeas([]);
-      setShowSelectedReview(false);
-      router.push(`/long-videos/${longProjectId}`);
-    } catch (err) {
-      notifyError(err instanceof Error ? err.message : "Could not add ideas", "Long video project not updated");
-    }
   };
 
   const handleSaveScript = async (data: Partial<ScriptProject>) => {
@@ -1421,10 +1367,10 @@ export default function Home() {
         <div className="app-selection-bar fixed inset-x-0 bottom-0 z-[80] border-t border-slate-200 bg-white/95 p-4 shadow-[0_-5px_20px_rgba(0,0,0,0.1)] backdrop-blur dark:border-slate-800 dark:bg-slate-950/95">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 sm:flex-wrap sm:gap-3">
             <div className="flex min-w-0 items-center gap-4">
-              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white ${isLongProjectPickMode ? "bg-violet-600" : "bg-slate-900 dark:bg-slate-800"}`}>{selectedIds.length}</span>
+              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white bg-slate-900 dark:bg-slate-800`}>{selectedIds.length}</span>
               <div className="min-w-0 max-sm:hidden">
-                <p className="truncate text-sm font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-200">{isLongProjectPickMode ? "Ideas for long video" : "Ideas selected"}</p>
-                <p className="truncate text-xs font-medium text-slate-400 dark:text-slate-500">{isLongProjectPickMode ? longProjectTitle : selectedTheme ? `Topic: ${selectedTheme.title}` : "Select ideas for your script"}</p>
+                <p className="truncate text-sm font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-200">Ideas selected</p>
+                <p className="truncate text-xs font-medium text-slate-400 dark:text-slate-500">{selectedTheme ? `Topic: ${selectedTheme.title}` : "Select ideas for your script"}</p>
               </div>
             </div>
             <div className="selection-actions max-sm:!w-auto max-sm:!flex-nowrap max-sm:min-w-0 max-sm:flex-1 max-sm:justify-end">
@@ -1445,8 +1391,7 @@ export default function Home() {
                   setSelectedIds([]);
                   setSelectedIdeas([]);
                   setShowSelectedReview(false);
-                  if (isLongProjectPickMode) router.push(`/long-videos/${longProjectId}`);
-                  else handleThemeChange("");
+                  handleThemeChange("");
                 }}
                 className="flex h-11 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-xs font-semibold uppercase tracking-wider text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800 max-sm:!flex-none max-sm:w-11 max-sm:!px-0 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-100"
                 aria-label="Cancel selection"
@@ -1454,14 +1399,10 @@ export default function Home() {
                 <XMarkIcon className="h-5 w-5 sm:hidden" />
                 <span className="max-sm:hidden">Cancel</span>
               </button>
-              {isLongProjectPickMode ? (
-                <button disabled={selectedIds.length === 0} onClick={() => void addIdeasToLongProject()} className="flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-violet-600 px-5 text-sm font-bold text-white shadow-lg transition hover:bg-violet-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"><FilmIcon className="h-5 w-5" /> Add to project</button>
-              ) : (
                 <>
                 <button disabled={selectedIds.length === 0} onClick={() => void addSelectedToRecording()} className="flex h-11 cursor-pointer items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-bold text-rose-700 transition hover:bg-rose-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 max-sm:w-11 max-sm:justify-center max-sm:px-0 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:bg-rose-500/20" aria-label="Add selected ideas to the Recording List" title="Record these myself"><VideoCameraIcon className="h-5 w-5" /> <span className="max-sm:hidden">Record</span></button>
                 <button disabled={selectedIds.length === 0} onClick={() => void openScriptEditor()} className="flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-bold text-white shadow-lg transition hover:bg-blue-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"><PlayCircleIcon className="h-5 w-5" /> <span className="max-sm:hidden">Create Script</span><span className="sm:hidden">Create</span></button>
                 </>
-              )}
             </div>
           </div>
         </div>
@@ -1492,7 +1433,7 @@ export default function Home() {
         <div className="app-container library-container">
           <AppPageHeader
             title={pinnedOnly ? "Pinned" : activeGroup?.name || "All Ideas"}
-            description={pinnedOnly ? (isSelectMode ? "Pick from your pinned ideas. Ideas you already selected stay selected." : "Every idea you starred. Unpin a card to take it out of this list.") : activeGroup ? "Remove ideas that don't fit this collection. They stay in All Ideas." : isLongProjectPickMode ? `Browse and select ideas for ${longProjectTitle}.` : "Choose a topic, search your library, and build the next video from the ideas you already have."}
+            description={pinnedOnly ? (isSelectMode ? "Pick from your pinned ideas. Ideas you already selected stay selected." : "Every idea you starred. Unpin a card to take it out of this list.") : activeGroup ? "Remove ideas that don't fit this collection. They stay in All Ideas." : "Choose a topic, search your library, and build the next video from the ideas you already have."}
             icon={pinnedOnly ? <StarSolidIcon className="h-5 w-5 text-amber-500" /> : <Squares2X2Icon className="h-5 w-5" />}
             className="mb-4"
             action={
@@ -1502,22 +1443,7 @@ export default function Home() {
             }
           />
 
-          {isLongProjectPickMode ? (
-            <section className="mb-4 overflow-hidden rounded-3xl border border-violet-200 bg-gradient-to-r from-violet-600 via-fuchsia-600 to-rose-500 p-4 text-white shadow-sm sm:p-5 dark:border-violet-900">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="flex min-w-0 items-center gap-4">
-                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 backdrop-blur"><FilmIcon className="h-6 w-6" /></span>
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-white/70">Picking for long video</p>
-                    <h2 className="truncate text-xl font-bold">{longProjectTitle}</h2>
-                    <p className="mt-1 text-sm text-white/75">Search, filter, preview and select ideas. They will become your recording checklist.</p>
-                  </div>
-                </div>
-                <button type="button" onClick={() => router.push(`/long-videos/${longProjectId}`)} className="h-10 cursor-pointer rounded-xl bg-white/15 px-4 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/25">Back to project</button>
-              </div>
-            </section>
-          ) : (
-            <div className="relative z-[45] mb-4">
+          <div className="relative z-[45] mb-4">
               <VideoThemeBoard
                 value={selectedThemeId}
                 themes={videoThemes}
@@ -1528,7 +1454,6 @@ export default function Home() {
                 onReorder={handleReorderThemes}
               />
             </div>
-          )}
 
           <div className="library-toolbar mb-6 rounded-3xl border border-line bg-surface/90 p-2.5 shadow-sm backdrop-blur-md">
             <div className="library-filter-fields">
@@ -1598,7 +1523,6 @@ export default function Home() {
           <Modal open={showFilterSheet} onClose={() => setShowFilterSheet(false)} size="md" zClass="z-[150]" labelledBy="filter-sheet-title">
             <ModalHeader id="filter-sheet-title" title="Filters" onClose={() => setShowFilterSheet(false)} />
             <ModalBody className="space-y-5">
-              {!isLongProjectPickMode && (
                 <div>
                   <FieldLabel>Collection</FieldLabel>
                   <div className="flex flex-wrap gap-2">
@@ -1627,7 +1551,6 @@ export default function Home() {
                     ))}
                   </div>
                 </div>
-              )}
               <div>
                 <FieldLabel>Game</FieldLabel>
                 <ComboBox placeholder="All games" items={games.map(g=>({id:g.id, name:g.title, coverUrl:g.cover_url}))} selectedId={gameId} onChange={setGameId} />
@@ -1708,7 +1631,7 @@ export default function Home() {
           ) : (
             <ul className={`idea-grid transition-opacity duration-150 ${loading ? "opacity-60" : ""}`} aria-busy={loading}>
               {currentIdeas.map((r, index) => (
-                 <IdeaItem key={r.id} priority={index < 6} r={r} game={games.find(g => g.id === r.game_id)} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={togglePin} usage={usageOf(r.id)} onToggleRecord={isLongProjectPickMode ? undefined : (idea) => void toggleRecord(idea)} onEditGame={setEditingGame} onQuickView={setPreviewIdea} onRemoveFromGroup={groupId && loadedGroupId === groupId ? removeIdeaFromGroup : undefined} groupName={activeGroup?.name} removingFromGroup={removingGroupItems.has(`${groupId}:${r.id}`)} />
+                 <IdeaItem key={r.id} priority={index < 6} r={r} game={games.find(g => g.id === r.game_id)} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={togglePin} usage={usageOf(r.id)} onToggleRecord={(idea) => void toggleRecord(idea)} onEditGame={setEditingGame} onQuickView={setPreviewIdea} onRemoveFromGroup={groupId && loadedGroupId === groupId ? removeIdeaFromGroup : undefined} groupName={activeGroup?.name} removingFromGroup={removingGroupItems.has(`${groupId}:${r.id}`)} />
               ))}
             </ul>
           )}

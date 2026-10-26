@@ -852,7 +852,7 @@ export default function IdeaDetailPage() {
                             <span className="min-w-0 flex-1">
                               <span className="block truncate font-medium">{video.title}</span>
                               <span className="block text-[11px] text-fg-4">
-                                {video.kind === "short" ? "Short" : "Long video"} · {video.status}
+                                {video.status}
                               </span>
                             </span>
                           </Link>

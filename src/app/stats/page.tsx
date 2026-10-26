@@ -71,7 +71,7 @@ function MonthlyChart({ videos }: { videos: UsageVideo[] }) {
     const now = new Date();
     const list = Array.from({ length: 12 }, (_, i) => {
       const date = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1);
-      return { key: `${date.getFullYear()}-${date.getMonth()}`, label: date.toLocaleDateString("en-GB", { month: "short" }), full: date.toLocaleDateString("en-GB", { month: "long", year: "numeric" }), total: 0, published: 0, shorts: 0, longs: 0 };
+      return { key: `${date.getFullYear()}-${date.getMonth()}`, label: date.toLocaleDateString("en-GB", { month: "short" }), full: date.toLocaleDateString("en-GB", { month: "long", year: "numeric" }), total: 0, published: 0 };
     });
     const index = new Map(list.map((m, i) => [m.key, i]));
     for (const video of videos) {
@@ -81,7 +81,6 @@ function MonthlyChart({ videos }: { videos: UsageVideo[] }) {
       if (i === undefined) continue;
       list[i].total += 1;
       if (video.published) list[i].published += 1;
-      if (video.kind === "short") list[i].shorts += 1; else list[i].longs += 1;
     }
     return list;
   }, [videos]);
@@ -134,7 +133,6 @@ function MonthlyChart({ videos }: { videos: UsageVideo[] }) {
             <p className="font-semibold text-fg">{shown.full}</p>
             <p className="mt-1 flex justify-between text-fg-2"><span>Videos</span><span className="font-semibold tabular-nums">{shown.total}</span></p>
             <p className="flex justify-between text-fg-3"><span>Published</span><span className="tabular-nums">{shown.published}</span></p>
-            <p className="flex justify-between text-fg-3"><span>Shorts · Long</span><span className="tabular-nums">{shown.shorts} · {shown.longs}</span></p>
           </div>
         )}
       </div>
@@ -201,7 +199,7 @@ export default function StatsPage() {
     }
 
     const topicRows = new Map<string, { videos: number; published: number }>();
-    for (const v of videos.filter((video) => video.kind === "short")) {
+    for (const v of videos) {
       const key = v.topic?.trim() || "No topic";
       const row = topicRows.get(key) ?? { videos: 0, published: 0 };
       row.videos += 1; if (v.published) row.published += 1;
@@ -210,8 +208,6 @@ export default function StatsPage() {
 
     return {
       videos,
-      shorts: videos.filter((v) => v.kind === "short").length,
-      longs: videos.filter((v) => v.kind === "long").length,
       published: videos.filter((v) => v.published).length,
       used: used.length,
       fresh: ideas.length - used.length,
@@ -255,15 +251,15 @@ export default function StatsPage() {
 
               {/* Overview */}
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <Tile label="Ideas used in a video" value={`${stats.used}`} sub={`${totalIdeas ? Math.round((stats.used / totalIdeas) * 100) : 0}% of ${totalIdeas} ideas`} />
+                <Tile label="Ideas used in a Short" value={`${stats.used}`} sub={`${totalIdeas ? Math.round((stats.used / totalIdeas) * 100) : 0}% of ${totalIdeas} ideas`} />
                 <Tile label="Fresh ideas" value={formatCount(stats.fresh)} sub="Never used yet" />
-                <Tile label="Videos" value={`${stats.videos.length}`} sub={`${stats.shorts} shorts · ${stats.longs} long`} />
-                <Tile label="Published videos" value={`${stats.published}`} sub={`${stats.videos.length ? Math.round((stats.published / stats.videos.length) * 100) : 0}% of all videos`} />
+                <Tile label="Short Projects" value={`${stats.videos.length}`} sub={`${stats.videos.length - stats.published} in progress`} />
+                <Tile label="Published Shorts" value={`${stats.published}`} sub={`${stats.videos.length ? Math.round((stats.published / stats.videos.length) * 100) : 0}% of Short Projects`} />
               </div>
 
               <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
                 <section className={cardClass}>
-                  <SectionTitle icon={<FilmIcon className="h-4 w-4" />} title="Videos created per month" hint="Shorts and long videos, last 12 months. Hover a month for details." />
+                  <SectionTitle icon={<FilmIcon className="h-4 w-4" />} title="Shorts created per month" hint="Last 12 months. Hover a month for details." />
                   <MonthlyChart videos={stats.videos} />
                 </section>
 
@@ -339,7 +335,7 @@ export default function StatsPage() {
 
                 {/* By topic */}
                 <section className={cardClass}>
-                  <SectionTitle icon={<ChartPieIcon className="h-4 w-4" />} title="By topic (Shorts)" hint="Which topics you make the most Shorts about." />
+                  <SectionTitle icon={<ChartPieIcon className="h-4 w-4" />} title="By topic" hint="Which topics you make the most Shorts about." />
                   {stats.topics.length === 0 ? (
                     <p className="text-sm text-fg-4">No Short Projects yet.</p>
                   ) : (

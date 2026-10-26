@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 
 /* ================= TYPES (shared with /api/usage) ================= */
 
-export type VideoKind = "short" | "long";
+export type VideoKind = "short";
 
 export type UsageVideo = {
   kind: VideoKind;
@@ -134,7 +134,7 @@ export function formatCount(value: number | null | undefined) {
 }
 
 export function videoHref(video: Pick<UsageVideo, "kind" | "id">) {
-  return video.kind === "short" ? `/scripts?open=${video.id}` : `/long-videos/${video.id}`;
+  return `/scripts?open=${video.id}`;
 }
 
 export function statusDot(video: Pick<UsageVideo, "status" | "published">) {

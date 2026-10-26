@@ -11,7 +11,6 @@ import {
   ChatBubbleLeftRightIcon,
   CheckIcon,
   DocumentTextIcon,
-  FilmIcon,
   LightBulbIcon,
   PencilSquareIcon,
   PlusIcon,
@@ -26,7 +25,7 @@ import { Modal, ModalBody, ModalHeader } from "@/components/ui/Modal";
 import type { Group } from "@/types/gamekb";
 import logoImage from "@/assets/ninjaplay-logo.webp";
 
-type ActivePage = "ideas" | "dashboard" | "stats" | "scripts" | "recording" | "audienceRequests" | "longVideos" | "addGame" | "addIdea" | "migrate";
+type ActivePage = "ideas" | "dashboard" | "stats" | "scripts" | "recording" | "audienceRequests" | "addGame" | "addIdea" | "migrate";
 
 type AppSidebarProps = {
   activePage: ActivePage;
@@ -61,7 +60,6 @@ const navItems: Array<{ key: ActivePage; href: string; Icon: NavIconType; label:
   { key: "addIdea", href: "/add", Icon: LightBulbIcon, label: "Add Idea" },
   { key: "scripts", href: "/scripts", Icon: DocumentTextIcon, label: "Short Projects" },
   { key: "recording", href: "/recording", Icon: VideoCameraIcon, label: "Recording List" },
-  { key: "longVideos", href: "/long-videos", Icon: FilmIcon, label: "Long Video Studio" },
   { key: "audienceRequests", href: "/audience-requests", Icon: ChatBubbleLeftRightIcon, label: "Audience Requests" },
 ];
 
@@ -70,7 +68,7 @@ const tabItems: Array<{ key: ActivePage | "more"; href: string; Icon: NavIconTyp
   { key: "ideas", href: "/", Icon: Squares2X2Icon, label: "Ideas" },
   { key: "scripts", href: "/scripts", Icon: DocumentTextIcon, label: "Shorts" },
   { key: "addIdea", href: "/add", Icon: PlusIcon, label: "Add" },
-  { key: "longVideos", href: "/long-videos", Icon: FilmIcon, label: "Long video" },
+  { key: "recording", href: "/recording", Icon: VideoCameraIcon, label: "Record" },
   { key: "more", href: "#", Icon: Bars3Icon, label: "More" },
 ];
 
