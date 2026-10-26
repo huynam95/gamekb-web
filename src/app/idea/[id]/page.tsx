@@ -8,6 +8,7 @@ import {
   ArrowPathIcon,
   ArrowTopRightOnSquareIcon,
   CalendarDaysIcon,
+  ChartBarIcon,
   CheckIcon,
   ClipboardDocumentIcon,
   CloudArrowDownIcon,
@@ -31,6 +32,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { fetchYoutubeMetadata } from "@/lib/youtube";
 import { getYoutubeVideoId } from "@/lib/mediaLinks";
 import { readIdeaPreview } from "@/lib/ideaPreviewCache";
+import { formatCount, statusDot, useIdeaUsage, videoHref } from "@/lib/ideaUsage";
 import { useNotifications } from "@/components/NotificationCenter";
 import { AppSidebar } from "@/components/AppSidebar";
 import { appPageMainClass, appPageRootClass } from "@/components/AppPage";
@@ -85,15 +87,6 @@ type FootageRow = {
 
 type SourceRow = { id: number; detail_id: number; url: string; note: string | null; created_at: string | null };
 type Group = { id: number; name: string; description: string | null };
-type ProjectUse = { id: number; title: string; status: string | null };
-
-const STATUS_DOT: Record<string, string> = {
-  Draft: "bg-slate-400",
-  Filming: "bg-amber-500",
-  Edited: "bg-indigo-500",
-  Published: "bg-emerald-500",
-};
-
 /* ================= HELPERS ================= */
 
 const cardClass = "rounded-3xl border border-line bg-surface p-5 shadow-sm sm:p-6";
@@ -361,7 +354,8 @@ export default function IdeaDetailPage() {
   const [sources, setSources] = useState<SourceRow[] | null>(null);
   const [allGroups, setAllGroups] = useState<Group[]>([]);
   const [ideaGroups, setIdeaGroups] = useState<Group[] | null>(null);
-  const [projects, setProjects] = useState<ProjectUse[] | null>(null);
+  const { data: usageData, usageOf } = useIdeaUsage();
+  const usage = usageOf(id);
   const [notFound, setNotFound] = useState(false);
 
   const [showScriptModal, setShowScriptModal] = useState(false);
@@ -408,13 +402,6 @@ export default function IdeaDetailPage() {
       setAllGroups(groups);
       setIdeaGroups(groups.filter((group) => linked.has(group.id)));
     });
-
-    supabase.from("scripts").select("id,title,status,assets").order("id", { ascending: false })
-      .then(({ data }) => {
-        if (!active) return;
-        const rows = (data ?? []) as (ProjectUse & { assets: { idea_id?: number | null }[] | null })[];
-        setProjects(rows.filter((row) => (row.assets || []).some((asset) => asset.idea_id === id)).map(({ id: pid, title, status }) => ({ id: pid, title, status })));
-      });
 
     return () => { active = false; };
   }, [id]);
@@ -842,27 +829,44 @@ export default function IdeaDetailPage() {
             <aside className="space-y-5 lg:sticky lg:top-6 lg:space-y-6">
               {detail && <RecordingCard detail={detail} onChange={updateRecording} />}
               <section className={cardClass}>
-                <CardTitle
-                  icon={<FilmIcon className="h-4 w-4" />}
-                  title="In script projects"
-                  count={projects ? projects.length : undefined}
-                />
-                {projects === null ? (
-                  <Skeleton className="h-11" />
-                ) : projects.length === 0 ? (
-                  <p className="text-sm text-fg-4">Not used in a short project yet.</p>
+                <CardTitle icon={<ChartBarIcon className="h-4 w-4" />} title="Usage" count={usageData ? usage.total : undefined} />
+                {usageData === null ? (
+                  <Skeleton className="h-16" />
+                ) : usage.total === 0 ? (
+                  <p className="text-sm text-fg-3"><span className="font-semibold text-emerald-600 dark:text-emerald-300">Fresh idea</span> — not used in any video yet.</p>
                 ) : (
-                  <ul className="-mx-2 space-y-0.5">
-                    {projects.map((p) => (
-                      <li key={p.id}>
-                        <Link href={`/scripts?open=${p.id}`} className="flex items-center gap-2.5 rounded-xl px-2 py-2 text-sm text-fg-2 transition hover:bg-surface-sunken hover:text-fg">
-                          <span className={`h-2 w-2 shrink-0 rounded-full ${STATUS_DOT[p.status || "Draft"] ?? STATUS_DOT.Draft}`} title={p.status || "Draft"} />
-                          <span className="min-w-0 flex-1 truncate font-medium">{p.title}</span>
-                          <span className="shrink-0 text-xs text-fg-4">{p.status || "Draft"}</span>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
+                  <>
+                    <dl className="mb-3 grid grid-cols-3 gap-2 text-center">
+                      {[["Videos", String(usage.total)], ["Published", String(usage.published)], ["Views", usage.views ? formatCount(usage.views) : "—"]].map(([label, value]) => (
+                        <div key={label} className="rounded-xl bg-surface-muted px-1 py-2">
+                          <dd className="text-lg font-black tabular-nums text-fg">{value}</dd>
+                          <dt className="text-[11px] text-fg-4">{label}</dt>
+                        </div>
+                      ))}
+                    </dl>
+                    <ul className="-mx-2 space-y-0.5">
+                      {[...usage.videos].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).map((video) => (
+                        <li key={`${video.kind}-${video.id}`}>
+                          <Link href={videoHref(video)} className="flex items-center gap-2.5 rounded-xl px-2 py-2 text-sm text-fg-2 transition hover:bg-surface-sunken hover:text-fg">
+                            <span className={`h-2 w-2 shrink-0 rounded-full ${statusDot(video)}`} title={video.status} />
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate font-medium">{video.title}</span>
+                              <span className="block text-[11px] text-fg-4">
+                                {video.kind === "short" ? "Short" : "Long video"} · {video.status}
+                                {video.youtube_views != null && ` · ${formatCount(video.youtube_views)} views`}
+                              </span>
+                            </span>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                    {usage.videos.length > 0 && (
+                      <p className="mt-2 text-[11px] text-fg-4">
+                        First used {formatDate(usage.videos.reduce((min, v) => (!min || (v.created_at && v.created_at < min) ? v.created_at : min), null as string | null))}
+                        {usage.total > 1 && <> · last {formatDate(usage.videos.reduce((max, v) => (!max || (v.created_at && v.created_at > max) ? v.created_at : max), null as string | null))}</>}
+                      </p>
+                    )}
+                  </>
                 )}
                 <Button variant="secondary" size="sm" className="mt-3 w-full" onClick={() => setShowScriptModal(true)} disabled={!detail}>
                   <PlusIcon className="h-4 w-4" /> Add to a project

@@ -10,6 +10,7 @@ import type { VideoTheme } from "@/lib/videoThemes";
 import { PlayCircleIcon, StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import { AdjustmentsHorizontalIcon, ArrowDownIcon, ArrowPathIcon, ArrowUpIcon, CalendarDaysIcon, CheckIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, FilmIcon, MagnifyingGlassIcon, PencilSquareIcon, PlusIcon, PuzzlePieceIcon, Squares2X2Icon, TrashIcon, VideoCameraIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { captureStatusPatch, isMissingRecordingColumns, RECORDING_SETUP_MESSAGE } from "@/lib/recording";
+import { buildUsageIndex, invalidateUsage, linkIdeasToScript, loadUsage, useIdeaUsage } from "@/lib/ideaUsage";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppPageHeader, appPageMainClass, appPageRootClass } from "@/components/AppPage";
 import { GameEditorModal, IdeaItem, QuickViewModal, ScriptEditorModal } from "@/components/IdeaCards";
@@ -164,6 +165,19 @@ const TYPE_FILTER_OPTIONS: DropdownOption<string>[] = [
     Icon: TYPE_CONFIG[key].Icon,
   })),
 ];
+
+type UsageFilter = "" | "unused" | "used" | "published";
+
+const USAGE_FILTER_OPTIONS: DropdownOption<UsageFilter>[] = [
+  { value: "", label: "Any usage", Icon: FilmIcon },
+  { value: "unused", label: "Not used yet" },
+  { value: "used", label: "Used in a video" },
+  { value: "published", label: "In a published video" },
+];
+
+function UsageFilterDropdown({ value, onChange }: { value: UsageFilter; onChange: (value: UsageFilter) => void }) {
+  return <Dropdown value={value} options={USAGE_FILTER_OPTIONS} onChange={onChange} heading="Usage" ariaLabel="Filter by usage" />;
+}
 
 function TypeFilterDropdown({ value, onChange }: { value: string | ""; onChange: (value: string | "") => void }) {
   return <Dropdown value={value} options={TYPE_FILTER_OPTIONS} onChange={onChange} heading="Type" ariaLabel="Filter by type" />;
@@ -540,6 +554,8 @@ export default function Home() {
   const [gameId, setGameId] = useState<number | "">("");
   const [groupId, setGroupId] = useState<number | "">("");
   const [type, setType] = useState<string | "">("");
+  const [usageFilter, setUsageFilter] = useState<UsageFilter>("");
+  const { usageOf, data: usageData } = useIdeaUsage();
   const [releaseYear, setReleaseYear] = useState<number | "" | "unknown">("");
   const [selectedThemeId, setSelectedThemeId] = useState<string | "">("");
   const [videoThemes, setVideoThemes] = useState<VideoTheme[]>(DEFAULT_VIDEO_THEMES);
@@ -747,7 +763,7 @@ export default function Home() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedQ, gameId, groupId, type, releaseYear, sortOrder, pinnedOnly]);
+  }, [debouncedQ, gameId, groupId, type, releaseYear, sortOrder, pinnedOnly, usageFilter]);
 
   /*
    * Page loading. Every loaded page is kept for a short while and the next page
@@ -758,7 +774,8 @@ export default function Home() {
   const pageCacheRef = useRef(new Map<string, { result: IdeasPageResult; at: number }>());
   const idListCacheRef = useRef(new Map<string, { ids: number[]; total: number; at: number }>());
   const filterKey = JSON.stringify({
-    q: debouncedQ, gameId, groupId, type, releaseYear, sortOrder, pinnedOnly,
+    q: debouncedQ, gameId, groupId, type, releaseYear, sortOrder, pinnedOnly, usageFilter,
+    usage: usageFilter && usageData ? usageData.links.length : 0,
     seed: sortOrder === "random" ? randomSeed : 0,
     rev: ideasRevision,
     games: games.length,
@@ -789,8 +806,20 @@ export default function Home() {
       if (groupDetailIds.length === 0) return { kind: "empty" };
     }
 
+    // Usage filter: ids come from /api/usage (Short + Long video links).
+    let usageIds: number[] | null = null;
+    if (usageFilter) {
+      const usage = buildUsageIndex(await loadUsage());
+      usageIds = Array.from(usage.entries())
+        .filter(([, entry]) => (usageFilter === "published" ? entry.published > 0 : entry.total > 0))
+        .map(([id]) => id);
+      if (usageFilter !== "unused" && usageIds.length === 0) return { kind: "empty" };
+    }
+
     const applyFilters = (query: any) => {
       let nextQuery = query;
+      if (usageIds && usageFilter === "unused") { if (usageIds.length) nextQuery = nextQuery.not("id", "in", `(${usageIds.join(",")})`); }
+      else if (usageIds) nextQuery = nextQuery.in("id", usageIds);
       if (groupDetailIds) nextQuery = nextQuery.in("id", groupDetailIds);
       if (gameId) nextQuery = nextQuery.eq("game_id", gameId);
       if (releaseYear !== "") {
@@ -1063,6 +1092,7 @@ export default function Home() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "Could not add ideas");
 
+      invalidateUsage();
       const added = Number(payload.added ?? 0);
       const skipped = Number(payload.skipped ?? 0);
       success(
@@ -1081,11 +1111,12 @@ export default function Home() {
   };
 
   const handleSaveScript = async (data: Partial<ScriptProject>) => {
-    const { error } = await supabase.from("scripts").insert(data);
+    const { data: created, error } = await supabase.from("scripts").insert(data).select("id").single();
     if (error) {
       notifyError(error.message);
       return;
     }
+    if (created) void linkIdeasToScript((created as { id: number }).id, projectIdeas.map((idea) => idea.id));
 
     success("Added to Video Project.", "Project saved");
     setIsSelectMode(Boolean(selectedThemeId));
@@ -1276,7 +1307,7 @@ export default function Home() {
   };
 
   const activeGroup = groups.find((group) => group.id === groupId);
-  const phoneFilterCount = [Boolean(gameId), releaseYear !== "", Boolean(type), Boolean(groupId) || pinnedOnly, sortOrder !== "newest"].filter(Boolean).length;
+  const phoneFilterCount = [Boolean(gameId), releaseYear !== "", Boolean(type), Boolean(usageFilter), Boolean(groupId) || pinnedOnly, sortOrder !== "newest"].filter(Boolean).length;
 
   const goToPage = (p: number) => {
     setCurrentPage(p);
@@ -1546,12 +1577,15 @@ export default function Home() {
               <div className="library-type max-sm:hidden">
                 <TypeFilterDropdown value={type} onChange={setType} />
               </div>
+              <div className="library-usage max-sm:hidden">
+                <UsageFilterDropdown value={usageFilter} onChange={setUsageFilter} />
+              </div>
               <div className="library-sort flex min-w-0 items-center justify-between gap-2 max-sm:hidden">
                 <SortToggle value={sortOrder} onChange={handleSortChange} />
-                {(q||gameId||groupId||type||releaseYear!==""||pinnedOnly) && (
+                {(q||gameId||groupId||type||releaseYear!==""||pinnedOnly||usageFilter) && (
                   <button
                     type="button"
-                    onClick={()=>{setQ("");setGameId("");setGroupId("");setType("");setReleaseYear("");setPinnedOnly(false)}}
+                    onClick={()=>{setQ("");setGameId("");setGroupId("");setType("");setReleaseYear("");setPinnedOnly(false);setUsageFilter("")}}
                     className="h-10 shrink-0 cursor-pointer rounded-full px-3 text-sm font-semibold text-rose-500 transition hover:bg-danger-soft hover:text-rose-600 dark:hover:text-rose-300"
                   >
                     Clear filters
@@ -1622,6 +1656,27 @@ export default function Home() {
                 </div>
               </div>
               <div>
+                <FieldLabel>Usage</FieldLabel>
+                <div className="grid grid-cols-2 gap-2">
+                  {USAGE_FILTER_OPTIONS.map((option) => {
+                    const active = usageFilter === option.value;
+                    return (
+                      <button
+                        key={option.value || "any"}
+                        type="button"
+                        onClick={() => setUsageFilter(option.value)}
+                        aria-pressed={active}
+                        className={`flex h-11 cursor-pointer items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition active:scale-[0.98] ${
+                          active ? "border-slate-900 bg-slate-900 text-white dark:border-white dark:bg-white dark:text-slate-950" : "border-line bg-surface text-fg-2"
+                        }`}
+                      >
+                        <span className="truncate">{option.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
                 <FieldLabel>Release year</FieldLabel>
                 <YearFilterDropdown
                   value={releaseYear}
@@ -1653,7 +1708,7 @@ export default function Home() {
           ) : (
             <ul className={`idea-grid transition-opacity duration-150 ${loading ? "opacity-60" : ""}`} aria-busy={loading}>
               {currentIdeas.map((r, index) => (
-                 <IdeaItem key={r.id} priority={index < 6} r={r} game={games.find(g => g.id === r.game_id)} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={togglePin} onToggleRecord={isLongProjectPickMode ? undefined : (idea) => void toggleRecord(idea)} onEditGame={setEditingGame} onQuickView={setPreviewIdea} onRemoveFromGroup={groupId && loadedGroupId === groupId ? removeIdeaFromGroup : undefined} groupName={activeGroup?.name} removingFromGroup={removingGroupItems.has(`${groupId}:${r.id}`)} />
+                 <IdeaItem key={r.id} priority={index < 6} r={r} game={games.find(g => g.id === r.game_id)} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={togglePin} usage={usageOf(r.id)} onToggleRecord={isLongProjectPickMode ? undefined : (idea) => void toggleRecord(idea)} onEditGame={setEditingGame} onQuickView={setPreviewIdea} onRemoveFromGroup={groupId && loadedGroupId === groupId ? removeIdeaFromGroup : undefined} groupName={activeGroup?.name} removingFromGroup={removingGroupItems.has(`${groupId}:${r.id}`)} />
               ))}
             </ul>
           )}

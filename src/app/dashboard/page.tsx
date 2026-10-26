@@ -3,8 +3,9 @@
 import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { ChartBarIcon, ChevronRightIcon, DocumentTextIcon, PlayCircleIcon, PuzzlePieceIcon, SparklesIcon, VideoCameraIcon } from "@heroicons/react/24/outline";
+import { ChartBarIcon, ChartPieIcon, ChevronRightIcon, DocumentTextIcon, PlayCircleIcon, PuzzlePieceIcon, SparklesIcon, VideoCameraIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
+import { formatCount, linkIdeasToScript, useIdeaUsage } from "@/lib/ideaUsage";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppPageHeader, appPageContainerClass, appPageMainClass, appPageRootClass } from "@/components/AppPage";
 import { GameEditorModal, IdeaItem, QuickViewModal, ScriptEditorModal } from "@/components/IdeaCards";
@@ -47,6 +48,7 @@ export default function Dashboard() {
   const [showEditor, setShowEditor] = useState(false);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const [previewIdea, setPreviewIdea] = useState<DetailRow | null>(null);
+  const { data: usageData, byIdea: usageByIdea } = useIdeaUsage();
   const [recording, setRecording] = useState<{ toRecord: number; thisWeek: number; used: number; next: { id: number; title: string; game: string }[] } | null>(null);
 
   useEffect(() => {
@@ -100,11 +102,12 @@ export default function Dashboard() {
   };
 
   async function handleSaveScript(data: Partial<ScriptProject>) {
-    const { error } = await supabase.from("scripts").insert(data);
+    const { data: created, error } = await supabase.from("scripts").insert(data).select("id").single();
     if (error) {
       notifyError(error.message, "Could not save script");
       return;
     }
+    if (created) void linkIdeasToScript((created as { id: number }).id, selectedIds);
     success("Script saved successfully!", "Script saved");
     setIsSelectMode(false);
     setSelectedIds([]);
@@ -153,6 +156,18 @@ export default function Dashboard() {
               <StatCard title="Total Games" value={stats.games} icon={PuzzlePieceIcon} color="bg-emerald-500" />
               <StatCard title="Scripts" value={stats.scripts} icon={ChartBarIcon} color="bg-purple-500" />
            </div>
+
+           {usageData && (
+             <Link href="/stats" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[1.5rem] border border-line bg-surface px-4 py-3 shadow-sm transition hover:border-line-strong sm:px-5">
+               <span className="flex items-center gap-2 text-sm font-bold text-fg"><ChartPieIcon className="h-5 w-5 text-fg-4" /> Stats</span>
+               <span className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-fg-3">
+                 <span><span className="font-semibold tabular-nums text-fg">{usageByIdea.size}</span> of {stats.total} ideas used</span>
+                 <span><span className="font-semibold tabular-nums text-fg">{usageData.videos.length}</span> videos · {usageData.videos.filter((v) => v.published).length} published</span>
+                 {usageData.videos.some((v) => v.youtube_views != null) && <span><span className="font-semibold tabular-nums text-fg">{formatCount(usageData.videos.reduce((sum, v) => sum + (v.youtube_views ?? 0), 0))}</span> views</span>}
+                 <ChevronRightIcon className="h-4 w-4" />
+               </span>
+             </Link>
+           )}
 
            {recording && (
              <section className="mb-8 rounded-[1.5rem] border border-line bg-surface p-4 shadow-sm sm:mb-12 sm:p-5">

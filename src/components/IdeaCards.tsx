@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { Bars3Icon, CheckIcon, DocumentDuplicateIcon, ExclamationTriangleIcon, EyeIcon, FolderIcon, HashtagIcon, LinkIcon, PencilSquareIcon, StarIcon, TagIcon, TrashIcon, VideoCameraIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { Bars3Icon, CheckIcon, FilmIcon, DocumentDuplicateIcon, ExclamationTriangleIcon, EyeIcon, FolderIcon, HashtagIcon, LinkIcon, PencilSquareIcon, StarIcon, TagIcon, TrashIcon, VideoCameraIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import { supabase } from "@/lib/supabaseClient";
 import type { DetailRow, Game, ScriptProject } from "@/types/gamekb";
@@ -505,6 +505,7 @@ export function IdeaItem({
   onToggleSelect,
   onTogglePin,
   onToggleRecord,
+  usage,
   onEditGame,
   onQuickView,
   onRemoveFromGroup,
@@ -520,6 +521,8 @@ export function IdeaItem({
   onTogglePin: (id: number, current: boolean) => void;
   /** Add to / take off the Recording List. */
   onToggleRecord?: (idea: DetailRow) => void;
+  /** How many videos already use this idea. */
+  usage?: { total: number; published: number } | null;
   onEditGame: (game: Game) => void;
   onQuickView: (idea: DetailRow) => void;
   onRemoveFromGroup?: (idea: DetailRow) => void;
@@ -602,6 +605,14 @@ export function IdeaItem({
           <div className="flex items-center gap-2">
             <TypePill typeKey={r.detail_type} />
             {r.pinned && <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-300"><StarSolidIcon className="h-3 w-3" aria-hidden="true" /> Pinned</span>}
+            {usage && usage.total > 0 && (
+              <span
+                className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-semibold tabular-nums backdrop-blur-md ${usage.published ? "border-emerald-400/30 bg-emerald-500/20 text-emerald-100" : "border-white/15 bg-white/10 text-white/85"}`}
+                title={`Used in ${usage.total} video${usage.total === 1 ? "" : "s"}${usage.published ? ` · ${usage.published} published` : ""}`}
+              >
+                <FilmIcon className="h-3 w-3" aria-hidden="true" /> ×{usage.total}
+              </span>
+            )}
             {r.capture_status && CAPTURE_META[r.capture_status] && (
               <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-semibold backdrop-blur-md ${CAPTURE_META[r.capture_status].onDark}`}>
                 <VideoCameraIcon className="h-3 w-3" aria-hidden="true" /> {CAPTURE_META[r.capture_status].short}

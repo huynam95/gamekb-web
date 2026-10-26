@@ -14,6 +14,7 @@ import { analyzeAssetLinks } from "@/lib/assetLinks";
 import { buildScriptGuide } from "@/lib/scriptGuide";
 import { getScriptTopic, getScriptTopicValue } from "@/lib/scriptTopics";
 import { useProjectTopics } from "@/lib/useProjectTopics";
+import { YouTubeLinkField } from "@/components/YouTubeLinkField";
 import { ProjectTopicSelect } from "@/components/ProjectTopicSelect";
 import type { VideoTheme } from "@/lib/videoThemes";
 import {
@@ -487,9 +488,12 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh, topics,
                 </button>
               </div>
               <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-fg-4">Video Project Studio</p>
-              <div className="mt-3 max-w-md">
+              <div className="mt-3 grid max-w-2xl gap-3 sm:grid-cols-2">
+                <div className="min-w-0">
                 <ProjectTopicSelect label="Topic" value={getScriptTopicValue(formData)} topics={topics} loading={topicsLoading} onChange={(topic) => setFormData((current) => ({ ...current, topic }))} />
                 {topicsError && <p role="alert" className="mt-2 text-xs text-rose-500">{topicsError} <button type="button" onClick={onRetryTopics} className="cursor-pointer font-bold underline">Retry</button></p>}
+                </div>
+                {script?.id ? <YouTubeLinkField kind="short" id={script.id} initialUrl={(script as { youtube_url?: string | null }).youtube_url ?? ""} initialViews={(script as { youtube_views?: number | null }).youtube_views ?? null} onSaved={() => void onRefresh(script.id)} /> : null}
               </div>
             </div>
           </div>
@@ -851,8 +855,10 @@ export default function ScriptsPage() {
     return fresh;
   };
 
-  const handleUpdate = async (data: any) => {
+  const handleUpdate = async (rawData: any) => {
     if (!editingScript) return false;
+    // YouTube link/stats are saved on their own (see YouTubeLinkField); never overwrite them from the editor draft.
+    const data = Object.fromEntries(Object.entries(rawData ?? {}).filter(([key]) => !key.startsWith("youtube_")));
     const { error } = await supabase.from("scripts").update(data).eq("id", editingScript.id);
     if (error) {
       notifyError(error.message, "Could not update project");

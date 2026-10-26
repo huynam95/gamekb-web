@@ -497,8 +497,9 @@ html[data-tabbar="on"] .app-selection-bar {
   .library-filter-fields {
     grid-template-columns: repeat(12, minmax(0, 1fr));
   }
-  .library-search { grid-column: span 7; }
-  .library-game { grid-column: span 5; }
+  .library-search { grid-column: span 5; }
+  .library-game { grid-column: span 4; }
+  .library-usage { grid-column: span 3; }
   .library-year, .library-type { grid-column: span 3; }
   .library-sort { grid-column: span 6; }
 }
@@ -518,9 +519,9 @@ html[data-tabbar="on"] .app-selection-bar {
 
 @media (min-width: 1680px) {
   .library-filter-fields {
-    grid-template-columns: minmax(16rem, 1fr) minmax(11rem, 15rem) minmax(8rem, 10rem) minmax(9rem, 11rem) auto;
+    grid-template-columns: minmax(16rem, 1fr) minmax(11rem, 15rem) minmax(8rem, 10rem) minmax(9rem, 11rem) minmax(10rem, 12rem) auto;
   }
-  .library-search, .library-game, .library-year, .library-type, .library-sort { grid-column: auto; }
+  .library-search, .library-game, .library-year, .library-type, .library-usage, .library-sort { grid-column: auto; }
 }
 
 @media (min-width: 2200px) {

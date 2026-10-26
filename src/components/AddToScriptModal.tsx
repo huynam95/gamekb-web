@@ -16,6 +16,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useNotifications } from "@/components/NotificationCenter";
 import { buildScriptGuide } from "@/lib/scriptGuide";
 import { getScriptTopicValue } from "@/lib/scriptTopics";
+import { linkIdeasToScript, useIdeaUsage } from "@/lib/ideaUsage";
 import { getTopicVisual } from "@/lib/topicVisuals";
 import { useProjectTopics } from "@/lib/useProjectTopics";
 import { themeToHashtag, type VideoTheme } from "@/lib/videoThemes";
@@ -179,6 +180,8 @@ export function AddToScriptModal({
 
   // New project
   const { topics, loading: topicsLoading } = useProjectTopics(isOpen);
+  const { usageOf } = useIdeaUsage(isOpen);
+  const publishedIn = usageOf(detail.id).videos.filter((video) => video.published);
   const [topicTitle, setTopicTitle] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [titleEdited, setTitleEdited] = useState(false);
@@ -269,6 +272,7 @@ export function AddToScriptModal({
       notifyError("Failed to update script.", "Could not update script");
       return;
     }
+    void linkIdeasToScript(selected.script.id, [detail.id]);
     success(`Added to “${current.title}” as idea #${nextIdeaOrder}.`, "Script updated");
     setDone({ id: selected.script.id, title: current.title, ideaNumber: nextIdeaOrder, created: false });
   };
@@ -298,6 +302,8 @@ export function AddToScriptModal({
       notifyError("Failed to create script.", "Could not create script");
       return;
     }
+    const newId = (data as { id: number } | null)?.id ?? 0;
+    if (newId) void linkIdeasToScript(newId, [detail.id]);
     success("Created new script with this idea!", "Script created");
     setDone({ id: (data as { id: number } | null)?.id ?? 0, title, ideaNumber: 1, created: true });
   };
@@ -342,6 +348,14 @@ export function AddToScriptModal({
               <p className="mt-1 line-clamp-3 text-sm leading-6 text-fg-2">“{scriptLine}”</p>
               <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-fg-3">
                 <span className="inline-flex items-center gap-1"><FilmIcon className="h-3.5 w-3.5" /> {footage.length} clip{footage.length === 1 ? "" : "s"}</span>
+                {publishedIn.length > 0 && (
+                  <>
+                    <Dot />
+                    <span className="font-semibold text-rose-600 dark:text-rose-300" title={publishedIn.map((video) => video.title).join("\n")}>
+                      Already in {publishedIn.length} published video{publishedIn.length === 1 ? "" : "s"}
+                    </span>
+                  </>
+                )}
                 {alreadyIn.length > 0 && (
                   <>
                     <Dot />

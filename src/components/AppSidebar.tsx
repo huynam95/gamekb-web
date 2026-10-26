@@ -7,6 +7,7 @@ import {
   Bars3Icon,
   EllipsisHorizontalIcon,
   ChartBarIcon,
+  ChartPieIcon,
   ChatBubbleLeftRightIcon,
   CheckIcon,
   DocumentTextIcon,
@@ -25,7 +26,7 @@ import { Modal, ModalBody, ModalHeader } from "@/components/ui/Modal";
 import type { Group } from "@/types/gamekb";
 import logoImage from "@/assets/ninjaplay-logo.webp";
 
-type ActivePage = "ideas" | "dashboard" | "scripts" | "recording" | "audienceRequests" | "longVideos" | "addGame" | "addIdea" | "migrate";
+type ActivePage = "ideas" | "dashboard" | "stats" | "scripts" | "recording" | "audienceRequests" | "longVideos" | "addGame" | "addIdea" | "migrate";
 
 type AppSidebarProps = {
   activePage: ActivePage;
@@ -56,6 +57,7 @@ type NavIconType = ComponentType<SVGProps<SVGSVGElement>>;
 const navItems: Array<{ key: ActivePage; href: string; Icon: NavIconType; label: string }> = [
   { key: "ideas", href: "/", Icon: Squares2X2Icon, label: "All Ideas" },
   { key: "dashboard", href: "/dashboard", Icon: ChartBarIcon, label: "Dashboard" },
+  { key: "stats", href: "/stats", Icon: ChartPieIcon, label: "Stats" },
   { key: "addIdea", href: "/add", Icon: LightBulbIcon, label: "Add Idea" },
   { key: "scripts", href: "/scripts", Icon: DocumentTextIcon, label: "Short Projects" },
   { key: "recording", href: "/recording", Icon: VideoCameraIcon, label: "Recording List" },
