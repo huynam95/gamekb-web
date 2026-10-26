@@ -3,7 +3,7 @@
 import { CoverImage } from "@/components/CoverImage";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentType, SVGProps } from "react";
-import { ArrowPathIcon, ArrowTopRightOnSquareIcon, ChatBubbleLeftRightIcon, CheckIcon, ChevronDownIcon, CloudArrowDownIcon, CubeTransparentIcon, ExclamationTriangleIcon, FaceSmileIcon, FilmIcon, FolderIcon, GlobeAltIcon, LightBulbIcon, MagnifyingGlassIcon, PlusIcon, PuzzlePieceIcon, SparklesIcon, UserGroupIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { ArrowPathIcon, ArrowTopRightOnSquareIcon, ChatBubbleLeftRightIcon, CheckIcon, ChevronDownIcon, CloudArrowDownIcon, CubeTransparentIcon, ExclamationTriangleIcon, FaceSmileIcon, FilmIcon, FolderIcon, GlobeAltIcon, LightBulbIcon, MagnifyingGlassIcon, PhotoIcon, PlusIcon, PuzzlePieceIcon, SparklesIcon, UserGroupIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchYoutubeMetadata } from "@/lib/youtube";
@@ -242,6 +242,108 @@ function GamePicker({
   );
 }
 
+type NewGameDraft = { title: string; releaseYear: string; coverUrl: string };
+
+/** The full "add a game" form (same fields as the old Add Game page), shown inside Add Idea. */
+function NewGameForm({
+  draft,
+  onChange,
+  onSave,
+  onCancel,
+  saving,
+}: {
+  draft: NewGameDraft;
+  onChange: (draft: NewGameDraft) => void;
+  onSave: () => void;
+  onCancel: () => void;
+  saving: boolean;
+}) {
+  const coverUrl = draft.coverUrl.trim();
+  const [failedCover, setFailedCover] = useState<string | null>(null);
+  const showCover = Boolean(coverUrl) && failedCover !== coverUrl;
+
+  return (
+    <div
+      className="mt-3 rounded-2xl border border-accent-line bg-accent-soft/60 p-4 animate-in fade-in slide-in-from-top-1 duration-150 sm:p-5"
+      onKeyDown={(e) => {
+        // Enter adds the game instead of submitting the idea form around it.
+        if (e.key === "Enter" && !(e.metaKey || e.ctrlKey) && (e.target as HTMLElement).tagName === "INPUT") {
+          e.preventDefault();
+          onSave();
+        }
+      }}
+    >
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <p className="flex items-center gap-2 text-sm font-semibold text-accent">
+          <PuzzlePieceIcon className="h-4 w-4" /> New game
+        </p>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="touch-target flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-fg-4 transition hover:bg-surface hover:text-fg"
+          aria-label="Cancel new game"
+        >
+          <XMarkIcon className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_9rem]">
+        <Field label="Game title">
+          <Input
+            className="h-12 text-base font-semibold"
+            value={draft.title}
+            onChange={(e) => onChange({ ...draft, title: e.target.value })}
+            placeholder="e.g. Elden Ring"
+            autoFocus
+          />
+        </Field>
+        <Field label="Release year">
+          <Input
+            className="h-12"
+            type="number"
+            inputMode="numeric"
+            min={1970}
+            max={2100}
+            value={draft.releaseYear}
+            onChange={(e) => onChange({ ...draft, releaseYear: e.target.value })}
+            placeholder="e.g. 2026"
+          />
+        </Field>
+      </div>
+      <p className="mt-1.5 text-xs text-fg-4">The year is used by the Year filter on All Ideas. You can leave it blank and add it later.</p>
+
+      <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_9rem] sm:items-start">
+        <Field label="Cover image URL">
+          <Input
+            value={draft.coverUrl}
+            onChange={(e) => onChange({ ...draft, coverUrl: e.target.value })}
+            placeholder="https://..."
+            inputMode="url"
+          />
+          <span className="mt-1.5 block text-xs text-fg-4">Paste a direct link to an image (jpg, png, webp).</span>
+        </Field>
+        <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-line bg-surface-sunken sm:mt-6" aria-label="Cover preview">
+          {showCover ? (
+            <CoverImage key={coverUrl} src={coverUrl} sizes="(min-width: 640px) 144px, 100vw" alt="Cover preview" onError={() => setFailedCover(coverUrl)} />
+          ) : (
+            <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-center text-[11px] text-fg-4">
+              <PhotoIcon className="h-5 w-5" />
+              {coverUrl ? "Can't load image" : "Cover preview"}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="mt-5 flex justify-end gap-2">
+        <Button variant="ghost" onClick={onCancel}>Cancel</Button>
+        <Button variant="accent" onClick={onSave} disabled={saving || !draft.title.trim()}>
+          <PlusIcon className="h-4 w-4" /> {saving ? "Adding..." : "Add game"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function TypeChips({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Detail type">
@@ -418,7 +520,8 @@ export default function AddIdeaPage() {
 
   // Modals / Inline forms
   const [showCreateGame, setShowCreateGame] = useState(false);
-  const [newGameTitle, setNewGameTitle] = useState("");
+  const emptyGameDraft: NewGameDraft = { title: "", releaseYear: "", coverUrl: "" };
+  const [newGame, setNewGame] = useState<NewGameDraft>(emptyGameDraft);
   const [savingGame, setSavingGame] = useState(false);
 
   // Staging
@@ -443,6 +546,8 @@ export default function AddIdeaPage() {
     const presetDescription = params.get("description");
     if (presetTitle) setTitle(presetTitle);
     if (presetDescription) setDescription(presetDescription);
+    // Old "Add Game" links land here with the new-game form open.
+    if (params.get("newGame")) setShowCreateGame(true);
   }, []);
 
   useEffect(() => {
@@ -480,9 +585,22 @@ export default function AddIdeaPage() {
       });
   }, [debouncedTitle, gameId]);
 
+  function openNewGame(presetTitle = "") {
+    setNewGame({ ...emptyGameDraft, title: presetTitle });
+    setShowCreateGame(true);
+  }
+
+  function closeNewGame() {
+    setShowCreateGame(false);
+    setNewGame(emptyGameDraft);
+  }
+
   async function createGameInline() {
-    const trimmedTitle = newGameTitle.trim();
-    if (!trimmedTitle) return;
+    const trimmedTitle = newGame.title.trim();
+    if (!trimmedTitle) {
+      warning("Please enter a game title.", "Missing title");
+      return;
+    }
 
     const duplicate = games.find(
       (game) => normalizeGameTitle(game.title) === normalizeGameTitle(trimmedTitle),
@@ -492,10 +610,20 @@ export default function AddIdeaPage() {
       return;
     }
 
+    const parsedReleaseYear = newGame.releaseYear.trim() ? Number(newGame.releaseYear) : null;
+    if (parsedReleaseYear !== null && (!Number.isInteger(parsedReleaseYear) || parsedReleaseYear < 1970 || parsedReleaseYear > 2100)) {
+      warning("Please enter a valid release year.", "Invalid year");
+      return;
+    }
+
     setSavingGame(true);
     const { data, error } = await supabase
       .from("games")
-      .insert({ title: trimmedTitle })
+      .insert({
+        title: trimmedTitle,
+        release_year: parsedReleaseYear,
+        cover_url: newGame.coverUrl.trim() || null,
+      })
       .select("id")
       .single();
     setSavingGame(false);
@@ -511,14 +639,13 @@ export default function AddIdeaPage() {
 
     if (data) {
       setGameId(data.id);
-      setShowCreateGame(false);
-      setNewGameTitle("");
+      closeNewGame();
       const { data: gs } = await supabase
         .from("games")
         .select("*")
         .order("title");
       setGames((gs ?? []) as Game[]);
-      success("Game added to your library.", "Game saved");
+      success(`“${trimmedTitle}” added to your library and selected.`, "Game saved");
     }
   }
 
@@ -705,7 +832,7 @@ export default function AddIdeaPage() {
         <div className="app-container max-w-6xl">
           <AppPageHeader
             title="Add Idea"
-            description="Capture a game detail, secret or mechanic. Game, title and description are required; everything else is optional."
+            description="Capture a game detail, secret or mechanic — and add a new game to your library right here if it isn’t there yet. Game, title and description are required."
             icon={<LightBulbIcon className="h-5 w-5" />}
             className="mb-4"
             action={audienceRequestId ? (
@@ -729,41 +856,31 @@ export default function AddIdeaPage() {
             <div className="min-w-0 space-y-5">
               {/* 1. Game */}
               <section className={cardClass} aria-labelledby="add-step-game">
-                <h2 id="add-step-game" className={`${sectionTitleClass} mb-3`}><StepBadge n={1} done={Boolean(gameId)} /> Game</h2>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h2 id="add-step-game" className={sectionTitleClass}><StepBadge n={1} done={Boolean(gameId)} /> Game</h2>
+                  {!showCreateGame && (
+                    <Button variant="ghost" size="sm" onClick={() => openNewGame()} className="text-accent">
+                      <PlusIcon className="h-4 w-4" /> New game
+                    </Button>
+                  )}
+                </div>
                 <GamePicker
                   games={games}
                   selectedGameId={gameId}
-                  onSelect={(g) => setGameId(g.id)}
-                  onCreateGame={(t) => {
-                    setNewGameTitle(t);
-                    setShowCreateGame(true);
+                  onSelect={(g) => {
+                    setGameId(g.id);
+                    if (showCreateGame && !newGame.title.trim()) closeNewGame();
                   }}
+                  onCreateGame={(t) => openNewGame(t)}
                 />
                 {showCreateGame && (
-                  <div className="mt-3 rounded-2xl border border-accent-line bg-accent-soft p-3 animate-in fade-in slide-in-from-top-1 duration-150">
-                    <p className="mb-2 text-xs font-semibold text-accent">New game</p>
-                    <div className="flex gap-2">
-                      <Input
-                        value={newGameTitle}
-                        onChange={(e) => setNewGameTitle(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            void createGameInline();
-                          }
-                        }}
-                        placeholder="Game title"
-                        aria-label="New game title"
-                        autoFocus
-                      />
-                      <Button variant="accent" onClick={() => void createGameInline()} disabled={savingGame || !newGameTitle.trim()}>
-                        {savingGame ? "Adding..." : "Add game"}
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => setShowCreateGame(false)} aria-label="Cancel new game">
-                        <XMarkIcon className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
+                  <NewGameForm
+                    draft={newGame}
+                    onChange={setNewGame}
+                    onSave={() => void createGameInline()}
+                    onCancel={closeNewGame}
+                    saving={savingGame}
+                  />
                 )}
               </section>
 
