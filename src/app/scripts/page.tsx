@@ -10,7 +10,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppPageHeader, appPageMainClass, appPageRootClass } from "@/components/AppPage";
 import { useNotifications } from "@/components/NotificationCenter";
-import { analyzeAssetLinks } from "@/lib/assetLinks";
+import { analyzeAssetLinks, countClips, getClipIdentity } from "@/lib/assetLinks";
 import { buildScriptGuide } from "@/lib/scriptGuide";
 import { getScriptTopic, getScriptTopicValue } from "@/lib/scriptTopics";
 import { useProjectTopics } from "@/lib/useProjectTopics";
@@ -78,6 +78,16 @@ function getScriptChannels(script: ScriptProject) {
   );
 }
 
+/** A clip saved on one of the project's ideas (footage table). */
+type IdeaClip = {
+  detail_id: number;
+  file_path: string;
+  title: string | null;
+  channel_name: string | null;
+  idea_title: string;
+  game_title: string;
+};
+
 async function enrichScriptsWithFootageChannels(rows: ScriptProject[]) {
   const urls = Array.from(
     new Set(
@@ -126,8 +136,10 @@ function getTopicVisual(topic: string) {
 
 /* ================= MODAL: STUDIO WORKSPACE ================= */
 
-function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh, topics, topicsLoading, topicsError, onRetryTopics }: {
+function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh, topics, topicsLoading, topicsError, onRetryTopics, ideaClips = [] }: {
   isOpen: boolean;
+  /** Clips on this project's ideas, so ones missing from the assets list can be added. */
+  ideaClips?: IdeaClip[];
   onClose: () => void;
   script: ScriptProject | null;
   onSave: (data: Partial<ScriptProject>) => Promise<boolean>;
@@ -165,6 +177,32 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh, topics,
 
   const assetAnalysis = useMemo(() => analyzeAssetLinks(formData.assets || []), [formData.assets]);
   const scriptGuide = useMemo(() => buildScriptGuide(String(formData.content || "")), [formData.content]);
+  const missingIdeaClips = useMemo(() => {
+    const have = new Set((formData.assets || []).map((asset) => getClipIdentity(asset.url || "")).filter(Boolean));
+    const seen = new Set<string>();
+    return ideaClips.filter((clip) => {
+      const id = getClipIdentity(clip.file_path);
+      if (!id || have.has(id) || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  }, [formData.assets, ideaClips]);
+
+  const addMissingIdeaClips = () => {
+    const sectionForGame = (game: string) =>
+      scriptGuide.find((section) => !section.isHook && section.label.trim().toLowerCase() === game.trim().toLowerCase())?.number ?? null;
+    const added = missingIdeaClips.map((clip) => ({
+      url: clip.file_path,
+      name: clip.title || clip.file_path.split("/").pop() || "Video",
+      channel_name: clip.channel_name,
+      idea_id: clip.detail_id,
+      idea_title: clip.idea_title,
+      game_title: clip.game_title,
+      idea_order: sectionForGame(clip.game_title),
+    }));
+    setFormData((current) => ({ ...current, assets: [...(current.assets || []), ...added] }));
+    success(`${added.length} clip${added.length === 1 ? "" : "s"} added to the project.`, "Assets updated");
+  };
 
   useEffect(() => {
     onSaveRef.current = onSave;
@@ -678,7 +716,7 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh, topics,
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wider text-fg-4">Project Assets</p>
                   <p className="mt-1 text-xs font-medium text-slate-400 dark:text-slate-500">
-                    {(formData.assets || []).length} entries · {assetAnalysis.uniqueLinkCount} unique links
+                    {countClips((formData.assets || []).map((asset) => asset.url)).clips} clips · {assetAnalysis.uniqueLinkCount} source {assetAnalysis.uniqueLinkCount === 1 ? "video" : "videos"} to download
                   </p>
                 </div>
                 <button
@@ -689,6 +727,21 @@ function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh, topics,
                   <DocumentDuplicateIcon className="h-4 w-4" /> Copy Unique Links
                 </button>
               </div>
+
+              {missingIdeaClips.length > 0 && (
+                <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900 sm:flex-row sm:items-center sm:justify-between dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+                  <div className="flex items-start gap-3">
+                    <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold">{missingIdeaClips.length} clip{missingIdeaClips.length === 1 ? "" : "s"} from this project&apos;s ideas {missingIdeaClips.length === 1 ? "isn't" : "aren't"} in the list</p>
+                      <p className="mt-1 text-xs leading-5 opacity-80">{missingIdeaClips.map((clip) => clip.idea_title).filter((v, i, a) => a.indexOf(v) === i).join(" · ")}</p>
+                    </div>
+                  </div>
+                  <button type="button" onClick={addMissingIdeaClips} className="inline-flex shrink-0 cursor-pointer items-center gap-2 self-start rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-amber-700 sm:self-auto">
+                    <PlusIcon className="h-4 w-4" /> Add {missingIdeaClips.length === 1 ? "it" : "them"}
+                  </button>
+                </div>
+              )}
 
               {assetAnalysis.repeatedLinkCount > 0 && (
                 <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-100/80 p-4 text-slate-700 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
@@ -780,6 +833,37 @@ export default function ScriptsPage() {
     }
     load();
   }, []);
+
+  // Clips on each project's ideas (via script_ideas), so the Clips column counts clips added after the project was made.
+  const [ideaClipsByScript, setIdeaClipsByScript] = useState<Map<number, IdeaClip[]>>(new Map());
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const { data: links, error } = await supabase.from("script_ideas").select("script_id,detail_id");
+      if (error || !links?.length || !active) return;
+      const ideaIds = Array.from(new Set((links as { detail_id: number }[]).map((link) => link.detail_id)));
+      const clips: (IdeaClip & { detail_id: number })[] = [];
+      for (let i = 0; i < ideaIds.length; i += 200) {
+        const { data } = await supabase
+          .from("footage")
+          .select("detail_id,file_path,title,channel_name,detail:details(title,game:games(title))")
+          .in("detail_id", ideaIds.slice(i, i + 200));
+        for (const row of (data ?? []) as unknown as { detail_id: number; file_path: string | null; title: string | null; channel_name: string | null; detail: { title: string; game: { title: string } | null } | null }[]) {
+          if (!row.file_path?.trim()) continue;
+          clips.push({ detail_id: row.detail_id, file_path: row.file_path, title: row.title, channel_name: row.channel_name, idea_title: row.detail?.title ?? "", game_title: row.detail?.game?.title ?? "" });
+        }
+      }
+      if (!active) return;
+      const byIdea = new Map<number, IdeaClip[]>();
+      for (const clip of clips) byIdea.set(clip.detail_id, [...(byIdea.get(clip.detail_id) ?? []), clip]);
+      const result = new Map<number, IdeaClip[]>();
+      for (const link of links as { script_id: number; detail_id: number }[]) {
+        result.set(link.script_id, [...(result.get(link.script_id) ?? []), ...(byIdea.get(link.detail_id) ?? [])]);
+      }
+      setIdeaClipsByScript(result);
+    })();
+    return () => { active = false; };
+  }, [scripts.length]);
 
   // Ideas still on the Recording List, matched to projects by footage or by their "• Game: title" line.
   const [toRecordIdeas, setToRecordIdeas] = useState<{ id: number; line: string }[]>([]);
@@ -994,7 +1078,7 @@ export default function ScriptsPage() {
 
   return (
     <div className={`${appPageRootClass} xl:flex`}>
-      <ScriptEditorModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} script={editingScript} onSave={handleUpdate} onRefresh={refreshScriptProject} topics={topics} topicsLoading={topicsLoading} topicsError={topicsError} onRetryTopics={retryTopics} />
+      <ScriptEditorModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} script={editingScript} onSave={handleUpdate} onRefresh={refreshScriptProject} topics={topics} topicsLoading={topicsLoading} topicsError={topicsError} onRetryTopics={retryTopics} ideaClips={editingScript ? ideaClipsByScript.get(editingScript.id) ?? [] : []} />
 
       <AppSidebar activePage="scripts" hideTabBar={selecting} />
 
@@ -1122,7 +1206,8 @@ export default function ScriptsPage() {
                   const selected = selectedIds.includes(script.id);
                   const topicValue = getScriptTopicValue(script);
                   const topicVisual = getTopicVisual(topicValue || "No topic");
-                  const clipCount = analyzeAssetLinks(script.assets || []).uniqueLinkCount;
+                  const clipStats = countClips([...(script.assets || []).map((asset) => asset.url), ...(ideaClipsByScript.get(script.id) ?? []).map((clip) => clip.file_path)]);
+                  const clipCount = clipStats.clips;
                   const created = new Date(script.created_at).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
                   const channelLabel = channels.length ? `${channels[0]}${channels.length > 1 ? ` +${channels.length - 1}` : ""}` : "";
                   const meta = [topicValue || "No topic", channelLabel, `${clipCount} ${clipCount === 1 ? "clip" : "clips"}`, created].filter(Boolean);
@@ -1176,7 +1261,7 @@ export default function ScriptsPage() {
                         <span className={`truncate ${topicValue ? "" : "text-fg-4"}`}>{topicValue || "No topic"}</span>
                       </span>
                       <span className={`hidden truncate text-sm lg:block ${channels.length ? "text-fg-2" : "text-fg-4"}`} title={channels.join(" · ") || undefined}>{channelLabel || "—"}</span>
-                      <span className="hidden text-right text-sm tabular-nums text-fg-2 lg:block">{clipCount}</span>
+                      <span className="hidden text-right text-sm tabular-nums text-fg-2 lg:block" title={clipStats.sources !== clipCount ? `${clipCount} clips from ${clipStats.sources} source videos` : undefined}>{clipCount}</span>
                       <span className="hidden text-sm tabular-nums text-fg-3 lg:block">{created}</span>
 
                       <div className="relative z-10 shrink-0">
