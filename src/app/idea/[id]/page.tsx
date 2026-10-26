@@ -9,8 +9,8 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchYoutubeMetadata } from "@/lib/youtube";
 import { useNotifications } from "@/components/NotificationCenter";
-import { buildScriptGuide } from "@/lib/scriptGuide";
-import { ArrowLeftIcon, CheckIcon, CloudArrowDownIcon, DocumentDuplicateIcon, DocumentPlusIcon, FilmIcon, FolderPlusIcon, GlobeAltIcon, HashtagIcon, PencilSquareIcon, PuzzlePieceIcon, StarIcon, TagIcon, TrashIcon, VideoCameraIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { AddToScriptModal } from "@/components/AddToScriptModal";
+import { ArrowLeftIcon, CheckIcon, CloudArrowDownIcon, DocumentDuplicateIcon, FilmIcon, GlobeAltIcon, HashtagIcon, PencilSquareIcon, PuzzlePieceIcon, StarIcon, TagIcon, TrashIcon, VideoCameraIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
 /* ================= TYPES ================= */
 
@@ -158,223 +158,6 @@ function GroupAddPicker({ groups, onAdd, onCreate }: { groups: Group[]; onAdd: (
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-/* ================= COMPONENT: ADD TO SCRIPT MODAL ================= */
-function AddToScriptModal({ 
-  isOpen, onClose, detail, game, footage 
-}: { 
-  isOpen: boolean; onClose: () => void; 
-  detail: Detail; game: Game | null; footage: FootageRow[];
-}) {
-  const { success, error: notifyError } = useNotifications();
-  const [activeTab, setActiveTab] = useState<"existing" | "new">("existing");
-  const [scripts, setScripts] = useState<{ id: number; title: string; status: string }[]>([]);
-  const [selectedScriptId, setSelectedScriptId] = useState<number | "">("");
-  const [loading, setLoading] = useState(false);
-
-  // Form data cho phần Tạo mới
-  const [newTitle, setNewTitle] = useState(`Video Script: ${detail?.title || "Draft"}`);
-
-  // Fetch danh sách scripts mỗi khi mở modal
-  useEffect(() => {
-    if (isOpen) {
-      supabase.from("scripts").select("id, title, status").order("id", { ascending: false })
-        .then(({ data }) => {
-          if (data) {
-            setScripts(data);
-            if (data.length > 0) setSelectedScriptId(data[0].id);
-          }
-        });
-    }
-  }, [isOpen]);
-
-  if (!isOpen || !detail) return null;
-
-  // Xử lý Dữ liệu của Idea hiện tại
-  const ideaTitle = detail.title;
-  const ideaDesc = detail.description || "";
-  const gameName = game?.title || "";
-
-  const ensurePeriod = (text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed) return trimmed;
-    return /[.!?…]$/.test(trimmed) ? trimmed : `${trimmed}.`;
-  };
-
-  const smoothScriptDetail = (text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed) return trimmed;
-    return /^(If|When|During|After|Before|At|Right|There|You|Most|But|And)\b/.test(trimmed)
-      ? trimmed.charAt(0).toLowerCase() + trimmed.slice(1)
-      : trimmed;
-  };
-
-  const buildScriptLine = () => {
-    const rawDetail = (ideaDesc || ideaTitle || "")
-      .replace(/\s+/g, " ")
-      .replace(/^\[[^\]]+\]\s*/, "")
-      .trim();
-    const safeGameName = gameName || "this game";
-
-    if (!rawDetail) return `In ${safeGameName}, ${smoothScriptDetail(ideaTitle)}`;
-    if (/^in\s+/i.test(rawDetail)) return ensurePeriod(rawDetail);
-
-    return ensurePeriod(`In ${safeGameName}, ${smoothScriptDetail(rawDetail)}`);
-  };
-  
-  const newContentPart = buildScriptLine();
-  const newDescPart = `• ${gameName || "Unknown Game"}: ${ideaTitle}${ideaDesc ? `\n${ideaDesc}` : ""}`;
-  const newTags = [gameName, "Shorts", "Gaming", "Game Facts"].filter(Boolean);
-  const newHashtags = ["#shorts", "#gaming", gameName ? `#${gameName.replace(/\s+/g, '').toLowerCase()}` : ""].filter(Boolean);
-  const baseNewAssets = footage.map(f => ({
-    url: f.file_path || "",
-    name: f.title || f.file_path?.split('/').pop() || "Video",
-    channel_name: f.channel_name || null,
-    idea_id: detail.id,
-    idea_title: ideaTitle,
-    game_title: gameName || "Unknown Game",
-  }));
-
-  // Xử lý THÊM VÀO SCRIPT CÓ SẴN
-  const handleAddToExisting = async () => {
-    if (!selectedScriptId) return;
-    setLoading(true);
-
-    const { data: currentScript, error: fetchErr } = await supabase.from("scripts").select("*").eq("id", selectedScriptId).single();
-    
-    if (fetchErr || !currentScript) {
-      notifyError("Error fetching script data.", "Could not load script");
-      setLoading(false);
-      return;
-    }
-
-    // Merge logic
-    const mergedContent = currentScript.content ? `${currentScript.content}\n\n${newContentPart}` : newContentPart;
-    const mergedDesc = currentScript.description ? `${currentScript.description}\n\n${newDescPart}` : newDescPart;
-    const mergedTags = Array.from(new Set([...(currentScript.tags || []), ...newTags]));
-    const mergedHashtags = Array.from(new Set([...(currentScript.hashtags || []), ...newHashtags]));
-    const nextIdeaOrder = buildScriptGuide(String(currentScript.content || "")).filter((section) => !section.isHook).length + 1;
-    const newAssets = baseNewAssets.map((asset) => ({ ...asset, idea_order: nextIdeaOrder }));
-    const mergedAssets = [...(currentScript.assets || []), ...newAssets];
-
-    const { error: updateErr } = await supabase.from("scripts").update({
-      content: mergedContent,
-      description: mergedDesc,
-      tags: mergedTags,
-      hashtags: mergedHashtags,
-      assets: mergedAssets
-    }).eq("id", selectedScriptId);
-
-    setLoading(false);
-    if (!updateErr) {
-      success("Added idea to existing script successfully!", "Script updated");
-      onClose();
-    } else {
-      notifyError("Failed to update script.", "Could not update script");
-    }
-  };
-
-  // Xử lý TẠO SCRIPT MỚI
-  const handleCreateNew = async () => {
-    if (!newTitle.trim()) return;
-    setLoading(true);
-
-    const { error } = await supabase.from("scripts").insert({
-      title: newTitle.trim(),
-      content: newContentPart,
-      description: `Video tổng hợp các chi tiết thú vị.\n\n${newDescPart}`,
-      tags: newTags,
-      hashtags: newHashtags,
-      assets: baseNewAssets.map((asset) => ({ ...asset, idea_order: 1 })),
-      status: "Draft"
-    });
-
-    setLoading(false);
-    if (!error) {
-      success("Created new script with this idea!", "Script created");
-      onClose();
-    } else {
-      notifyError("Failed to create script.", "Could not create script");
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in cursor-pointer" onClick={onClose}>
-      <div className="bg-surface w-full max-w-xl rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 cursor-auto" onClick={e => e.stopPropagation()}>
-        
-        {/* Header */}
-        <div className="px-6 py-5 border-b border-line-soft bg-surface-muted flex justify-between items-center">
-          <div>
-            <h2 className="text-xl font-bold text-fg">Add to Script Project</h2>
-            <p className="text-xs font-medium text-fg-3 mt-1 line-clamp-1">{detail.title}</p>
-          </div>
-          <button onClick={onClose} className="rounded-full p-2 text-fg-4 transition hover:bg-surface-sunken hover:text-fg-2" aria-label="Close" type="button"><XMarkIcon className="h-5 w-5" /></button>
-        </div>
-
-        {/* Tabs Toggle */}
-        <div className="flex p-2 bg-surface-sunken/50">
-          <button onClick={() => setActiveTab("existing")} className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold rounded-xl transition ${activeTab === "existing" ? "bg-surface text-accent shadow-sm border border-line" : "text-fg-3 hover:bg-surface-sunken"}`}>
-            <FolderPlusIcon className="w-5 h-5"/> Existing Script
-          </button>
-          <button onClick={() => setActiveTab("new")} className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold rounded-xl transition ${activeTab === "new" ? "bg-surface text-accent shadow-sm border border-line" : "text-fg-3 hover:bg-surface-sunken"}`}>
-            <DocumentPlusIcon className="w-5 h-5"/> New Script
-          </button>
-        </div>
-
-        {/* Tab Content */}
-        <div className="p-6 bg-surface min-h-[220px]">
-          {activeTab === "existing" ? (
-            <div className="space-y-6">
-              <div>
-                <label className="text-xs font-semibold uppercase text-fg-4 mb-2 block tracking-wider">Select Script</label>
-                {scripts.length === 0 ? (
-                  <div className="p-4 rounded-xl border border-dashed border-line-strong text-center text-sm text-fg-3 font-medium">No scripts found. Create a new one first!</div>
-                ) : (
-                  <select 
-                    className="h-12 w-full rounded-xl border border-line bg-surface px-4 text-sm font-bold text-fg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-sm cursor-pointer"
-                    value={selectedScriptId}
-                    onChange={e => setSelectedScriptId(Number(e.target.value))}
-                  >
-                    {scripts.map(s => (
-                      <option key={s.id} value={s.id}>{s.title} ({s.status})</option>
-                    ))}
-                  </select>
-                )}
-              </div>
-              <button 
-                onClick={handleAddToExisting} 
-                disabled={loading || scripts.length === 0} 
-                className="w-full h-12 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 active:scale-[0.98] transition disabled:opacity-50 shadow-lg shadow-blue-500/30"
-              >
-                {loading ? "Adding..." : "Add to Selected Script"}
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <div>
-                <label className="text-xs font-semibold uppercase text-fg-4 mb-2 block tracking-wider">New Script Title</label>
-                <input 
-                  className="h-12 w-full rounded-xl border border-line bg-surface px-4 text-sm font-bold text-fg outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 shadow-sm"
-                  value={newTitle}
-                  onChange={e => setNewTitle(e.target.value)}
-                  placeholder="Enter script title..."
-                  autoFocus
-                />
-              </div>
-              <button 
-                onClick={handleCreateNew} 
-                disabled={loading || !newTitle.trim()} 
-                className="w-full h-12 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800 active:scale-[0.98] transition disabled:opacity-50 shadow-lg"
-              >
-                {loading ? "Creating..." : "Create & Add Idea"}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
@@ -568,13 +351,13 @@ export default function IdeaDetailPage() {
     <main className="min-h-screen bg-surface-muted pb-20">
       
       {/* ADD TO SCRIPT MODAL */}
-      <AddToScriptModal 
-        isOpen={showScriptModal} 
+      {showScriptModal && <AddToScriptModal
+        isOpen
         onClose={() => setShowScriptModal(false)} 
         detail={detail} 
         game={game} 
-        footage={footage} 
-      />
+        footage={footage}
+      />}
       
       {/* ================= NEW HERO HEADER (POSTER STYLE) ================= */}
       <div className="relative w-full bg-slate-900 shadow-xl overflow-hidden">

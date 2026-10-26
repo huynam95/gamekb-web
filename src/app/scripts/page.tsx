@@ -767,6 +767,14 @@ export default function ScriptsPage() {
       const enrichedScripts = await enrichScriptsWithFootageChannels((sData || []) as ScriptProject[]);
       setScripts(enrichedScripts);
       setLoadingScripts(false);
+      // "Open project" links (e.g. after adding an idea) arrive as /scripts?open=<id>.
+      const openId = Number(new URLSearchParams(window.location.search).get("open"));
+      const toOpen = openId ? enrichedScripts.find((script) => script.id === openId) : undefined;
+      if (toOpen) {
+        setEditingScript(toOpen);
+        setIsModalOpen(true);
+      }
+      if (openId) window.history.replaceState({}, "", "/scripts");
     }
     load();
   }, []);
