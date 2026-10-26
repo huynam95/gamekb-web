@@ -16,11 +16,6 @@ export type UsageVideo = {
   topic: string | null;
   created_at: string | null;
   published_at: string | null;
-  youtube_url: string | null;
-  youtube_views: number | null;
-  youtube_likes: number | null;
-  youtube_comments: number | null;
-  youtube_stats_at: string | null;
 };
 
 export type UsageLink = { kind: VideoKind; video_id: number; detail_id: number };
@@ -30,18 +25,15 @@ export type UsagePayload = {
   links: UsageLink[];
   /** False until the script_ideas table exists (links are then inferred). */
   linksReady: boolean;
-  /** True when YOUTUBE_API_KEY is set on the server. */
-  youtubeReady: boolean;
 };
 
 export type IdeaUsage = {
   videos: UsageVideo[];
   total: number;
   published: number;
-  views: number;
 };
 
-const EMPTY_USAGE: IdeaUsage = { videos: [], total: 0, published: 0, views: 0 };
+const EMPTY_USAGE: IdeaUsage = { videos: [], total: 0, published: 0 };
 
 /* ================= LOADING (one request shared by every component) ================= */
 
@@ -84,12 +76,11 @@ export function buildUsageIndex(data: UsagePayload | null) {
   for (const link of data.links) {
     const video = videoByKey.get(`${link.kind}:${link.video_id}`);
     if (!video) continue;
-    const entry = byIdea.get(link.detail_id) ?? { videos: [], total: 0, published: 0, views: 0 };
+    const entry = byIdea.get(link.detail_id) ?? { videos: [], total: 0, published: 0 };
     if (entry.videos.some((v) => v.kind === video.kind && v.id === video.id)) continue;
     entry.videos.push(video);
     entry.total += 1;
     if (video.published) entry.published += 1;
-    entry.views += video.youtube_views ?? 0;
     byIdea.set(link.detail_id, entry);
   }
   return byIdea;

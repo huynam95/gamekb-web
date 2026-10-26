@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { ChartBarIcon, ChartPieIcon, ChevronRightIcon, DocumentTextIcon, PlayCircleIcon, PuzzlePieceIcon, SparklesIcon, VideoCameraIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
-import { formatCount, linkIdeasToScript, useIdeaUsage } from "@/lib/ideaUsage";
+import { linkIdeasToScript, useIdeaUsage } from "@/lib/ideaUsage";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppPageHeader, appPageContainerClass, appPageMainClass, appPageRootClass } from "@/components/AppPage";
 import { GameEditorModal, IdeaItem, QuickViewModal, ScriptEditorModal } from "@/components/IdeaCards";
@@ -163,7 +163,6 @@ export default function Dashboard() {
                <span className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-fg-3">
                  <span><span className="font-semibold tabular-nums text-fg">{usageByIdea.size}</span> of {stats.total} ideas used</span>
                  <span><span className="font-semibold tabular-nums text-fg">{usageData.videos.length}</span> videos · {usageData.videos.filter((v) => v.published).length} published</span>
-                 {usageData.videos.some((v) => v.youtube_views != null) && <span><span className="font-semibold tabular-nums text-fg">{formatCount(usageData.videos.reduce((sum, v) => sum + (v.youtube_views ?? 0), 0))}</span> views</span>}
                  <ChevronRightIcon className="h-4 w-4" />
                </span>
              </Link>

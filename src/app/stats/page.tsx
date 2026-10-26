@@ -3,11 +3,9 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowPathIcon,
   ChartPieIcon,
   ExclamationTriangleIcon,
   FilmIcon,
-  PlayIcon,
   PuzzlePieceIcon,
   SparklesIcon,
   TagIcon,
@@ -15,11 +13,10 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppPageHeader, appPageMainClass, appPageRootClass } from "@/components/AppPage";
-import { useNotifications } from "@/components/NotificationCenter";
 import { CoverImage } from "@/components/CoverImage";
 import { TypeLabel } from "@/components/TypePill";
 import { Button } from "@/components/ui/Button";
-import { formatCount, statusDot, useIdeaUsage, videoHref, type UsageVideo } from "@/lib/ideaUsage";
+import { formatCount, useIdeaUsage, type UsageVideo } from "@/lib/ideaUsage";
 
 type IdeaRow = { id: number; title: string; detail_type: string; game_id: number; created_at: string | null };
 type GameRow = { id: number; title: string; cover_url: string | null };
@@ -155,12 +152,10 @@ function MonthlyChart({ videos }: { videos: UsageVideo[] }) {
 /* ================= PAGE ================= */
 
 export default function StatsPage() {
-  const { success, error: notifyError } = useNotifications();
-  const { data: usage, byIdea, refresh, error: usageError } = useIdeaUsage();
+  const { data: usage, byIdea, error: usageError } = useIdeaUsage();
   const [ideas, setIdeas] = useState<IdeaRow[] | null>(null);
   const [games, setGames] = useState<GameRow[]>([]);
   const [showAllGames, setShowAllGames] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -179,27 +174,25 @@ export default function StatsPage() {
     const gameById = new Map(games.map((g) => [g.id, g]));
     const videos = usage.videos;
     const used = ideas.filter((idea) => byIdea.get(idea.id)?.total);
-    const views = videos.reduce((sum, v) => sum + (v.youtube_views ?? 0), 0);
-    const withViews = videos.filter((v) => v.youtube_views != null);
 
     const topIdeas = ideas
       .map((idea) => ({ idea, usage: byIdea.get(idea.id) }))
       .filter((row) => row.usage && row.usage.total > 0)
-      .sort((a, b) => b.usage!.total - a.usage!.total || b.usage!.published - a.usage!.published || b.usage!.views - a.usage!.views)
+      .sort((a, b) => b.usage!.total - a.usage!.total || b.usage!.published - a.usage!.published)
       .slice(0, 10);
 
-    const gameRows = new Map<number, { game: GameRow | undefined; ideas: number; used: number; videoKeys: Set<string>; views: number }>();
+    const gameRows = new Map<number, { game: GameRow | undefined; ideas: number; used: number; videoKeys: Set<string> }>();
     const typeRows = new Map<string, { ideas: number; used: number; videoKeys: Set<string> }>();
     for (const idea of ideas) {
       const u = byIdea.get(idea.id);
-      const g = gameRows.get(idea.game_id) ?? { game: gameById.get(idea.game_id), ideas: 0, used: 0, videoKeys: new Set<string>(), views: 0 };
+      const g = gameRows.get(idea.game_id) ?? { game: gameById.get(idea.game_id), ideas: 0, used: 0, videoKeys: new Set<string>() };
       const t = typeRows.get(idea.detail_type) ?? { ideas: 0, used: 0, videoKeys: new Set<string>() };
       g.ideas += 1; t.ideas += 1;
       if (u?.total) {
         g.used += 1; t.used += 1;
         for (const v of u.videos) {
           const key = `${v.kind}:${v.id}`;
-          if (!g.videoKeys.has(key)) { g.videoKeys.add(key); g.views += v.youtube_views ?? 0; }
+          g.videoKeys.add(key);
           t.videoKeys.add(key);
         }
       }
@@ -207,11 +200,11 @@ export default function StatsPage() {
       typeRows.set(idea.detail_type, t);
     }
 
-    const topicRows = new Map<string, { videos: number; published: number; views: number }>();
+    const topicRows = new Map<string, { videos: number; published: number }>();
     for (const v of videos.filter((video) => video.kind === "short")) {
       const key = v.topic?.trim() || "No topic";
-      const row = topicRows.get(key) ?? { videos: 0, published: 0, views: 0 };
-      row.videos += 1; if (v.published) row.published += 1; row.views += v.youtube_views ?? 0;
+      const row = topicRows.get(key) ?? { videos: 0, published: 0 };
+      row.videos += 1; if (v.published) row.published += 1;
       topicRows.set(key, row);
     }
 
@@ -220,8 +213,6 @@ export default function StatsPage() {
       shorts: videos.filter((v) => v.kind === "short").length,
       longs: videos.filter((v) => v.kind === "long").length,
       published: videos.filter((v) => v.published).length,
-      views,
-      withViews,
       used: used.length,
       fresh: ideas.length - used.length,
       overused: topIdeas.filter((row) => row.usage!.total >= 3).length,
@@ -229,27 +220,10 @@ export default function StatsPage() {
       games: Array.from(gameRows.values()).sort((a, b) => b.ideas - a.ideas || b.used - a.used || (a.game?.title ?? "").localeCompare(b.game?.title ?? "", undefined, { numeric: true })),
       types: Array.from(typeRows.entries()).sort((a, b) => b[1].ideas - a[1].ideas),
       topics: Array.from(topicRows.entries()).sort((a, b) => b[1].videos - a[1].videos),
-      topByViews: [...withViews].sort((a, b) => (b.youtube_views ?? 0) - (a.youtube_views ?? 0)).slice(0, 8),
     };
   }, [ideas, usage, games, byIdea]);
 
-  const refreshYoutube = async () => {
-    setRefreshing(true);
-    try {
-      const response = await fetch("/api/videos/youtube", { method: "POST" });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Could not refresh");
-      await refresh();
-      success(`Updated ${payload.updated} of ${payload.total} videos.`, "YouTube stats refreshed");
-    } catch (error) {
-      notifyError(error instanceof Error ? error.message : "Could not refresh", "YouTube stats");
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
   const totalIdeas = ideas?.length ?? 0;
-  const lastStatsAt = usage?.videos.map((v) => v.youtube_stats_at).filter(Boolean).sort().pop();
 
   return (
     <div className={`${appPageRootClass} xl:flex`}>
@@ -283,8 +257,8 @@ export default function StatsPage() {
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 <Tile label="Ideas used in a video" value={`${stats.used}`} sub={`${totalIdeas ? Math.round((stats.used / totalIdeas) * 100) : 0}% of ${totalIdeas} ideas`} />
                 <Tile label="Fresh ideas" value={formatCount(stats.fresh)} sub="Never used yet" />
-                <Tile label="Videos" value={`${stats.videos.length}`} sub={`${stats.shorts} shorts · ${stats.longs} long · ${stats.published} published`} />
-                <Tile label="YouTube views" value={stats.withViews.length ? formatCount(stats.views) : "—"} sub={stats.withViews.length ? `${stats.withViews.length} linked video${stats.withViews.length === 1 ? "" : "s"}` : "Add links to published videos"} />
+                <Tile label="Videos" value={`${stats.videos.length}`} sub={`${stats.shorts} shorts · ${stats.longs} long`} />
+                <Tile label="Published videos" value={`${stats.published}`} sub={`${stats.videos.length ? Math.round((stats.published / stats.videos.length) * 100) : 0}% of all videos`} />
               </div>
 
               <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
@@ -305,7 +279,7 @@ export default function StatsPage() {
                             <span className="w-5 shrink-0 text-right text-xs tabular-nums text-fg-4">{index + 1}</span>
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-sm font-medium text-fg">{idea.title}</span>
-                              <span className="block truncate text-[11px] text-fg-4">{games.find((g) => g.id === idea.game_id)?.title}{u!.published ? ` · ${u!.published} published` : ""}{u!.views ? ` · ${formatCount(u!.views)} views` : ""}</span>
+                              <span className="block truncate text-[11px] text-fg-4">{games.find((g) => g.id === idea.game_id)?.title}{u!.published ? ` · ${u!.published} published` : ""}</span>
                             </span>
                             <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-xs font-semibold tabular-nums ${u!.total >= 3 ? "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300" : "bg-surface-sunken text-fg-2"}`}>×{u!.total}</span>
                           </Link>
@@ -318,13 +292,13 @@ export default function StatsPage() {
 
               {/* By game */}
               <section className={cardClass}>
-                <SectionTitle icon={<PuzzlePieceIcon className="h-4 w-4" />} title="By game" hint="Share of each game's ideas already used. Long bars with few used ideas are untapped." />
-                <div className="hidden grid-cols-[minmax(0,1.4fr)_minmax(0,1.6fr)_4rem_4rem_4.5rem] gap-3 border-b border-line-soft pb-2 text-[11px] font-medium uppercase tracking-wider text-fg-4 sm:grid">
-                  <span>Game</span><span>Used / ideas</span><span className="text-right">Fresh</span><span className="text-right">Videos</span><span className="text-right">Views</span>
+                <SectionTitle icon={<PuzzlePieceIcon className="h-4 w-4" />} title="By game" hint="Share of each game's ideas already used. Games with many fresh ideas are untapped." />
+                <div className="hidden grid-cols-[minmax(0,1.4fr)_minmax(0,1.6fr)_4rem_4rem] gap-3 border-b border-line-soft pb-2 text-[11px] font-medium uppercase tracking-wider text-fg-4 sm:grid">
+                  <span>Game</span><span>Used / ideas</span><span className="text-right">Fresh</span><span className="text-right">Videos</span>
                 </div>
                 <ul className="divide-y divide-line-soft">
                   {(showAllGames ? stats.games : stats.games.slice(0, 12)).map((row) => (
-                    <li key={row.game?.id ?? row.game?.title} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 py-2.5 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1.6fr)_4rem_4rem_4.5rem]">
+                    <li key={row.game?.id ?? row.game?.title} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 py-2.5 sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1.6fr)_4rem_4rem]">
                       <span className="flex min-w-0 items-center gap-2.5">
                         <span className="relative h-9 w-7 shrink-0 overflow-hidden rounded-md bg-surface-sunken">{row.game?.cover_url && <CoverImage src={row.game.cover_url} sizes="28px" />}</span>
                         <span className="truncate text-sm font-medium text-fg">{row.game?.title ?? "Unknown game"}</span>
@@ -336,7 +310,6 @@ export default function StatsPage() {
                       </span>
                       <span className="hidden text-right text-sm tabular-nums text-fg-2 sm:block">{row.ideas - row.used}</span>
                       <span className="hidden text-right text-sm tabular-nums text-fg-2 sm:block">{row.videoKeys.size}</span>
-                      <span className="hidden text-right text-sm tabular-nums text-fg-2 sm:block">{row.views ? formatCount(row.views) : "—"}</span>
                     </li>
                   ))}
                 </ul>
@@ -374,7 +347,7 @@ export default function StatsPage() {
                       {stats.topics.map(([topic, row]) => (
                         <li key={topic} className="flex items-center justify-between gap-3 py-2 text-sm">
                           <span className={`min-w-0 truncate ${topic === "No topic" ? "text-fg-4" : "font-medium text-fg"}`}>{topic}</span>
-                          <span className="shrink-0 text-xs tabular-nums text-fg-3">{row.videos} video{row.videos === 1 ? "" : "s"} · {row.published} published{row.views ? ` · ${formatCount(row.views)} views` : ""}</span>
+                          <span className="shrink-0 text-xs tabular-nums text-fg-3">{row.videos} video{row.videos === 1 ? "" : "s"} · {row.published} published</span>
                         </li>
                       ))}
                     </ul>
@@ -382,39 +355,6 @@ export default function StatsPage() {
                 </section>
               </div>
 
-              {/* YouTube */}
-              <section className={cardClass}>
-                <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-                  <SectionTitle icon={<PlayIcon className="h-4 w-4 text-rose-500" />} title="YouTube performance" hint={lastStatsAt ? `Views last updated ${new Date(lastStatsAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}.` : "Paste the YouTube link in a published Short or Long video to track its views."} />
-                  {usage?.youtubeReady && (
-                    <Button variant="secondary" size="sm" onClick={() => void refreshYoutube()} disabled={refreshing}>
-                      <ArrowPathIcon className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} /> {refreshing ? "Refreshing..." : "Refresh views"}
-                    </Button>
-                  )}
-                </div>
-                {!usage?.youtubeReady && (
-                  <p className="mb-4 rounded-2xl bg-surface-muted p-3 text-xs leading-5 text-fg-3">
-                    To load view counts, add a <span className="font-mono font-semibold text-fg-2">YOUTUBE_API_KEY</span> environment variable in Vercel (a free YouTube Data API v3 key from Google Cloud), then redeploy. Links you paste are saved either way.
-                  </p>
-                )}
-                {stats.topByViews.length === 0 ? (
-                  <p className="text-sm text-fg-4">No view counts yet.</p>
-                ) : (
-                  <ol className="-mx-2 space-y-0.5">
-                    {stats.topByViews.map((video, index) => (
-                      <li key={`${video.kind}-${video.id}`}>
-                        <Link href={videoHref(video)} className="flex items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-surface-sunken">
-                          <span className="w-5 shrink-0 text-right text-xs tabular-nums text-fg-4">{index + 1}</span>
-                          <span className={`h-2 w-2 shrink-0 rounded-full ${statusDot(video)}`} />
-                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-fg">{video.title}</span>
-                          <span className="shrink-0 text-xs text-fg-4">{video.kind === "short" ? "Short" : "Long"}</span>
-                          <span className="w-16 shrink-0 text-right text-sm font-semibold tabular-nums text-fg">{formatCount(video.youtube_views)}</span>
-                        </Link>
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </section>
             </div>
           )}
         </div>

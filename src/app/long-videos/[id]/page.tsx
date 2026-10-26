@@ -1,7 +1,6 @@
 "use client";
 
 import { CoverImage } from "@/components/CoverImage";
-import { YouTubeLinkField } from "@/components/YouTubeLinkField";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -404,14 +403,6 @@ export default function LongVideoProjectPage() {
                   <label className="block"><span className="mb-1.5 block text-xs font-medium text-fg-3">Status</span><select value={workspace.project.status} onChange={(event) => updateProject("status", event.target.value as LongVideoProject["status"])} className="h-11 w-full cursor-pointer rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-bold outline-none dark:border-slate-700 dark:bg-slate-950">{PROJECT_STATUS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
                   <label className="block"><span className="mb-1.5 block text-xs font-medium text-fg-3">Target duration</span><div className="relative"><input type="number" min={1} value={workspace.project.target_duration_minutes} onChange={(event) => updateProject("target_duration_minutes", Number(event.target.value))} className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 pr-12 text-sm font-bold outline-none dark:border-slate-700 dark:bg-slate-950" /><span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-fg-4">min</span></div></label>
                 </div>
-                <YouTubeLinkField
-                  key={workspace.project.id}
-                  kind="long"
-                  id={workspace.project.id}
-                  initialUrl={(workspace.project as { youtube_url?: string | null }).youtube_url ?? ""}
-                  initialViews={(workspace.project as { youtube_views?: number | null }).youtube_views ?? null}
-                  className="mt-4 max-w-xl"
-                />
                 <div className="mt-4 grid gap-4 lg:grid-cols-2">
                   <label className="block"><span className="mb-1.5 block text-xs font-medium text-fg-3">Main goal</span><textarea value={workspace.project.core_idea ?? ""} onChange={(event) => updateProject("core_idea", event.target.value)} rows={3} className="w-full resize-y rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold outline-none focus:border-violet-400 dark:border-slate-700 dark:bg-slate-950" placeholder="What should this video deliver?" /></label>
                   <label className="block"><span className="mb-1.5 block text-xs font-medium text-fg-3">Thumbnail concept</span><textarea value={workspace.project.thumbnail_notes ?? ""} onChange={(event) => updateProject("thumbnail_notes", event.target.value)} rows={3} className="w-full resize-y rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold outline-none focus:border-violet-400 dark:border-slate-700 dark:bg-slate-950" placeholder="Main subject, text, background, contrast..." /></label>

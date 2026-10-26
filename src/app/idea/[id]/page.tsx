@@ -32,7 +32,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { fetchYoutubeMetadata } from "@/lib/youtube";
 import { getYoutubeVideoId } from "@/lib/mediaLinks";
 import { readIdeaPreview } from "@/lib/ideaPreviewCache";
-import { formatCount, statusDot, useIdeaUsage, videoHref } from "@/lib/ideaUsage";
+import { statusDot, useIdeaUsage, videoHref } from "@/lib/ideaUsage";
 import { useNotifications } from "@/components/NotificationCenter";
 import { AppSidebar } from "@/components/AppSidebar";
 import { appPageMainClass, appPageRootClass } from "@/components/AppPage";
@@ -836,8 +836,8 @@ export default function IdeaDetailPage() {
                   <p className="text-sm text-fg-3"><span className="font-semibold text-emerald-600 dark:text-emerald-300">Fresh idea</span> — not used in any video yet.</p>
                 ) : (
                   <>
-                    <dl className="mb-3 grid grid-cols-3 gap-2 text-center">
-                      {[["Videos", String(usage.total)], ["Published", String(usage.published)], ["Views", usage.views ? formatCount(usage.views) : "—"]].map(([label, value]) => (
+                    <dl className="mb-3 grid grid-cols-2 gap-2 text-center">
+                      {[["Videos", String(usage.total)], ["Published", String(usage.published)]].map(([label, value]) => (
                         <div key={label} className="rounded-xl bg-surface-muted px-1 py-2">
                           <dd className="text-lg font-black tabular-nums text-fg">{value}</dd>
                           <dt className="text-[11px] text-fg-4">{label}</dt>
@@ -853,7 +853,6 @@ export default function IdeaDetailPage() {
                               <span className="block truncate font-medium">{video.title}</span>
                               <span className="block text-[11px] text-fg-4">
                                 {video.kind === "short" ? "Short" : "Long video"} · {video.status}
-                                {video.youtube_views != null && ` · ${formatCount(video.youtube_views)} views`}
                               </span>
                             </span>
                           </Link>

@@ -6,7 +6,6 @@ type Row = Record<string, unknown>;
 type ShortRow = Row & { id: number; title: string | null; status: string | null; topic?: string | null; created_at: string | null; publish_date?: string | null; assets?: { idea_id?: number | null }[] | null; description?: string | null };
 type LongRow = Row & { id: number; title: string | null; status: string | null; created_at: string | null; updated_at?: string | null };
 
-const num = (value: unknown) => (typeof value === "number" ? value : value == null ? null : Number(value) || null);
 const str = (value: unknown) => (typeof value === "string" && value ? value : null);
 
 /**
@@ -40,11 +39,6 @@ export async function GET() {
         topic: str(row.topic),
         created_at: row.created_at,
         published_at: str(row.publish_date),
-        youtube_url: str(row.youtube_url),
-        youtube_views: num(row.youtube_views),
-        youtube_likes: num(row.youtube_likes),
-        youtube_comments: num(row.youtube_comments),
-        youtube_stats_at: str(row.youtube_stats_at),
       })),
       ...longs.map((row) => ({
         kind: "long" as const,
@@ -55,11 +49,6 @@ export async function GET() {
         topic: null,
         created_at: row.created_at,
         published_at: row.status === "published" ? str(row.updated_at) : null,
-        youtube_url: str(row.youtube_url),
-        youtube_views: num(row.youtube_views),
-        youtube_likes: num(row.youtube_likes),
-        youtube_comments: num(row.youtube_comments),
-        youtube_stats_at: str(row.youtube_stats_at),
       })),
     ];
 
@@ -86,7 +75,7 @@ export async function GET() {
       }
     }
 
-    const payload: UsagePayload = { videos, links, linksReady, youtubeReady: Boolean(process.env.YOUTUBE_API_KEY) };
+    const payload: UsagePayload = { videos, links, linksReady };
     return NextResponse.json(payload);
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Could not load usage" }, { status: 500 });
