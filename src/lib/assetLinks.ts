@@ -65,6 +65,44 @@ export function getAssetIdentity(rawUrl: string) {
   }
 }
 
+/** Start time of a link in seconds (?t=228, ?t=3m48s, &start=228, #t=228), or 0. */
+function getStartSeconds(rawUrl: string) {
+  try {
+    const url = new URL(/^https?:\/\//i.test(rawUrl.trim()) ? rawUrl.trim() : `https://${rawUrl.trim()}`);
+    const raw = url.searchParams.get("t") || url.searchParams.get("start") || new URLSearchParams(url.hash.replace(/^#/, "")).get("t") || "";
+    if (!raw) return 0;
+    if (/^\d+$/.test(raw)) return Number(raw);
+    const match = raw.match(/^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/i);
+    return match ? Number(match[1] || 0) * 3600 + Number(match[2] || 0) * 60 + Number(match[3] || 0) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Identity of a clip: the source video plus where it starts. Two moments of the
+ * same YouTube video are two clips (but one download, see getAssetIdentity).
+ */
+export function getClipIdentity(rawUrl: string) {
+  const source = getAssetIdentity(rawUrl);
+  if (!source) return null;
+  return source.startsWith("youtube:") ? `${source}@${getStartSeconds(rawUrl)}` : source;
+}
+
+/** Count distinct clips and distinct source videos across any number of link lists. */
+export function countClips(urls: (string | null | undefined)[]) {
+  const clips = new Set<string>();
+  const sources = new Set<string>();
+  for (const url of urls) {
+    if (!url?.trim()) continue;
+    const clip = getClipIdentity(url);
+    const source = getAssetIdentity(url);
+    if (clip) clips.add(clip);
+    if (source) sources.add(source);
+  }
+  return { clips: clips.size, sources: sources.size };
+}
+
 export function analyzeAssetLinks<T extends AssetLink>(assets: T[]) {
   const groupedIndexes = new Map<string, number[]>();
 

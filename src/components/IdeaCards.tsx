@@ -16,7 +16,7 @@ import { Button, buttonClass } from "@/components/ui/Button";
 import { Field, Input } from "@/components/ui/Field";
 import { Modal, ModalBody, ModalFooter, ModalHeader } from "@/components/ui/Modal";
 import { CoverBackdrop } from "@/components/CoverBackdrop";
-import { analyzeAssetLinks } from "@/lib/assetLinks";
+import { analyzeAssetLinks, countClips } from "@/lib/assetLinks";
 import { useNotifications } from "@/components/NotificationCenter";
 import { rememberIdeaPreview } from "@/lib/ideaPreviewCache";
 import { CAPTURE_META } from "@/lib/recording";
@@ -445,7 +445,7 @@ export function ScriptEditorModal({
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-fg-4">Selected Footage</label>
                   <p className="mt-1 text-xs font-medium text-slate-400 dark:text-slate-500">
-                    {(formData.assets || []).length} entries · {assetAnalysis.uniqueLinkCount} unique links
+                    {countClips((formData.assets || []).map((asset) => asset.url)).clips} clips · {assetAnalysis.uniqueLinkCount} source {assetAnalysis.uniqueLinkCount === 1 ? "video" : "videos"} to download
                   </p>
                 </div>
                 <button
