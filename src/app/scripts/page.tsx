@@ -15,6 +15,7 @@ import { buildScriptGuide } from "@/lib/scriptGuide";
 import { getScriptTopic, getScriptTopicValue } from "@/lib/scriptTopics";
 import { useProjectTopics } from "@/lib/useProjectTopics";
 import { YouTubeLinkField } from "@/components/YouTubeLinkField";
+import { formatCount } from "@/lib/ideaUsage";
 import { ProjectTopicSelect } from "@/components/ProjectTopicSelect";
 import type { VideoTheme } from "@/lib/videoThemes";
 import {
@@ -29,6 +30,7 @@ import {
   XMarkIcon,
   DocumentDuplicateIcon,
   ExclamationTriangleIcon,
+  PlayIcon,
   VideoCameraIcon,
   Bars3Icon,
   ArrowPathIcon,
@@ -59,6 +61,8 @@ type ScriptProject = {
   tags: string[];
   status: "Draft" | "Filming" | "Edited" | "Published";
   created_at: string;
+  youtube_url?: string | null;
+  youtube_views?: number | null;
 };
 
 const STATUS_STYLE: Record<string, string> = {
@@ -1155,19 +1159,37 @@ export default function ScriptsPage() {
                       </div>
 
                       {/* Title + one muted meta line (meta collapses into columns on wide screens). */}
+                      <div className="min-w-0">
                       <button
                         type="button"
                         onClick={() => (selecting ? toggleSelected(script.id) : openProject(script))}
-                        className="min-w-0 cursor-pointer py-1 text-left after:absolute after:inset-0 after:content-['']"
+                        className="block w-full min-w-0 cursor-pointer py-1 text-left after:absolute after:inset-0 after:content-['']"
                       >
                         <span className="line-clamp-2 break-words text-[15px] font-semibold leading-snug text-fg group-hover:text-accent lg:line-clamp-1">{script.title || "Untitled project"}</span>
                         <span className="mt-0.5 block truncate text-xs text-fg-3 lg:hidden">{meta.join(" · ")}</span>
-                        {(toRecordByScript.get(script.id) ?? 0) > 0 && (
-                          <span className="mt-1 inline-flex items-center gap-1 rounded-md bg-rose-100 px-1.5 py-0.5 text-[11px] font-semibold text-rose-700 dark:bg-rose-500/15 dark:text-rose-300" title="Ideas in this project that are still on your Recording List">
-                            <VideoCameraIcon className="h-3 w-3" /> {toRecordByScript.get(script.id)} still to record
-                          </span>
-                        )}
                       </button>
+                      {(script.youtube_url || (toRecordByScript.get(script.id) ?? 0) > 0) && (
+                        <div className="relative z-10 -mt-0.5 mb-1 flex flex-wrap items-center gap-1.5">
+                          {script.youtube_url && (
+                            <a
+                              href={script.youtube_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md bg-rose-50 px-1.5 text-[11px] font-semibold text-rose-700 ring-1 ring-rose-200 transition hover:bg-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/30 dark:hover:bg-rose-500/20 pointer-coarse:h-8"
+                              title="Open on YouTube"
+                            >
+                              <PlayIcon className="h-3 w-3" /> YouTube
+                              {script.youtube_views != null && <span className="font-bold tabular-nums">· {formatCount(script.youtube_views)}<span className="max-sm:hidden"> views</span></span>}
+                            </a>
+                          )}
+                          {(toRecordByScript.get(script.id) ?? 0) > 0 && (
+                            <span className="inline-flex h-6 items-center gap-1 rounded-md bg-rose-100 px-1.5 text-[11px] font-semibold text-rose-700 dark:bg-rose-500/15 dark:text-rose-300" title="Ideas in this project that are still on your Recording List">
+                              <VideoCameraIcon className="h-3 w-3" /> {toRecordByScript.get(script.id)} still to record
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      </div>
 
                       <span className="hidden min-w-0 items-center gap-1.5 truncate text-sm text-fg-2 lg:flex">
                         <span className={`h-2 w-2 shrink-0 rounded-full bg-gradient-to-br ${topicVisual.gradientClass}`} aria-hidden="true" />
