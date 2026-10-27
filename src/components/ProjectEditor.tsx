@@ -689,11 +689,11 @@ export function ProjectEditor({
         <p className="rounded-2xl border border-dashed border-line-strong p-8 text-center text-sm text-fg-4">No clips yet. Clips come from the ideas&apos; footage.</p>
       ) : (
         (() => {
-          const groups = new Map<string, { title: string; subtitle: string; order: number; items: { asset: ProjectAsset; index: number }[] }>();
+          const groups = new Map<string, { title: string; subtitle: string; cover: string | null; order: number; items: { asset: ProjectAsset; index: number }[] }>();
           // Every idea in the script gets its block, even before it has clips.
           for (const section of match.sections) {
             const idea = ideaById.get(match.bySection.get(section.id) ?? -1);
-            if (idea && section.number != null) groups.set(`i${idea.id}`, { title: idea.title, subtitle: idea.game_title, order: section.number, items: [] });
+            if (idea && section.number != null) groups.set(`i${idea.id}`, { title: idea.title, subtitle: idea.game_title, cover: idea.game_cover, order: section.number, items: [] });
           }
           assets.forEach((asset, index) => {
             const section = match.sections.find((s) => s.number === asset.idea_order);
@@ -702,6 +702,7 @@ export function ProjectEditor({
             const group = groups.get(key) ?? {
               title: idea?.title ?? asset.idea_title ?? (asset.idea_order != null ? `Idea ${asset.idea_order}` : "Other clips"),
               subtitle: idea?.game_title ?? asset.game_title ?? "",
+              cover: idea?.game_cover ?? (ideas ?? []).find((i) => i.game_cover && i.game_title === asset.game_title)?.game_cover ?? null,
               order: asset.idea_order ?? Number.MAX_SAFE_INTEGER,
               items: [],
             };
@@ -713,14 +714,25 @@ export function ProjectEditor({
             const hasNumber = group.order !== Number.MAX_SAFE_INTEGER;
             return (
             <section key={`${group.title}-${group.order}`} className={`overflow-hidden rounded-2xl border border-l-4 border-y-line border-r-line bg-surface ${color.bar}`}>
-              <header className={`flex items-center gap-3 px-4 py-3 ${color.soft}`}>
-                {hasNumber && <span className={`flex h-8 min-w-8 shrink-0 items-center justify-center rounded-lg px-1.5 text-sm font-bold shadow-sm ${color.badge}`}>{group.order}</span>}
-                <span className="min-w-0 flex-1">
-                  {group.subtitle && <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-fg-3">{group.subtitle}</span>}
-                  <span className={`block truncate text-base font-bold ${color.title}`}>{hasNumber ? `Idea ${group.order} · ` : ""}{group.title}</span>
+              <header className={`relative flex items-center gap-3 overflow-hidden px-4 py-3 ${color.soft}`}>
+                {group.cover && (
+                  // The game's art fades in from the right edge of the header.
+                  <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-2/3 opacity-30 [mask-image:linear-gradient(to_left,black_10%,transparent)] dark:opacity-25 sm:w-1/2">
+                    <CoverImage src={group.cover} sizes="(max-width: 640px) 66vw, 450px" className="scale-110 blur-[2px]" />
+                  </span>
+                )}
+                <span className="relative shrink-0">
+                  <span className="relative flex h-16 w-12 items-center justify-center overflow-hidden rounded-lg bg-surface-sunken text-fg-4 shadow-md ring-1 ring-black/10 dark:ring-white/10">
+                    {group.cover ? <CoverImage src={group.cover} alt={group.subtitle} sizes="48px" /> : <PuzzlePieceIcon className="h-5 w-5" />}
+                  </span>
+                  {hasNumber && <span className={`absolute -right-2 -top-2 flex h-7 min-w-7 items-center justify-center rounded-lg px-1.5 text-sm font-bold shadow-md ring-2 ring-surface ${color.badge}`}>{group.order}</span>}
                 </span>
-                <span className="hidden shrink-0 text-xs font-medium text-fg-3 sm:inline">{group.items.length} clip{group.items.length === 1 ? "" : "s"}</span>
-                {group.items.length > 0 && <Button variant="ghost" size="sm" onClick={() => void copy(group.items.map(({ asset }) => asset.url).filter(Boolean).join("\n"), "links")} title="Copy this idea's links"><DocumentDuplicateIcon className="h-4 w-4" /> <span className="hidden sm:inline">Copy links</span></Button>}
+                <span className="relative min-w-0 flex-1 pl-1">
+                  {group.subtitle && <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-fg-3">{group.subtitle}</span>}
+                  <span className={`line-clamp-2 text-base font-bold leading-snug ${color.title}`}>{hasNumber ? `Idea ${group.order} · ` : ""}{group.title}</span>
+                </span>
+                <span className="relative hidden shrink-0 text-xs font-medium text-fg-3 sm:inline">{group.items.length} clip{group.items.length === 1 ? "" : "s"}</span>
+                {group.items.length > 0 && <Button variant="ghost" size="sm" className="relative" onClick={() => void copy(group.items.map(({ asset }) => asset.url).filter(Boolean).join("\n"), "links")} title="Copy this idea's links"><DocumentDuplicateIcon className="h-4 w-4" /> <span className="hidden sm:inline">Copy links</span></Button>}
               </header>
               {group.items.length === 0 && <p className="flex items-center gap-2 px-4 py-3 text-sm text-fg-4"><FilmIcon className="h-4 w-4" /> No clips yet. Add footage to this idea, or record it yourself.</p>}
               <ul className="divide-y divide-line-soft">
