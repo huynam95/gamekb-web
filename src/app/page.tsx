@@ -8,13 +8,14 @@ import { supabase } from "@/lib/supabaseClient";
 import { ACTIVE_VIDEO_THEME_STORAGE_KEY, DEFAULT_VIDEO_THEMES, VIDEO_THEMES_STORAGE_KEY, VIDEO_TOPICS_TABLE, getVideoThemeById, makeVideoThemeId, normalizeVideoTheme, parseVideoThemes, rowToVideoTheme, videoThemeToRow } from "@/lib/videoThemes";
 import type { VideoTheme } from "@/lib/videoThemes";
 import { PlayCircleIcon, StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
-import { AdjustmentsHorizontalIcon, ArrowDownIcon, BuildingOffice2Icon, ArrowPathIcon, ArrowUpIcon, CalendarDaysIcon, CheckIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, FilmIcon, MagnifyingGlassIcon, PencilSquareIcon, PlusIcon, PuzzlePieceIcon, Squares2X2Icon, TrashIcon, VideoCameraIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { AdjustmentsHorizontalIcon, ArrowDownIcon, BuildingOffice2Icon, ArrowPathIcon, ArrowUpIcon, CalendarDaysIcon, CheckCircleIcon, CheckIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, FilmIcon, FolderPlusIcon, MagnifyingGlassIcon, PencilSquareIcon, PlusIcon, PuzzlePieceIcon, Squares2X2Icon, TrashIcon, VideoCameraIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { captureStatusPatch, isMissingRecordingColumns, RECORDING_SETUP_MESSAGE } from "@/lib/recording";
 import { buildUsageIndex, linkIdeasToScript, loadUsage, useIdeaUsage } from "@/lib/ideaUsage";
 import { getGameStudio } from "@/lib/studios";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppPageHeader, appPageMainClass, appPageRootClass } from "@/components/AppPage";
 import { GameEditorModal, IdeaItem, QuickViewModal, ScriptEditorModal } from "@/components/IdeaCards";
+import { AddIdeasToProjectModal } from "@/components/AddIdeasToProjectModal";
 import { useNotifications } from "@/components/NotificationCenter";
 import { Button } from "@/components/ui/Button";
 import { Dropdown, menuItemClass, menuPanelClass, pillTriggerClass, type DropdownOption } from "@/components/ui/Dropdown";
@@ -559,6 +560,8 @@ export default function Home() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [selectedIdeas, setSelectedIdeas] = useState<DetailRow[]>([]);
   const [showSelectedReview, setShowSelectedReview] = useState(false);
+  const [showAddToProject, setShowAddToProject] = useState(false);
+  const addedToProjectRef = useRef(false);
   const [showEditor, setShowEditor] = useState(false);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const [projectIdeas, setProjectIdeas] = useState<DetailRow[]>([]);
@@ -1294,6 +1297,27 @@ export default function Home() {
       <ScriptEditorModal isOpen={showEditor} onClose={() => { setShowEditor(false); setProjectIdeas([]); }} onSave={handleSaveScript} initialData={{ ids: projectIdeas.map((idea) => idea.id), ideas: projectIdeas, games: games, theme: selectedTheme }} />
       <GameEditorModal game={editingGame} isOpen={!!editingGame} onClose={() => setEditingGame(null)} onUpdate={(updatedGame) => { setGames(prev => prev.map(g => g.id === updatedGame.id ? updatedGame : g)); }} />
       <QuickViewModal idea={previewIdea} isOpen={!!previewIdea} onClose={() => setPreviewIdea(null)} />
+      {showAddToProject && (
+        <AddIdeasToProjectModal
+          isOpen
+          ideas={selectedIds.map((id) => {
+            const row = selectedIdeas.find((idea) => idea.id === id) ?? ideas.find((idea) => idea.id === id);
+            return { id, title: row?.title ?? `Idea #${id}`, gameTitle: games.find((g) => g.id === row?.game_id)?.title };
+          })}
+          onAdded={() => { addedToProjectRef.current = true; }}
+          onClose={() => {
+            setShowAddToProject(false);
+            // After a successful add, start the next pick fresh (same as after Create Script).
+            if (addedToProjectRef.current) {
+              addedToProjectRef.current = false;
+              setSelectedIds([]);
+              setSelectedIdeas([]);
+              setShowSelectedReview(false);
+              setIsSelectMode(Boolean(selectedThemeId));
+            }
+          }}
+        />
+      )}
 
       {isSelectMode && showSelectedReview && createPortal(
         <div className="fixed inset-0 z-[190]">
@@ -1429,6 +1453,7 @@ export default function Home() {
               </button>
                 <>
                 <button disabled={selectedIds.length === 0} onClick={() => void addSelectedToRecording()} className="flex h-11 cursor-pointer items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-bold text-rose-700 transition hover:bg-rose-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 max-sm:w-11 max-sm:justify-center max-sm:px-0 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:bg-rose-500/20" aria-label="Add selected ideas to the Recording List" title="Record these myself"><VideoCameraIcon className="h-5 w-5" /> <span className="max-sm:hidden">Record</span></button>
+                <button disabled={selectedIds.length === 0} onClick={() => { setShowSelectedReview(false); setShowAddToProject(true); }} className="flex h-11 cursor-pointer items-center gap-2 rounded-xl border border-blue-200 bg-accent-soft px-4 text-sm font-bold text-accent transition hover:bg-blue-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 max-sm:w-11 max-sm:justify-center max-sm:px-0 dark:border-blue-500/30 dark:hover:bg-blue-500/20" aria-label="Add selected ideas to an existing project" title="Add to an existing project"><FolderPlusIcon className="h-5 w-5" /> <span className="max-sm:hidden">Add to project</span></button>
                 <button disabled={selectedIds.length === 0} onClick={() => void openScriptEditor()} className="flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-bold text-white shadow-lg transition hover:bg-blue-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"><PlayCircleIcon className="h-5 w-5" /> <span className="max-sm:hidden">Create Script</span><span className="sm:hidden">Create</span></button>
                 </>
             </div>
@@ -1465,8 +1490,15 @@ export default function Home() {
             icon={pinnedOnly ? <StarSolidIcon className="h-5 w-5 text-amber-500" /> : <Squares2X2Icon className="h-5 w-5" />}
             className="mb-4"
             action={
-              <span className="inline-flex h-9 items-center rounded-full bg-surface-sunken px-3.5 text-sm font-semibold tabular-nums text-fg-2" aria-live="polite">
-                {loading && ideas.length === 0 ? "Loading…" : `${totalCount.toLocaleString()} ${totalCount === 1 ? "idea" : "ideas"}`}
+              <span className="flex items-center gap-2">
+                <span className="inline-flex h-9 items-center rounded-full bg-surface-sunken px-3.5 text-sm font-semibold tabular-nums text-fg-2" aria-live="polite">
+                  {loading && ideas.length === 0 ? "Loading…" : `${totalCount.toLocaleString()} ${totalCount === 1 ? "idea" : "ideas"}`}
+                </span>
+                {!isSelectMode && (
+                  <Button variant="secondary" size="sm" onClick={() => setIsSelectMode(true)} title="Pick several ideas to add to a project or the Recording List">
+                    <CheckCircleIcon className="h-4 w-4" /> Select
+                  </Button>
+                )}
               </span>
             }
           />

@@ -63,10 +63,10 @@ type ProjectSummary = {
   lastLine: string;
 };
 
-const STATUSES = ["Draft", "Filming", "Edited", "Published"] as const;
+export const STATUSES = ["Draft", "Filming", "Edited", "Published"] as const;
 type StatusFilter = "All" | (typeof STATUSES)[number];
 
-const STATUS_META: Record<string, { dot: string; pill: string }> = {
+export const STATUS_META: Record<string, { dot: string; pill: string }> = {
   Draft: { dot: "bg-slate-400", pill: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
   Filming: { dot: "bg-amber-500", pill: "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300" },
   Edited: { dot: "bg-indigo-500", pill: "bg-indigo-100 text-indigo-800 dark:bg-indigo-500/15 dark:text-indigo-300" },
@@ -102,7 +102,7 @@ function gameHashtag(gameName: string) {
   return gameName ? `#${gameName.replace(/\s+/g, "").toLowerCase()}` : "";
 }
 
-function formatDate(value: string | null) {
+export function formatDate(value: string | null) {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
@@ -130,7 +130,7 @@ function summarise(script: ScriptRow, idea: IdeaInput, gameName: string, scriptL
 
 /* ================= SMALL PIECES ================= */
 
-function StatusPill({ status }: { status: string | null }) {
+export function StatusPill({ status }: { status: string | null }) {
   const value = status || "Draft";
   const meta = STATUS_META[value] ?? STATUS_META.Draft;
   return (
@@ -141,7 +141,7 @@ function StatusPill({ status }: { status: string | null }) {
   );
 }
 
-function TopicTile({ topic, className = "h-10 w-10" }: { topic: string; className?: string }) {
+export function TopicTile({ topic, className = "h-10 w-10" }: { topic: string; className?: string }) {
   const { Icon, softClass } = getTopicVisual(topic, -1);
   return (
     <span className={`flex shrink-0 items-center justify-center rounded-xl ring-1 ${softClass} ${className}`}>
@@ -150,7 +150,7 @@ function TopicTile({ topic, className = "h-10 w-10" }: { topic: string; classNam
   );
 }
 
-function Dot() {
+export function Dot() {
   return <span className="text-fg-4" aria-hidden="true">·</span>;
 }
 

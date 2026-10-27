@@ -42,7 +42,10 @@ import {
   buildScriptLine,
   estimateSeconds,
   matchSectionsToIdeas,
+  IDEA_SELECT,
   removeIdeaFromDraft,
+  toProjectIdea,
+  type IdeaRow,
   type ProjectAsset,
   type ProjectIdea,
 } from "@/lib/projectIdeas";
@@ -85,31 +88,8 @@ function clipLabel(asset: ProjectAsset) {
   return asset.name || asset.url.replace(/^https?:\/\/(www\.)?/, "").slice(0, 40);
 }
 
-type IdeaRow = {
-  id: number;
-  title: string;
-  description: string | null;
-  detail_type: string;
-  capture_status: string | null;
-  game: { title: string; cover_url: string | null } | null;
-  footage: { file_path: string | null; title: string | null; channel_name: string | null }[] | null;
-};
 
-const IDEA_SELECT = "id,title,description,detail_type,capture_status,game:games(title,cover_url),footage(file_path,title,channel_name)";
 
-function toProjectIdea(row: IdeaRow, position: number): ProjectIdea {
-  return {
-    id: row.id,
-    title: row.title,
-    description: row.description,
-    detail_type: row.detail_type,
-    capture_status: row.capture_status ?? null,
-    game_title: row.game?.title ?? "",
-    game_cover: row.game?.cover_url ?? null,
-    position,
-    clips: (row.footage ?? []).filter((clip) => clip.file_path?.trim()).map((clip) => ({ file_path: clip.file_path!, title: clip.title, channel_name: clip.channel_name })),
-  };
-}
 
 function formatDuration(seconds: number) {
   if (seconds < 60) return `${seconds}s`;
