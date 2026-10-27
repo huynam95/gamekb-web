@@ -65,6 +65,26 @@ export type EditorScript = {
 const STATUSES = ["Draft", "Filming", "Edited", "Published"] as const;
 const STATUS_DOT: Record<string, string> = { Draft: "bg-slate-400", Filming: "bg-amber-500", Edited: "bg-indigo-500", Published: "bg-emerald-500" };
 
+/**
+ * One colour per idea number, shared by the Ideas list and the Clips tab so
+ * "idea 2" reads the same everywhere.
+ */
+const IDEA_COLORS = [
+  { badge: "bg-blue-600 text-white", bar: "border-l-blue-500", soft: "bg-blue-50 dark:bg-blue-500/10", title: "text-blue-900 dark:text-blue-100", link: "text-blue-700 hover:bg-blue-100 dark:text-blue-300 dark:hover:bg-blue-500/15" },
+  { badge: "bg-orange-500 text-white", bar: "border-l-orange-500", soft: "bg-orange-50 dark:bg-orange-500/10", title: "text-orange-900 dark:text-orange-100", link: "text-orange-700 hover:bg-orange-100 dark:text-orange-300 dark:hover:bg-orange-500/15" },
+  { badge: "bg-emerald-600 text-white", bar: "border-l-emerald-500", soft: "bg-emerald-50 dark:bg-emerald-500/10", title: "text-emerald-900 dark:text-emerald-100", link: "text-emerald-700 hover:bg-emerald-100 dark:text-emerald-300 dark:hover:bg-emerald-500/15" },
+  { badge: "bg-pink-600 text-white", bar: "border-l-pink-500", soft: "bg-pink-50 dark:bg-pink-500/10", title: "text-pink-900 dark:text-pink-100", link: "text-pink-700 hover:bg-pink-100 dark:text-pink-300 dark:hover:bg-pink-500/15" },
+  { badge: "bg-sky-500 text-white", bar: "border-l-sky-500", soft: "bg-sky-50 dark:bg-sky-500/10", title: "text-sky-900 dark:text-sky-100", link: "text-sky-700 hover:bg-sky-100 dark:text-sky-300 dark:hover:bg-sky-500/15" },
+  { badge: "bg-lime-500 text-lime-950", bar: "border-l-lime-500", soft: "bg-lime-50 dark:bg-lime-500/10", title: "text-lime-900 dark:text-lime-100", link: "text-lime-800 hover:bg-lime-100 dark:text-lime-300 dark:hover:bg-lime-500/15" },
+] as const;
+const NEUTRAL_COLOR = { badge: "bg-surface-sunken text-fg-2", bar: "border-l-line-strong", soft: "bg-surface-sunken", title: "text-fg", link: "text-fg-3 hover:bg-surface-sunken" };
+const ideaColor = (number: number | null | undefined) => (number != null && number > 0 && number < Number.MAX_SAFE_INTEGER ? IDEA_COLORS[(number - 1) % IDEA_COLORS.length] : NEUTRAL_COLOR);
+
+/** Short readable label for a clip link: channel, then the video name. */
+function clipLabel(asset: ProjectAsset) {
+  return asset.name || asset.url.replace(/^https?:\/\/(www\.)?/, "").slice(0, 40);
+}
+
 type IdeaRow = {
   id: number;
   title: string;
@@ -524,7 +544,8 @@ export function ProjectEditor({
         {guide.map((section) => {
           const ideaId = match.bySection.get(section.id);
           const idea = ideaId != null ? ideaById.get(ideaId) : undefined;
-          const clipsForSection = assets.filter((a) => (idea && a.idea_id === idea.id) || (!a.idea_id && a.idea_order === section.number)).length;
+          const sectionClips = assets.filter((a) => (idea && a.idea_id === idea.id) || (!a.idea_id && a.idea_order === section.number));
+          const color = ideaColor(section.number);
           const isOver = dragOverId === section.id && draggedId !== section.id;
           if (section.isHook) {
             return (
@@ -548,32 +569,46 @@ export function ProjectEditor({
               onDragLeave={() => setDragOverId((c) => (c === section.id ? null : c))}
               onDrop={(e) => { e.preventDefault(); const src = e.dataTransfer.getData("text/plain") || draggedId; if (src) moveSection(src, section.id); setDraggedId(null); setDragOverId(null); }}
               onDragEnd={() => { setDraggedId(null); setDragOverId(null); }}
-              className={`group relative flex items-start gap-2 rounded-xl border p-2 transition ${isOver ? "border-blue-500 bg-accent-soft ring-1 ring-blue-500" : "border-line bg-surface hover:border-line-strong"}`}
+              className={`group relative flex items-start gap-2 rounded-xl border border-l-4 p-2 transition ${color.bar} ${isOver ? "border-blue-500 bg-accent-soft ring-1 ring-blue-500" : "border-y-line border-r-line bg-surface hover:border-y-line-strong hover:border-r-line-strong"}`}
             >
               <Bars3Icon className="mt-2 h-4 w-4 shrink-0 cursor-grab text-fg-4 active:cursor-grabbing pointer-coarse:hidden" aria-hidden="true" />
-              <span className="mt-0.5 flex h-7 min-w-7 shrink-0 items-center justify-center rounded-lg bg-surface-sunken px-1 text-xs font-bold tabular-nums text-fg-2">{section.number}</span>
-              <button type="button" onClick={() => jumpTo(section.start, section.end)} className="min-w-0 flex-1 cursor-pointer text-left">
-                {idea ? (
-                  <>
-                    <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-fg-4">{idea.game_title}</span>
-                    <span className="line-clamp-2 text-sm font-semibold leading-5 text-fg">{idea.title}</span>
-                    <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-fg-3">
-                      <span className="inline-flex items-center gap-1"><FilmIcon className="h-3 w-3" /> {clipsForSection}</span>
+              <span className={`mt-0.5 flex h-7 min-w-7 shrink-0 items-center justify-center rounded-lg px-1 text-xs font-bold tabular-nums shadow-sm ${idea ? color.badge : NEUTRAL_COLOR.badge}`}>{section.number}</span>
+              <div className="min-w-0 flex-1">
+                <button type="button" onClick={() => jumpTo(section.start, section.end)} className="block w-full cursor-pointer text-left">
+                  {idea ? (
+                    <>
+                      <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-fg-4">{idea.game_title}</span>
+                      <span className="line-clamp-2 text-[15px] font-bold leading-5 text-fg">{idea.title}</span>
                       {idea.capture_status && CAPTURE_META[idea.capture_status as keyof typeof CAPTURE_META] && (
-                        <span className={`inline-flex items-center gap-1 rounded px-1 font-semibold ${CAPTURE_META[idea.capture_status as keyof typeof CAPTURE_META].pill}`}>
+                        <span className={`mt-1 inline-flex items-center gap-1 rounded px-1 text-[11px] font-semibold ${CAPTURE_META[idea.capture_status as keyof typeof CAPTURE_META].pill}`}>
                           <VideoCameraIcon className="h-3 w-3" /> {CAPTURE_META[idea.capture_status as keyof typeof CAPTURE_META].short}
                         </span>
                       )}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-fg-4">{section.label}</span>
-                    <span className="line-clamp-2 text-xs leading-5 text-fg-3">{section.preview}</span>
-                    <span className="mt-1 block text-[11px] italic text-fg-4">Not linked to an idea</span>
-                  </>
-                )}
-              </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-fg-4">{section.label}</span>
+                      <span className="line-clamp-2 text-xs leading-5 text-fg-3">{section.preview}</span>
+                      <span className="mt-1 block text-[11px] italic text-fg-4">Not linked to an idea</span>
+                    </>
+                  )}
+                </button>
+                {sectionClips.length > 0 ? (
+                  <ul className={`mt-1.5 space-y-0.5 rounded-lg p-1 ${color.soft}`}>
+                    {sectionClips.map((asset, i) => (
+                      <li key={`${asset.url}-${i}`}>
+                        <a href={asset.url} target="_blank" rel="noopener noreferrer" title={asset.url} className={`flex min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium transition ${color.link}`}>
+                          <LinkIcon className="h-3.5 w-3.5 shrink-0" />
+                          <span className="min-w-0 flex-1 truncate">{clipLabel(asset)}</span>
+                          {asset.channel_name && <span className="max-w-[40%] shrink-0 truncate text-[10px] font-semibold opacity-70">{asset.channel_name}</span>}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                ) : idea ? (
+                  <p className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-fg-4"><FilmIcon className="h-3 w-3" /> No clips yet</p>
+                ) : null}
+              </div>
               {idea && (
                 <div className="flex shrink-0 flex-col gap-0.5 pointer-fine:opacity-0 pointer-fine:transition pointer-fine:group-hover:opacity-100 pointer-fine:focus-within:opacity-100">
                   <Link href={`/idea/${idea.id}`} target="_blank" className="flex h-8 w-8 items-center justify-center rounded-lg text-fg-4 hover:bg-surface-sunken hover:text-fg" aria-label={`Open ${idea.title}`} title="Open idea">
@@ -650,11 +685,16 @@ export function ProjectEditor({
           <Button variant="accent" size="sm" onClick={addMissingClips} className="bg-amber-600 hover:bg-amber-700"><PlusIcon className="h-4 w-4" /> Add {missingClips.length === 1 ? "it" : "them"}</Button>
         </div>
       )}
-      {assets.length === 0 ? (
+      {assets.length === 0 && match.placed.size === 0 ? (
         <p className="rounded-2xl border border-dashed border-line-strong p-8 text-center text-sm text-fg-4">No clips yet. Clips come from the ideas&apos; footage.</p>
       ) : (
         (() => {
           const groups = new Map<string, { title: string; subtitle: string; order: number; items: { asset: ProjectAsset; index: number }[] }>();
+          // Every idea in the script gets its block, even before it has clips.
+          for (const section of match.sections) {
+            const idea = ideaById.get(match.bySection.get(section.id) ?? -1);
+            if (idea && section.number != null) groups.set(`i${idea.id}`, { title: idea.title, subtitle: idea.game_title, order: section.number, items: [] });
+          }
           assets.forEach((asset, index) => {
             const section = match.sections.find((s) => s.number === asset.idea_order);
             const idea = asset.idea_id ? ideaById.get(asset.idea_id) : section ? ideaById.get(match.bySection.get(section.id) ?? -1) : undefined;
@@ -668,28 +708,34 @@ export function ProjectEditor({
             group.items.push({ asset, index });
             groups.set(key, group);
           });
-          return Array.from(groups.values()).sort((a, b) => a.order - b.order).map((group) => (
-            <section key={`${group.title}-${group.order}`} className="rounded-2xl border border-line bg-surface">
-              <header className="flex items-center gap-2 border-b border-line-soft px-4 py-2.5">
-                {group.order !== Number.MAX_SAFE_INTEGER && <span className="flex h-6 min-w-6 items-center justify-center rounded-md bg-surface-sunken px-1 text-xs font-bold text-fg-2">{group.order}</span>}
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-fg">{group.title}</span>
-                  {group.subtitle && <span className="block truncate text-[11px] text-fg-4">{group.subtitle}</span>}
+          return Array.from(groups.values()).sort((a, b) => a.order - b.order).map((group) => {
+            const color = ideaColor(group.order);
+            const hasNumber = group.order !== Number.MAX_SAFE_INTEGER;
+            return (
+            <section key={`${group.title}-${group.order}`} className={`overflow-hidden rounded-2xl border border-l-4 border-y-line border-r-line bg-surface ${color.bar}`}>
+              <header className={`flex items-center gap-3 px-4 py-3 ${color.soft}`}>
+                {hasNumber && <span className={`flex h-8 min-w-8 shrink-0 items-center justify-center rounded-lg px-1.5 text-sm font-bold shadow-sm ${color.badge}`}>{group.order}</span>}
+                <span className="min-w-0 flex-1">
+                  {group.subtitle && <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-fg-3">{group.subtitle}</span>}
+                  <span className={`block truncate text-base font-bold ${color.title}`}>{hasNumber ? `Idea ${group.order} · ` : ""}{group.title}</span>
                 </span>
+                <span className="hidden shrink-0 text-xs font-medium text-fg-3 sm:inline">{group.items.length} clip{group.items.length === 1 ? "" : "s"}</span>
+                {group.items.length > 0 && <Button variant="ghost" size="sm" onClick={() => void copy(group.items.map(({ asset }) => asset.url).filter(Boolean).join("\n"), "links")} title="Copy this idea's links"><DocumentDuplicateIcon className="h-4 w-4" /> <span className="hidden sm:inline">Copy links</span></Button>}
               </header>
+              {group.items.length === 0 && <p className="flex items-center gap-2 px-4 py-3 text-sm text-fg-4"><FilmIcon className="h-4 w-4" /> No clips yet. Add footage to this idea, or record it yourself.</p>}
               <ul className="divide-y divide-line-soft">
-                {group.items.map(({ asset, index }) => {
+                {group.items.map(({ asset, index }, i) => {
                   const dup = assetAnalysis.duplicateMeta.get(index);
                   return (
                     <li key={`${asset.url}-${index}`} className="flex items-center gap-3 px-4 py-2.5">
-                      <FilmIcon className="h-4 w-4 shrink-0 text-fg-4" />
+                      <span className="w-5 shrink-0 text-center text-xs font-semibold tabular-nums text-fg-4">{i + 1}</span>
                       <div className="min-w-0 flex-1">
                         <p className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm font-medium text-fg">
                           <span className="truncate">{asset.name}</span>
                           {asset.channel_name && <span className="rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">{asset.channel_name}</span>}
                           {dup && <span className="rounded-full bg-surface-sunken px-1.5 py-0.5 text-[10px] font-semibold text-fg-3">{dup.isPrimary ? `Same source ×${dup.total}` : "Same source"}</span>}
                         </p>
-                        <p className="truncate font-mono text-[11px] text-fg-4">{asset.url}</p>
+                        <a href={asset.url} target="_blank" rel="noopener noreferrer" className={`block truncate rounded font-mono text-[11px] underline-offset-2 hover:underline ${hasNumber ? color.link.split(" ").filter((c) => !c.includes("hover:bg")).join(" ") : "text-fg-4"}`}>{asset.url}</a>
                       </div>
                       <a href={asset.url} target="_blank" rel="noopener noreferrer" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line text-fg-3 hover:text-fg" aria-label="Open clip"><LinkIcon className="h-4 w-4" /></a>
                     </li>
@@ -697,7 +743,8 @@ export function ProjectEditor({
                 })}
               </ul>
             </section>
-          ));
+            );
+          });
         })()
       )}
     </div>
