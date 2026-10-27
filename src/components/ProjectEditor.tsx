@@ -18,6 +18,7 @@ import {
   InformationCircleIcon,
   LinkIcon,
   MagnifyingGlassIcon,
+  PlayIcon,
   PlusIcon,
   PuzzlePieceIcon,
   TrashIcon,
@@ -651,22 +652,26 @@ export function ProjectEditor({
   }
   const otherClips = assets.map((asset, index) => ({ asset, index })).filter(({ index }) => !claimed.has(index));
 
+  // Clips as small chips: number and channel. Hover shows the clip title and link.
   const clipRows = (items: { asset: ProjectAsset; index: number }[], color: (typeof IDEA_COLORS)[number] | typeof NEUTRAL_COLOR) => (
-    <ul className="divide-y divide-line-soft">
+    <ul className="flex flex-wrap gap-1.5 px-3 py-2.5">
       {items.map(({ asset, index }, i) => {
         const dup = assetAnalysis.duplicateMeta.get(index);
         return (
-          <li key={`${asset.url}-${index}`} className="flex items-center gap-2.5 px-3 py-2">
-            <span className="w-4 shrink-0 text-center text-[11px] font-semibold tabular-nums text-fg-4">{i + 1}</span>
-            <div className="min-w-0 flex-1">
-              <p className="flex min-w-0 items-center gap-1.5 text-[13px] font-medium text-fg">
-                <span className="min-w-0 truncate">{clipLabel(asset)}</span>
-                {asset.channel_name && <span className="max-w-[45%] shrink-0 truncate rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">{asset.channel_name}</span>}
-                {dup && <span className="shrink-0 rounded-full bg-surface-sunken px-1.5 py-0.5 text-[10px] font-semibold text-fg-3">{dup.isPrimary ? `Same source ×${dup.total}` : "Same source"}</span>}
-              </p>
-              <a href={asset.url} target="_blank" rel="noopener noreferrer" className={`block truncate font-mono text-[11px] underline-offset-2 hover:underline ${color.link.split(" ").filter((c) => !c.includes("hover:bg")).join(" ")}`}>{asset.url}</a>
-            </div>
-            <a href={asset.url} target="_blank" rel="noopener noreferrer" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line text-fg-3 hover:text-fg" aria-label="Open clip"><LinkIcon className="h-4 w-4" /></a>
+          <li key={`${asset.url}-${index}`} className="min-w-0 max-w-full">
+            <a
+              href={asset.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={`${clipLabel(asset)}\n${asset.url}`}
+              aria-label={`Open clip ${i + 1}: ${clipLabel(asset)}`}
+              className={`inline-flex h-8 max-w-full items-center gap-1.5 rounded-lg border border-line bg-surface px-2 text-xs font-semibold transition hover:border-line-strong ${color.link}`}
+            >
+              <PlayIcon className="h-3.5 w-3.5 shrink-0" />
+              <span className="shrink-0 tabular-nums">Clip {i + 1}</span>
+              {asset.channel_name && <span className="min-w-0 truncate font-medium text-fg-3">· {asset.channel_name}</span>}
+              {dup && <span className="shrink-0 rounded bg-surface-sunken px-1 text-[10px] text-fg-3" title="Same source video as another clip">{dup.isPrimary ? `×${dup.total}` : "dup"}</span>}
+            </a>
           </li>
         );
       })}
@@ -731,22 +736,8 @@ export function ProjectEditor({
               <CoverImage src={idea.game_cover} sizes="300px" className="scale-110 blur-[2px]" />
             </span>
           )}
-          <Bars3Icon className="relative mt-4 h-4 w-4 shrink-0 cursor-grab text-fg-4 active:cursor-grabbing pointer-coarse:hidden" aria-hidden="true" />
-          {(() => {
-            const thumb = (
-              <>
-                <span className="relative flex h-14 w-11 items-center justify-center overflow-hidden rounded-lg bg-surface-sunken text-fg-4 shadow-md ring-1 ring-black/10 transition group-hover/thumb:ring-2 group-hover/thumb:ring-blue-500 dark:ring-white/10">
-                  {idea?.game_cover ? <CoverImage src={idea.game_cover} alt={idea.game_title} sizes="44px" /> : <PuzzlePieceIcon className="h-5 w-5" />}
-                </span>
-                <span className={`absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-md px-1 text-xs font-bold tabular-nums shadow-md ring-2 ring-surface ${color.badge}`}>{section.number}</span>
-              </>
-            );
-            return idea ? (
-              <Link href={ideaHref(idea.id)} onClick={(e) => void openIdea(e, idea.id)} className="group/thumb relative mt-1 shrink-0" title="Open idea page" aria-label={`Open idea page: ${idea.title}`}>{thumb}</Link>
-            ) : (
-              <span className="relative mt-1 shrink-0">{thumb}</span>
-            );
-          })()}
+          <Bars3Icon className="relative mt-2 h-4 w-4 shrink-0 cursor-grab text-fg-4 active:cursor-grabbing pointer-coarse:hidden" aria-hidden="true" />
+          <span className={`relative mt-0.5 flex h-8 min-w-8 shrink-0 items-center justify-center rounded-lg px-1.5 text-sm font-bold tabular-nums shadow-sm ${color.badge}`}>{section.number}</span>
           <div className="relative min-w-0 flex-1 pl-1">
             <button type="button" onClick={onJump} className="block w-full cursor-pointer text-left" title="Go to this line in the script">
               {idea ? (
