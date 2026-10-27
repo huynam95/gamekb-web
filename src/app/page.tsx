@@ -8,9 +8,10 @@ import { supabase } from "@/lib/supabaseClient";
 import { ACTIVE_VIDEO_THEME_STORAGE_KEY, DEFAULT_VIDEO_THEMES, VIDEO_THEMES_STORAGE_KEY, VIDEO_TOPICS_TABLE, getVideoThemeById, makeVideoThemeId, normalizeVideoTheme, parseVideoThemes, rowToVideoTheme, videoThemeToRow } from "@/lib/videoThemes";
 import type { VideoTheme } from "@/lib/videoThemes";
 import { PlayCircleIcon, StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
-import { AdjustmentsHorizontalIcon, ArrowDownIcon, ArrowPathIcon, ArrowUpIcon, CalendarDaysIcon, CheckIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, FilmIcon, MagnifyingGlassIcon, PencilSquareIcon, PlusIcon, PuzzlePieceIcon, Squares2X2Icon, TrashIcon, VideoCameraIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { AdjustmentsHorizontalIcon, ArrowDownIcon, BuildingOffice2Icon, ArrowPathIcon, ArrowUpIcon, CalendarDaysIcon, CheckIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, FilmIcon, MagnifyingGlassIcon, PencilSquareIcon, PlusIcon, PuzzlePieceIcon, Squares2X2Icon, TrashIcon, VideoCameraIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { captureStatusPatch, isMissingRecordingColumns, RECORDING_SETUP_MESSAGE } from "@/lib/recording";
 import { buildUsageIndex, linkIdeasToScript, loadUsage, useIdeaUsage } from "@/lib/ideaUsage";
+import { getGameStudio } from "@/lib/studios";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppPageHeader, appPageMainClass, appPageRootClass } from "@/components/AppPage";
 import { GameEditorModal, IdeaItem, QuickViewModal, ScriptEditorModal } from "@/components/IdeaCards";
@@ -177,6 +178,26 @@ const USAGE_FILTER_OPTIONS: DropdownOption<UsageFilter>[] = [
 
 function UsageFilterDropdown({ value, onChange }: { value: UsageFilter; onChange: (value: UsageFilter) => void }) {
   return <Dropdown value={value} options={USAGE_FILTER_OPTIONS} onChange={onChange} heading="Usage" ariaLabel="Filter by usage" />;
+}
+
+const NO_STUDIO = "__none__";
+
+function StudioFilterDropdown({ value, games, onChange }: { value: string; games: Game[]; onChange: (value: string) => void }) {
+  const counts = new Map<string, number>();
+  let unknown = 0;
+  for (const game of games) {
+    const studio = getGameStudio(game);
+    if (studio) counts.set(studio, (counts.get(studio) ?? 0) + 1);
+    else unknown += 1;
+  }
+  const options: DropdownOption<string>[] = [
+    { value: "", label: "All studios", Icon: BuildingOffice2Icon },
+    ...Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([name, count]) => ({ value: name, label: `${name} · ${count} game${count === 1 ? "" : "s"}` })),
+    ...(unknown ? [{ value: NO_STUDIO, label: `No studio set · ${unknown}` }] : []),
+  ];
+  return <Dropdown value={value} options={options} onChange={onChange} heading="Studio" ariaLabel="Filter by studio" />;
 }
 
 function TypeFilterDropdown({ value, onChange }: { value: string | ""; onChange: (value: string | "") => void }) {
@@ -551,6 +572,7 @@ export default function Home() {
   const [groupId, setGroupId] = useState<number | "">("");
   const [type, setType] = useState<string | "">("");
   const [usageFilter, setUsageFilter] = useState<UsageFilter>("");
+  const [studioFilter, setStudioFilter] = useState("");
   const { usageOf, data: usageData } = useIdeaUsage();
   const [releaseYear, setReleaseYear] = useState<number | "" | "unknown">("");
   const [selectedThemeId, setSelectedThemeId] = useState<string | "">("");
@@ -741,7 +763,7 @@ export default function Home() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedQ, gameId, groupId, type, releaseYear, sortOrder, pinnedOnly, usageFilter]);
+  }, [debouncedQ, gameId, groupId, type, releaseYear, sortOrder, pinnedOnly, usageFilter, studioFilter]);
 
   /*
    * Page loading. Every loaded page is kept for a short while and the next page
@@ -752,7 +774,7 @@ export default function Home() {
   const pageCacheRef = useRef(new Map<string, { result: IdeasPageResult; at: number }>());
   const idListCacheRef = useRef(new Map<string, { ids: number[]; total: number; at: number }>());
   const filterKey = JSON.stringify({
-    q: debouncedQ, gameId, groupId, type, releaseYear, sortOrder, pinnedOnly, usageFilter,
+    q: debouncedQ, gameId, groupId, type, releaseYear, sortOrder, pinnedOnly, usageFilter, studioFilter,
     usage: usageFilter && usageData ? usageData.links.length : 0,
     seed: sortOrder === "random" ? randomSeed : 0,
     rev: ideasRevision,
@@ -805,6 +827,12 @@ export default function Home() {
           .filter((game) => releaseYear === "unknown" ? game.release_year == null : game.release_year === releaseYear)
           .map((game) => game.id);
         nextQuery = nextQuery.in("game_id", yearGameIds.length > 0 ? yearGameIds : [-1]);
+      }
+      if (studioFilter) {
+        const studioGameIds = games
+          .filter((game) => (studioFilter === NO_STUDIO ? !getGameStudio(game) : getGameStudio(game) === studioFilter))
+          .map((game) => game.id);
+        nextQuery = nextQuery.in("game_id", studioGameIds.length > 0 ? studioGameIds : [-1]);
       }
       if (type) nextQuery = nextQuery.eq("detail_type", type);
       if (pinnedOnly) nextQuery = nextQuery.eq("pinned", true);
@@ -1253,7 +1281,7 @@ export default function Home() {
   };
 
   const activeGroup = groups.find((group) => group.id === groupId);
-  const phoneFilterCount = [Boolean(gameId), releaseYear !== "", Boolean(type), Boolean(usageFilter), Boolean(groupId) || pinnedOnly, sortOrder !== "newest"].filter(Boolean).length;
+  const phoneFilterCount = [Boolean(gameId), Boolean(studioFilter), releaseYear !== "", Boolean(type), Boolean(usageFilter), Boolean(groupId) || pinnedOnly, sortOrder !== "newest"].filter(Boolean).length;
 
   const goToPage = (p: number) => {
     setCurrentPage(p);
@@ -1492,6 +1520,9 @@ export default function Home() {
               <div className="library-game max-sm:hidden">
                 <ComboBox placeholder="All games" items={games.map(g=>({id:g.id, name:g.title, coverUrl:g.cover_url}))} selectedId={gameId} onChange={setGameId} />
               </div>
+              <div className="library-studio max-sm:hidden">
+                <StudioFilterDropdown value={studioFilter} games={games} onChange={setStudioFilter} />
+              </div>
               <div className="library-year max-sm:hidden">
                 <YearFilterDropdown
                   value={releaseYear}
@@ -1507,10 +1538,10 @@ export default function Home() {
               </div>
               <div className="library-sort flex min-w-0 items-center justify-between gap-2 max-sm:hidden">
                 <SortToggle value={sortOrder} onChange={handleSortChange} />
-                {(q||gameId||groupId||type||releaseYear!==""||pinnedOnly||usageFilter) && (
+                {(q||gameId||groupId||type||releaseYear!==""||pinnedOnly||usageFilter||studioFilter) && (
                   <button
                     type="button"
-                    onClick={()=>{setQ("");setGameId("");setGroupId("");setType("");setReleaseYear("");setPinnedOnly(false);setUsageFilter("")}}
+                    onClick={()=>{setQ("");setGameId("");setGroupId("");setType("");setReleaseYear("");setPinnedOnly(false);setUsageFilter("");setStudioFilter("")}}
                     className="h-10 shrink-0 cursor-pointer rounded-full px-3 text-sm font-semibold text-rose-500 transition hover:bg-danger-soft hover:text-rose-600 dark:hover:text-rose-300"
                   >
                     Clear filters
@@ -1554,6 +1585,10 @@ export default function Home() {
               <div>
                 <FieldLabel>Game</FieldLabel>
                 <ComboBox placeholder="All games" items={games.map(g=>({id:g.id, name:g.title, coverUrl:g.cover_url}))} selectedId={gameId} onChange={setGameId} />
+              </div>
+              <div>
+                <FieldLabel>Studio</FieldLabel>
+                <StudioFilterDropdown value={studioFilter} games={games} onChange={setStudioFilter} />
               </div>
               <div>
                 <FieldLabel>Type</FieldLabel>

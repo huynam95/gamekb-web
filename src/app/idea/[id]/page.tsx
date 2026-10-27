@@ -32,6 +32,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { fetchYoutubeMetadata } from "@/lib/youtube";
 import { getYoutubeVideoId } from "@/lib/mediaLinks";
 import { readIdeaPreview } from "@/lib/ideaPreviewCache";
+import { getGameStudio } from "@/lib/studios";
 import { statusDot, useIdeaUsage, videoHref } from "@/lib/ideaUsage";
 import { useNotifications } from "@/components/NotificationCenter";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -72,6 +73,7 @@ type Game = {
   release_year: number | null;
   cover_url?: string | null;
   genres_text?: string | null;
+  studio?: string | null;
 };
 
 type FootageRow = {
@@ -902,6 +904,7 @@ export default function IdeaDetailPage() {
                   {[
                     ["Game", game?.title ?? "—"],
                     ["Released", game?.release_year ? String(game.release_year) : "—"],
+                    ["Studio", getGameStudio(game) ?? "—"],
                     ["Genre", game?.genres_text || "—"],
                     ["Added", formatDate(detail?.created_at)],
                     ...(detail?.pinned && detail.pinned_at ? [["Pinned", formatDate(detail.pinned_at)]] : []),

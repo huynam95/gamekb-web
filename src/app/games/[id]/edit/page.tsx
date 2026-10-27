@@ -5,6 +5,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useNotifications } from "@/components/NotificationCenter";
+import { StudioSuggestions } from "@/components/IdeaCards";
+import { getGameStudio, inferStudio, isMissingStudioColumn, STUDIO_SETUP_MESSAGE } from "@/lib/studios";
 
 /* ================= STYLES ================= */
 
@@ -39,6 +41,8 @@ export default function EditGamePage() {
   const [coverUrl, setCoverUrl] = useState(""); // MỚI
   const [genres, setGenres] = useState("");
   const [notes, setNotes] = useState("");
+  const [studio, setStudio] = useState("");
+  const [savedStudio, setSavedStudio] = useState<string | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -67,6 +71,8 @@ export default function EditGamePage() {
         setCoverUrl(data.cover_url || ""); // Load ảnh cũ lên
         setGenres(data.genres_text || "");
         setNotes(data.notes || "");
+        setSavedStudio(data.studio ?? null);
+        setStudio(getGameStudio(data) ?? "");
       }
       setLoading(false);
     }
@@ -93,11 +99,13 @@ export default function EditGamePage() {
         cover_url: coverUrl.trim() || null, // Lưu link ảnh mới
         genres_text: genres.trim() || null,
         notes: notes.trim() || null,
+        // Only send the studio when it changed, so saving still works before the studio column exists.
+        ...((studio.trim() || null) !== (savedStudio?.trim() || null) && (studio.trim() || null) !== inferStudio(title) ? { studio: studio.trim() || null } : {}),
       })
       .eq("id", id);
 
     if (error) {
-      notifyError(error.message, "Could not update game");
+      notifyError(isMissingStudioColumn(error) ? STUDIO_SETUP_MESSAGE : error.message, "Could not update game");
       setSaving(false);
     } else {
       success("Updated successfully!", "Game updated");
@@ -202,6 +210,18 @@ Warning: This will delete ALL ideas attached to this game!`,
                       onChange={(e) => setReleaseYear(e.target.value)}
                       placeholder="YYYY"
                     />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-semibold text-fg">Studio</span>
+                    <input
+                      className={inputClass}
+                      value={studio}
+                      onChange={(e) => setStudio(e.target.value)}
+                      placeholder="e.g. Rockstar Games"
+                      list="game-studio-suggestions"
+                    />
+                    <StudioSuggestions />
                   </label>
 
                   <label className="block">

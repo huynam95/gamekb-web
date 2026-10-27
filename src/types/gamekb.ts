@@ -3,6 +3,8 @@ export type Game = {
   title: string;
   cover_url?: string | null;
   release_year?: number | null;
+  /** Studio / label, e.g. "Rockstar Games" (see src/lib/studios.ts). */
+  studio?: string | null;
 };
 
 export type Group = {

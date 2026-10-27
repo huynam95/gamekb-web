@@ -20,6 +20,7 @@ import { analyzeAssetLinks } from "@/lib/assetLinks";
 import { useNotifications } from "@/components/NotificationCenter";
 import { rememberIdeaPreview } from "@/lib/ideaPreviewCache";
 import { CAPTURE_META } from "@/lib/recording";
+import { getGameStudio, inferStudio, isMissingStudioColumn, STUDIO_SETUP_MESSAGE, SUGGESTED_STUDIOS } from "@/lib/studios";
 
 
 export function QuickViewModal({ idea, isOpen, onClose }: { idea: DetailRow | null; isOpen: boolean; onClose: () => void }) {
@@ -41,10 +42,21 @@ export function QuickViewModal({ idea, isOpen, onClose }: { idea: DetailRow | nu
   );
 }
 
+/** Datalist for Studio inputs (input list="game-studio-suggestions"). */
+export function StudioSuggestions({ extra = [] }: { extra?: string[] }) {
+  const options = Array.from(new Set([...SUGGESTED_STUDIOS, ...extra].filter(Boolean)));
+  return (
+    <datalist id="game-studio-suggestions">
+      {options.map((name) => <option key={name} value={name} />)}
+    </datalist>
+  );
+}
+
 export function GameEditorModal({ game, isOpen, onClose, onUpdate }: { game: Game | null; isOpen: boolean; onClose: () => void; onUpdate: (game: Game) => void }) {
   const [title, setTitle] = useState("");
   const [cover, setCover] = useState("");
   const [releaseYear, setReleaseYear] = useState("");
+  const [studio, setStudio] = useState("");
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -53,6 +65,7 @@ export function GameEditorModal({ game, isOpen, onClose, onUpdate }: { game: Gam
       setTitle(game.title);
       setCover(game.cover_url || "");
       setReleaseYear(game.release_year ? String(game.release_year) : "");
+      setStudio(getGameStudio(game) ?? "");
       setFormError("");
     }
   }, [game]);
@@ -66,13 +79,19 @@ export function GameEditorModal({ game, isOpen, onClose, onUpdate }: { game: Gam
       return;
     }
     setLoading(true);
-    const { error } = await supabase.from("games").update({ title, cover_url: cover, release_year: parsedReleaseYear }).eq("id", game.id);
+    const nextStudio = studio.trim() || null;
+    // Only send the studio when it changed, so saving still works before the studio column exists.
+    const studioChanged = nextStudio !== (game.studio?.trim() || null) && nextStudio !== inferStudio(title);
+    const { error } = await supabase
+      .from("games")
+      .update({ title, cover_url: cover, release_year: parsedReleaseYear, ...(studioChanged ? { studio: nextStudio } : {}) })
+      .eq("id", game.id);
     setLoading(false);
     if (error) {
-      setFormError(error.message);
+      setFormError(isMissingStudioColumn(error) ? STUDIO_SETUP_MESSAGE : error.message);
       return;
     }
-    onUpdate({ ...game, title, cover_url: cover, release_year: parsedReleaseYear });
+    onUpdate({ ...game, title, cover_url: cover, release_year: parsedReleaseYear, ...(studioChanged ? { studio: nextStudio } : {}) });
     onClose();
   }
 
@@ -85,6 +104,10 @@ export function GameEditorModal({ game, isOpen, onClose, onUpdate }: { game: Gam
         </Field>
         <Field label="Release year">
           <Input type="number" min="1970" max="2100" value={releaseYear} onChange={(event) => setReleaseYear(event.target.value)} placeholder="2026" />
+        </Field>
+        <Field label="Studio">
+          <Input value={studio} onChange={(event) => setStudio(event.target.value)} placeholder="e.g. Rockstar Games" list="game-studio-suggestions" />
+          <StudioSuggestions />
         </Field>
         <Field label="Cover URL">
           <Input value={cover} onChange={(event) => setCover(event.target.value)} placeholder="https://..." />

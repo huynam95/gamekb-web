@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/Button";
 import { Field, FieldLabel, Input, Textarea } from "@/components/ui/Field";
 import { useDismiss } from "@/components/ui/useDismiss";
 import { TypeChips } from "@/components/TypeChips";
+import { StudioSuggestions } from "@/components/IdeaCards";
+import { inferStudio, isMissingStudioColumn, STUDIO_SETUP_MESSAGE } from "@/lib/studios";
 
 /* ================= TYPES ================= */
 
@@ -196,7 +198,7 @@ function GamePicker({
   );
 }
 
-type NewGameDraft = { title: string; releaseYear: string; coverUrl: string };
+type NewGameDraft = { title: string; releaseYear: string; coverUrl: string; studio: string };
 
 /** The full "add a game" form (same fields as the old Add Game page), shown inside Add Idea. */
 function NewGameForm({
@@ -265,6 +267,19 @@ function NewGameForm({
         </Field>
       </div>
       <p className="mt-1.5 text-xs text-fg-4">The year is used by the Year filter on All Ideas. You can leave it blank and add it later.</p>
+
+      <div className="mt-4">
+        <Field label="Studio">
+          <Input
+            value={draft.studio}
+            onChange={(e) => onChange({ ...draft, studio: e.target.value })}
+            placeholder={inferStudio(draft.title) ?? "e.g. Rockstar Games"}
+            list="game-studio-suggestions"
+          />
+          <StudioSuggestions />
+          <span className="mt-1.5 block text-xs text-fg-4">Used by the Studio filter on All Ideas.{inferStudio(draft.title) ? ` Leave blank to use ${inferStudio(draft.title)}.` : ""}</span>
+        </Field>
+      </div>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,1fr)_9rem] sm:items-start">
         <Field label="Cover image URL">
@@ -439,7 +454,7 @@ export default function AddIdeaPage() {
 
   // Modals / Inline forms
   const [showCreateGame, setShowCreateGame] = useState(false);
-  const emptyGameDraft: NewGameDraft = { title: "", releaseYear: "", coverUrl: "" };
+  const emptyGameDraft: NewGameDraft = { title: "", releaseYear: "", coverUrl: "", studio: "" };
   const [newGame, setNewGame] = useState<NewGameDraft>(emptyGameDraft);
   const [savingGame, setSavingGame] = useState(false);
 
@@ -542,6 +557,7 @@ export default function AddIdeaPage() {
         title: trimmedTitle,
         release_year: parsedReleaseYear,
         cover_url: newGame.coverUrl.trim() || null,
+        ...(newGame.studio.trim() ? { studio: newGame.studio.trim() } : {}),
       })
       .select("id")
       .single();
@@ -551,7 +567,7 @@ export default function AddIdeaPage() {
       if ((error as { code?: string }).code === "23505") {
         warning("A game with this title already exists.", "Game already exists");
       } else {
-        notifyError(error.message, "Could not add game");
+        notifyError(isMissingStudioColumn(error) ? STUDIO_SETUP_MESSAGE : error.message, "Could not add game");
       }
       return;
     }
