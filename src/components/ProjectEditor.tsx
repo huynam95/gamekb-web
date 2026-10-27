@@ -481,6 +481,9 @@ export function ProjectEditor({
   const length = estimateSeconds(content);
   const clipStats = countClips(assets.map((a) => a.url));
   const assetAnalysis = useMemo(() => analyzeAssetLinks(assets), [assets]);
+  // Ideas Nam recorded himself don't need their source clips downloaded.
+  const ownFootageIds = useMemo(() => new Set((ideas ?? []).filter((idea) => idea.capture_status === "recorded" || idea.capture_status === "used").map((idea) => idea.id)), [ideas]);
+  const downloadAssets = assetAnalysis.uniqueAssets.filter((asset) => !(asset.idea_id != null && ownFootageIds.has(asset.idea_id)));
   const toRecord = (ideas ?? []).filter((idea) => idea.capture_status === "to_record").length;
 
   const missingClips = useMemo(() => {
@@ -719,6 +722,9 @@ export function ProjectEditor({
     const color = idea ? ideaColor(section.number) : NEUTRAL_COLOR;
     const isOver = dragOverId === section.id && draggedId !== section.id;
     const capture = idea?.capture_status ? CAPTURE_META[idea.capture_status as keyof typeof CAPTURE_META] : undefined;
+    const ownFootage = idea ? ownFootageIds.has(idea.id) : false;
+    // Recorded ideas fade back; hovering or working on one brings it forward.
+    const faded = ownFootage && !active && !isOver && recordMenuFor !== idea?.id;
     return (
       <div
         draggable
@@ -727,7 +733,7 @@ export function ProjectEditor({
         onDragLeave={() => setDragOverId((c) => (c === section.id ? null : c))}
         onDrop={(e) => { e.preventDefault(); const src = e.dataTransfer.getData("text/plain") || draggedId; if (src) moveSection(src, section.id); setDraggedId(null); setDragOverId(null); }}
         onDragEnd={() => { setDraggedId(null); setDragOverId(null); }}
-        className={`group h-full overflow-hidden rounded-2xl border border-l-4 bg-surface transition ${color.bar} ${isOver ? "border-y-blue-500 border-r-blue-500 ring-2 ring-blue-500" : active ? "border-y-line-strong border-r-line-strong ring-2 ring-blue-500/50" : "border-y-line border-r-line"}`}
+        className={`group h-full overflow-hidden rounded-2xl border border-l-4 bg-surface transition ${faded ? "opacity-45 grayscale-[60%] hover:opacity-100 hover:grayscale-0 focus-within:opacity-100 focus-within:grayscale-0" : ""} ${color.bar} ${isOver ? "border-y-blue-500 border-r-blue-500 ring-2 ring-blue-500" : active ? "border-y-line-strong border-r-line-strong ring-2 ring-blue-500/50" : "border-y-line border-r-line"}`}
       >
         <div className={`relative flex items-start gap-3 overflow-hidden p-3 ${color.soft}`}>
           {idea?.game_cover && (
@@ -805,8 +811,14 @@ export function ProjectEditor({
             )}
           </div>
         </div>
+        {ownFootage && (
+          <p className="flex items-center gap-1.5 px-3 pt-2.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300">
+            <CheckIcon className="h-3.5 w-3.5" /> Recorded yourself, no need to download{sectionClips.length ? "" : "."}
+          </p>
+        )}
         {sectionClips.length > 0
           ? clipRows(sectionClips, color)
+          : ownFootage ? <div className="h-2.5" />
           : idea && <p className="flex items-center gap-2 px-3 py-2.5 text-xs text-fg-4"><FilmIcon className="h-4 w-4" /> No clips yet. Add footage to this idea, or record it yourself.</p>}
       </div>
     );
@@ -815,7 +827,7 @@ export function ProjectEditor({
   const ideasSummary = (
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div className="min-w-0">
-        <p className="text-sm font-semibold text-fg">Ideas & clips <span className="font-normal text-fg-4">· {ideas?.length ?? "…"} ideas · {clipStats.clips} clips · {assetAnalysis.uniqueLinkCount} {assetAnalysis.uniqueLinkCount === 1 ? "video" : "videos"}</span></p>
+        <p className="text-sm font-semibold text-fg">Ideas & clips <span className="font-normal text-fg-4">· {ideas?.length ?? "…"} ideas · {clipStats.clips} clips · {downloadAssets.length} {downloadAssets.length === 1 ? "video" : "videos"} to download</span></p>
         <p className="text-[11px] text-fg-4">Drag a card to reorder · click a title to go to its line</p>
       </div>
       <div className="flex items-center gap-1.5">
@@ -824,8 +836,8 @@ export function ProjectEditor({
             <VideoCameraIcon className="h-3 w-3" /> {toRecord} to record
           </span>
         )}
-        {assets.length > 0 && (
-          <Button variant="secondary" size="sm" onClick={() => void copy(assetAnalysis.uniqueAssets.map((a) => a.url).filter(Boolean).join("\n"), "links")} title="Copy every source video once">
+        {downloadAssets.length > 0 && (
+          <Button variant="secondary" size="sm" onClick={() => void copy(downloadAssets.map((a) => a.url).filter(Boolean).join("\n"), "links")} title={ownFootageIds.size ? "Copy every source video once (ideas you recorded are left out)" : "Copy every source video once"}>
             <DocumentDuplicateIcon className="h-4 w-4" /> Copy all links
           </Button>
         )}
