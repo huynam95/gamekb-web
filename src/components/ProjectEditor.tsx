@@ -34,6 +34,7 @@ import { buildScriptGuide, type ScriptGuideSection } from "@/lib/scriptGuide";
 import { getScriptTopicValue } from "@/lib/scriptTopics";
 import { analyzeAssetLinks, countClips, getClipIdentity } from "@/lib/assetLinks";
 import { invalidateUsage } from "@/lib/ideaUsage";
+import { loadLinks } from "@/lib/ideaLinks";
 import { CAPTURE_META } from "@/lib/recording";
 import type { VideoTheme } from "@/lib/videoThemes";
 import {
@@ -200,9 +201,10 @@ function ChipEditor({ label, values, onChange, prefix = "", placeholder }: { lab
 }
 
 /** Search the library and add an idea to the project. */
-function IdeaPicker({ excludeIds, onPick, onClose }: { excludeIds: Set<number>; onPick: (row: IdeaRow) => Promise<void>; onClose: () => void }) {
+function IdeaPicker({ excludeIds, suggested, onPick, onClose }: { excludeIds: Set<number>; suggested: { id: number; reason: string }[]; onPick: (row: IdeaRow) => Promise<void>; onClose: () => void }) {
   const [query, setQuery] = useState("");
   const [rows, setRows] = useState<IdeaRow[]>([]);
+  const [suggestedRows, setSuggestedRows] = useState<IdeaRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState<number | null>(null);
   const boxRef = useRef<HTMLDivElement | null>(null);
@@ -223,32 +225,62 @@ function IdeaPicker({ excludeIds, onPick, onClose }: { excludeIds: Set<number>; 
     return () => { active = false; clearTimeout(timer); };
   }, [query, excludeIds]);
 
+  // Ideas linked to the ones already in the project come first.
+  const suggestedKey = suggested.map((item) => item.id).join(",");
+  useEffect(() => {
+    let active = true;
+    const ids = suggestedKey ? suggestedKey.split(",").map(Number) : [];
+    if (!ids.length) return;
+    supabase.from("details").select(IDEA_SELECT).in("id", ids).then(({ data }) => {
+      if (!active) return;
+      const byId = new Map(((data ?? []) as unknown as IdeaRow[]).map((row) => [row.id, row]));
+      setSuggestedRows(ids.map((id) => byId.get(id)).filter(Boolean) as IdeaRow[]);
+    });
+    return () => { active = false; };
+  }, [suggestedKey]);
+  const reasonOf = new Map(suggested.map((item) => [item.id, item.reason]));
+  const showSuggested = !query.trim() && suggestedRows.some((row) => !excludeIds.has(row.id));
+  const visibleSuggested = showSuggested ? suggestedRows.filter((row) => !excludeIds.has(row.id)) : [];
+  const visibleRows = rows.filter((row) => !visibleSuggested.some((s) => s.id === row.id));
+
+  const option = (row: IdeaRow, reason?: string) => (
+    <li key={row.id}>
+      <button
+        type="button"
+        disabled={adding !== null}
+        onClick={async () => { setAdding(row.id); await onPick(row); setAdding(null); }}
+        className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-2 py-2 text-left transition hover:bg-surface-sunken disabled:opacity-60"
+      >
+        <GameThumb src={row.game?.cover_url ?? null} className="h-9 w-7" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold text-fg">{row.title}</span>
+          <span className="block truncate text-[11px] text-fg-4">
+            {reason ? <span className="font-semibold text-accent">{reason}</span> : row.game?.title}
+            {!reason && row.footage?.length ? ` · ${row.footage.length} clip${row.footage.length === 1 ? "" : "s"}` : ""}
+          </span>
+        </span>
+        {adding === row.id ? <ArrowPathIcon className="h-4 w-4 animate-spin text-fg-4" /> : <PlusIcon className="h-4 w-4 shrink-0 text-accent" />}
+      </button>
+    </li>
+  );
+
   return (
     <div ref={boxRef} className="absolute inset-x-0 bottom-full z-30 mb-2 rounded-2xl border border-line bg-surface p-2 shadow-2xl animate-in fade-in slide-in-from-bottom-1 duration-150">
       <label className="relative block">
         <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-4" />
         <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search idea title..." aria-label="Search ideas" className="h-10 w-full rounded-xl border border-line bg-surface-muted pl-9 pr-3 text-sm text-fg outline-none focus:border-blue-500" />
       </label>
-      <ul className="mt-1.5 max-h-72 overflow-y-auto">
-        {loading && rows.length === 0 && <li className="px-3 py-4 text-center text-xs text-fg-4">Searching…</li>}
-        {!loading && rows.length === 0 && <li className="px-3 py-4 text-center text-xs text-fg-4">No ideas found.</li>}
-        {rows.map((row) => (
-          <li key={row.id}>
-            <button
-              type="button"
-              disabled={adding !== null}
-              onClick={async () => { setAdding(row.id); await onPick(row); setAdding(null); }}
-              className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl px-2 py-2 text-left transition hover:bg-surface-sunken disabled:opacity-60"
-            >
-              <GameThumb src={row.game?.cover_url ?? null} className="h-9 w-7" />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold text-fg">{row.title}</span>
-                <span className="block truncate text-[11px] text-fg-4">{row.game?.title}{row.footage?.length ? ` · ${row.footage.length} clip${row.footage.length === 1 ? "" : "s"}` : ""}</span>
-              </span>
-              {adding === row.id ? <ArrowPathIcon className="h-4 w-4 animate-spin text-fg-4" /> : <PlusIcon className="h-4 w-4 shrink-0 text-accent" />}
-            </button>
-          </li>
-        ))}
+      <ul className="mt-1.5 max-h-80 overflow-y-auto">
+        {visibleSuggested.length > 0 && (
+          <>
+            <li className="flex items-center gap-1.5 px-2 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-wide text-accent"><LinkIcon className="h-3.5 w-3.5" /> Related to this project</li>
+            {visibleSuggested.map((row) => option(row, reasonOf.get(row.id)))}
+            <li className="px-2 pb-1 pt-2.5 text-[11px] font-semibold uppercase tracking-wide text-fg-4">Recent ideas</li>
+          </>
+        )}
+        {loading && visibleRows.length === 0 && <li className="px-3 py-4 text-center text-xs text-fg-4">Searching…</li>}
+        {!loading && visibleRows.length === 0 && visibleSuggested.length === 0 && <li className="px-3 py-4 text-center text-xs text-fg-4">No ideas found.</li>}
+        {visibleRows.map((row) => option(row))}
       </ul>
     </div>
   );
@@ -286,6 +318,8 @@ export function ProjectEditor({
   const [editingRow, setEditingRow] = useState<{ row: number; text: string; skip: number } | null>(null);
   const [activeRow, setActiveRow] = useState<number | null>(null);
   const rowRefs = useRef(new Map<number, HTMLTextAreaElement>());
+  const [links, setLinks] = useState<Map<number, Set<number>>>(() => new Map());
+  const addIdeaRef = useRef<HTMLDivElement | null>(null);
   const [saveState, setSaveState] = useState<"saved" | "saving" | "error">("saved");
   const [ideas, setIdeas] = useState<ProjectIdea[] | null>(null);
   const [picking, setPicking] = useState(false);
@@ -334,6 +368,15 @@ export function ProjectEditor({
     void loadIdeas(script.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, scriptId]);
+
+  // Related ideas (idea_links) for the ideas in this project.
+  const ideaIdsKey = (ideas ?? []).map((idea) => idea.id).sort((a, b) => a - b).join(",");
+  useEffect(() => {
+    let active = true;
+    const ids = ideaIdsKey ? ideaIdsKey.split(",").map(Number) : [];
+    loadLinks(ids).then(({ links: next }) => { if (active) setLinks(next); });
+    return () => { active = false; };
+  }, [ideaIdsKey]);
 
   /* ---------- save ---------- */
 
@@ -415,6 +458,18 @@ export function ProjectEditor({
   const match = useMemo(() => matchSectionsToIdeas(content, ideas ?? [], assets), [content, ideas, assets]);
   const ideaById = useMemo(() => new Map((ideas ?? []).map((idea) => [idea.id, idea])), [ideas]);
   const unplaced = (ideas ?? []).filter((idea) => !match.placed.has(idea.id));
+  const inProject = useMemo(() => new Set((ideas ?? []).map((idea) => idea.id)), [ideas]);
+  const relatedOutside = (ideaId: number) => Array.from(links.get(ideaId) ?? []).filter((id) => !inProject.has(id));
+  const suggested: { id: number; reason: string }[] = [];
+  for (const idea of [...(ideas ?? [])].sort((a, b) => a.position - b.position)) {
+    for (const id of relatedOutside(idea.id)) {
+      if (!suggested.some((item) => item.id === id)) suggested.push({ id, reason: `Goes with “${idea.title}”` });
+    }
+  }
+  const openPicker = () => {
+    setPicking(true);
+    requestAnimationFrame(() => addIdeaRef.current?.scrollIntoView({ block: "center", behavior: "smooth" }));
+  };
   const length = estimateSeconds(content);
   const clipStats = countClips(assets.map((a) => a.url));
   const assetAnalysis = useMemo(() => analyzeAssetLinks(assets), [assets]);
@@ -676,24 +731,33 @@ export function ProjectEditor({
             </span>
             <span className={`absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-md px-1 text-xs font-bold tabular-nums shadow-md ring-2 ring-surface ${color.badge}`}>{section.number}</span>
           </span>
-          <button type="button" onClick={onJump} className="relative min-w-0 flex-1 cursor-pointer pl-1 text-left" title="Go to this line in the script">
-            {idea ? (
-              <>
-                <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-fg-3">{idea.game_title}</span>
-                <span className={`line-clamp-2 text-[15px] font-bold leading-snug ${color.title}`}>{idea.title}</span>
-                <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-fg-3">
-                  <span className="inline-flex items-center gap-1"><FilmIcon className="h-3 w-3" /> {sectionClips.length} clip{sectionClips.length === 1 ? "" : "s"}</span>
-                  {capture && <span className={`inline-flex items-center gap-1 rounded px-1 font-semibold ${capture.pill}`}><VideoCameraIcon className="h-3 w-3" /> {capture.short}</span>}
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-fg-4">{section.label}</span>
-                <span className="line-clamp-2 text-xs leading-5 text-fg-3">{section.preview}</span>
-                <span className="mt-1 block text-[11px] italic text-fg-4">Not linked to an idea</span>
-              </>
+          <div className="relative min-w-0 flex-1 pl-1">
+            <button type="button" onClick={onJump} className="block w-full cursor-pointer text-left" title="Go to this line in the script">
+              {idea ? (
+                <>
+                  <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-fg-3">{idea.game_title}</span>
+                  <span className={`line-clamp-2 text-[15px] font-bold leading-snug ${color.title}`}>{idea.title}</span>
+                </>
+              ) : (
+                <>
+                  <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-fg-4">{section.label}</span>
+                  <span className="line-clamp-2 text-xs leading-5 text-fg-3">{section.preview}</span>
+                  <span className="mt-1 block text-[11px] italic text-fg-4">Not linked to an idea</span>
+                </>
+              )}
+            </button>
+            {idea && (
+              <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-fg-3">
+                <span className="inline-flex items-center gap-1"><FilmIcon className="h-3 w-3" /> {sectionClips.length} clip{sectionClips.length === 1 ? "" : "s"}</span>
+                {capture && <span className={`inline-flex items-center gap-1 rounded px-1 font-semibold ${capture.pill}`}><VideoCameraIcon className="h-3 w-3" /> {capture.short}</span>}
+                {relatedOutside(idea.id).length > 0 && (
+                  <button type="button" onClick={openPicker} className="inline-flex cursor-pointer items-center gap-1 rounded bg-surface/80 px-1 font-semibold text-accent ring-1 ring-blue-500/25 transition hover:bg-accent-soft" title="Related ideas not in this project yet">
+                    <LinkIcon className="h-3 w-3" /> {relatedOutside(idea.id).length} related
+                  </button>
+                )}
+              </span>
             )}
-          </button>
+          </div>
           <div className="relative -mr-1 -mt-1 flex shrink-0 flex-col gap-0.5 sm:flex-row">
             {sectionClips.length > 0 && (
               <button type="button" onClick={() => void copy(sectionClips.map(({ asset }) => asset.url).filter(Boolean).join("\n"), "links")} className={iconButton} aria-label="Copy this idea's links" title="Copy this idea's links">
@@ -781,10 +845,10 @@ export function ProjectEditor({
   );
 
   const addIdeaBlock = (
-    <div className="relative">
-      {picking && <IdeaPicker excludeIds={new Set((ideas ?? []).map((i) => i.id))} onPick={addIdea} onClose={() => setPicking(false)} />}
+    <div ref={addIdeaRef} className="relative">
+      {picking && <IdeaPicker excludeIds={inProject} suggested={suggested} onPick={addIdea} onClose={() => setPicking(false)} />}
       <Button variant="secondary" className="w-full" onClick={() => setPicking((v) => !v)} aria-expanded={picking}>
-        <PlusIcon className="h-4 w-4" /> Add idea
+        <PlusIcon className="h-4 w-4" /> Add idea{suggested.length > 0 && <span className="ml-1 rounded-full bg-accent-soft px-1.5 py-0.5 text-[10px] font-bold text-accent">{suggested.length} related</span>}
       </Button>
     </div>
   );

@@ -38,6 +38,7 @@ import { useNotifications } from "@/components/NotificationCenter";
 import { AppSidebar } from "@/components/AppSidebar";
 import { appPageMainClass, appPageRootClass } from "@/components/AppPage";
 import { AddToScriptModal } from "@/components/AddToScriptModal";
+import { RelatedIdeas } from "@/components/RelatedIdeas";
 import { CoverBackdrop } from "@/components/CoverBackdrop";
 import { CoverImage } from "@/components/CoverImage";
 import { TypePill } from "@/components/TypePill";
@@ -716,6 +717,9 @@ export default function IdeaDetailPage() {
                   <div className="space-y-2"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-11/12" /><Skeleton className="h-4 w-2/3" /></div>
                 )}
               </section>
+
+              {/* Related ideas */}
+              {Number.isFinite(id) && <RelatedIdeas key={id} ideaId={id} cardClass={cardClass} />}
 
               {/* Footage */}
               <section className={cardClass}>
