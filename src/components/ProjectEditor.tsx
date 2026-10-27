@@ -239,7 +239,7 @@ export function ProjectEditor({
 }) {
   const { success, error: notifyError, confirm } = useNotifications();
   const [formData, setFormData] = useState<Partial<EditorScript>>({});
-  const [tab, setTab] = useState<"script" | "ideas" | "clips" | "details">("script");
+  const [tab, setTab] = useState<"script" | "ideas" | "details">("script");
   const [saveState, setSaveState] = useState<"saved" | "saving" | "error">("saved");
   const [ideas, setIdeas] = useState<ProjectIdea[] | null>(null);
   const [picking, setPicking] = useState(false);
@@ -525,28 +525,86 @@ export function ProjectEditor({
 
   /* ---------- render pieces ---------- */
 
+  // Clips that belong to each script line, and the ones no line claims.
+  const clipsBySection = new Map<string, { asset: ProjectAsset; index: number }[]>();
+  const claimed = new Set<number>();
+  for (const section of guide) {
+    if (section.isHook) continue;
+    const ideaId = match.bySection.get(section.id);
+    const list: { asset: ProjectAsset; index: number }[] = [];
+    assets.forEach((asset, index) => {
+      if (claimed.has(index)) return;
+      if ((ideaId != null && asset.idea_id === ideaId) || (!asset.idea_id && asset.idea_order === section.number)) {
+        list.push({ asset, index });
+        claimed.add(index);
+      }
+    });
+    clipsBySection.set(section.id, list);
+  }
+  const otherClips = assets.map((asset, index) => ({ asset, index })).filter(({ index }) => !claimed.has(index));
+
+  const clipRows = (items: { asset: ProjectAsset; index: number }[], color: (typeof IDEA_COLORS)[number] | typeof NEUTRAL_COLOR) => (
+    <ul className="divide-y divide-line-soft">
+      {items.map(({ asset, index }, i) => {
+        const dup = assetAnalysis.duplicateMeta.get(index);
+        return (
+          <li key={`${asset.url}-${index}`} className="flex items-center gap-2.5 px-3 py-2">
+            <span className="w-4 shrink-0 text-center text-[11px] font-semibold tabular-nums text-fg-4">{i + 1}</span>
+            <div className="min-w-0 flex-1">
+              <p className="flex min-w-0 items-center gap-1.5 text-[13px] font-medium text-fg">
+                <span className="min-w-0 truncate">{clipLabel(asset)}</span>
+                {asset.channel_name && <span className="max-w-[45%] shrink-0 truncate rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">{asset.channel_name}</span>}
+                {dup && <span className="shrink-0 rounded-full bg-surface-sunken px-1.5 py-0.5 text-[10px] font-semibold text-fg-3">{dup.isPrimary ? `Same source ×${dup.total}` : "Same source"}</span>}
+              </p>
+              <a href={asset.url} target="_blank" rel="noopener noreferrer" className={`block truncate font-mono text-[11px] underline-offset-2 hover:underline ${color.link.split(" ").filter((c) => !c.includes("hover:bg")).join(" ")}`}>{asset.url}</a>
+            </div>
+            <a href={asset.url} target="_blank" rel="noopener noreferrer" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line text-fg-3 hover:text-fg" aria-label="Open clip"><LinkIcon className="h-4 w-4" /></a>
+          </li>
+        );
+      })}
+    </ul>
+  );
+
+  const iconButton = "flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-fg-4 transition hover:bg-surface/80 hover:text-fg";
+
   const ideasPanel = (
     <div className="flex min-h-0 flex-col">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <div>
-          <p className="text-sm font-semibold text-fg">Ideas <span className="font-normal text-fg-4">· {ideas?.length ?? "…"}</span></p>
-          <p className="text-[11px] text-fg-4">Drag to reorder · click to jump to the line</p>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-fg">Ideas & clips <span className="font-normal text-fg-4">· {ideas?.length ?? "…"} ideas · {clipStats.clips} clips · {assetAnalysis.uniqueLinkCount} {assetAnalysis.uniqueLinkCount === 1 ? "video" : "videos"}</span></p>
+          <p className="text-[11px] text-fg-4">Drag to reorder · click a title to jump to its line</p>
         </div>
-        {toRecord > 0 && (
-          <span className="inline-flex items-center gap-1 rounded-md bg-rose-100 px-1.5 py-0.5 text-[11px] font-semibold text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">
-            <VideoCameraIcon className="h-3 w-3" /> {toRecord} to record
-          </span>
-        )}
+        <div className="flex items-center gap-1.5">
+          {toRecord > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-md bg-rose-100 px-1.5 py-0.5 text-[11px] font-semibold text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">
+              <VideoCameraIcon className="h-3 w-3" /> {toRecord} to record
+            </span>
+          )}
+          {assets.length > 0 && (
+            <Button variant="secondary" size="sm" onClick={() => void copy(assetAnalysis.uniqueAssets.map((a) => a.url).filter(Boolean).join("\n"), "links")} title="Copy every source video once">
+              <DocumentDuplicateIcon className="h-4 w-4" /> Copy all links
+            </Button>
+          )}
+        </div>
       </div>
 
-      <ol className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-0.5">
+      {missingClips.length > 0 && (
+        <div className="mb-3 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+          <ExclamationTriangleIcon className="h-5 w-5 shrink-0" />
+          <p className="min-w-0 flex-1 text-xs"><span className="font-semibold">{missingClips.length} clip{missingClips.length === 1 ? "" : "s"} from these ideas {missingClips.length === 1 ? "is" : "are"} not in the list</span><span className="block truncate opacity-80">{Array.from(new Set(missingClips.map((m) => m.idea.title))).join(" · ")}</span></p>
+          <Button variant="accent" size="sm" onClick={addMissingClips} className="shrink-0 bg-amber-600 hover:bg-amber-700"><PlusIcon className="h-4 w-4" /> Add</Button>
+        </div>
+      )}
+
+      <ol className="min-h-0 flex-1 space-y-2.5 overflow-y-auto pr-0.5">
         {guide.length === 0 && <li className="rounded-2xl border border-dashed border-line-strong p-5 text-center text-xs text-fg-4">The script is empty. Add an idea below.</li>}
         {guide.map((section) => {
           const ideaId = match.bySection.get(section.id);
           const idea = ideaId != null ? ideaById.get(ideaId) : undefined;
-          const sectionClips = assets.filter((a) => (idea && a.idea_id === idea.id) || (!a.idea_id && a.idea_order === section.number));
-          const color = ideaColor(section.number);
+          const sectionClips = clipsBySection.get(section.id) ?? [];
+          const color = idea ? ideaColor(section.number) : NEUTRAL_COLOR;
           const isOver = dragOverId === section.id && draggedId !== section.id;
+          const capture = idea?.capture_status ? CAPTURE_META[idea.capture_status as keyof typeof CAPTURE_META] : undefined;
           if (section.isHook) {
             return (
               <li key={section.id}>
@@ -569,21 +627,31 @@ export function ProjectEditor({
               onDragLeave={() => setDragOverId((c) => (c === section.id ? null : c))}
               onDrop={(e) => { e.preventDefault(); const src = e.dataTransfer.getData("text/plain") || draggedId; if (src) moveSection(src, section.id); setDraggedId(null); setDragOverId(null); }}
               onDragEnd={() => { setDraggedId(null); setDragOverId(null); }}
-              className={`group relative flex items-start gap-2 rounded-xl border border-l-4 p-2 transition ${color.bar} ${isOver ? "border-blue-500 bg-accent-soft ring-1 ring-blue-500" : "border-y-line border-r-line bg-surface hover:border-y-line-strong hover:border-r-line-strong"}`}
+              className={`group overflow-hidden rounded-2xl border border-l-4 bg-surface transition ${color.bar} ${isOver ? "border-y-blue-500 border-r-blue-500 ring-2 ring-blue-500" : "border-y-line border-r-line"}`}
             >
-              <Bars3Icon className="mt-2 h-4 w-4 shrink-0 cursor-grab text-fg-4 active:cursor-grabbing pointer-coarse:hidden" aria-hidden="true" />
-              <span className={`mt-0.5 flex h-7 min-w-7 shrink-0 items-center justify-center rounded-lg px-1 text-xs font-bold tabular-nums shadow-sm ${idea ? color.badge : NEUTRAL_COLOR.badge}`}>{section.number}</span>
-              <div className="min-w-0 flex-1">
-                <button type="button" onClick={() => jumpTo(section.start, section.end)} className="block w-full cursor-pointer text-left">
+              <div className={`relative flex items-start gap-3 overflow-hidden p-3 ${color.soft}`}>
+                {idea?.game_cover && (
+                  // The game's art fades in from the right edge.
+                  <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-1/2 opacity-30 [mask-image:linear-gradient(to_left,black_10%,transparent)] dark:opacity-25">
+                    <CoverImage src={idea.game_cover} sizes="300px" className="scale-110 blur-[2px]" />
+                  </span>
+                )}
+                <Bars3Icon className="relative mt-4 h-4 w-4 shrink-0 cursor-grab text-fg-4 active:cursor-grabbing pointer-coarse:hidden" aria-hidden="true" />
+                <span className="relative mt-1 shrink-0">
+                  <span className="relative flex h-14 w-11 items-center justify-center overflow-hidden rounded-lg bg-surface-sunken text-fg-4 shadow-md ring-1 ring-black/10 dark:ring-white/10">
+                    {idea?.game_cover ? <CoverImage src={idea.game_cover} alt={idea.game_title} sizes="44px" /> : <PuzzlePieceIcon className="h-5 w-5" />}
+                  </span>
+                  <span className={`absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-md px-1 text-xs font-bold tabular-nums shadow-md ring-2 ring-surface ${color.badge}`}>{section.number}</span>
+                </span>
+                <button type="button" onClick={() => jumpTo(section.start, section.end)} className="relative min-w-0 flex-1 cursor-pointer pl-1 text-left">
                   {idea ? (
                     <>
-                      <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-fg-4">{idea.game_title}</span>
-                      <span className="line-clamp-2 text-[15px] font-bold leading-5 text-fg">{idea.title}</span>
-                      {idea.capture_status && CAPTURE_META[idea.capture_status as keyof typeof CAPTURE_META] && (
-                        <span className={`mt-1 inline-flex items-center gap-1 rounded px-1 text-[11px] font-semibold ${CAPTURE_META[idea.capture_status as keyof typeof CAPTURE_META].pill}`}>
-                          <VideoCameraIcon className="h-3 w-3" /> {CAPTURE_META[idea.capture_status as keyof typeof CAPTURE_META].short}
-                        </span>
-                      )}
+                      <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-fg-3">{idea.game_title}</span>
+                      <span className={`line-clamp-2 text-[15px] font-bold leading-snug ${color.title}`}>{idea.title}</span>
+                      <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-fg-3">
+                        <span className="inline-flex items-center gap-1"><FilmIcon className="h-3 w-3" /> {sectionClips.length} clip{sectionClips.length === 1 ? "" : "s"}</span>
+                        {capture && <span className={`inline-flex items-center gap-1 rounded px-1 font-semibold ${capture.pill}`}><VideoCameraIcon className="h-3 w-3" /> {capture.short}</span>}
+                      </span>
                     </>
                   ) : (
                     <>
@@ -593,35 +661,41 @@ export function ProjectEditor({
                     </>
                   )}
                 </button>
-                {sectionClips.length > 0 ? (
-                  <ul className={`mt-1.5 space-y-0.5 rounded-lg p-1 ${color.soft}`}>
-                    {sectionClips.map((asset, i) => (
-                      <li key={`${asset.url}-${i}`}>
-                        <a href={asset.url} target="_blank" rel="noopener noreferrer" title={asset.url} className={`flex min-w-0 items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium transition ${color.link}`}>
-                          <LinkIcon className="h-3.5 w-3.5 shrink-0" />
-                          <span className="min-w-0 flex-1 truncate">{clipLabel(asset)}</span>
-                          {asset.channel_name && <span className="max-w-[40%] shrink-0 truncate text-[10px] font-semibold opacity-70">{asset.channel_name}</span>}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                ) : idea ? (
-                  <p className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-fg-4"><FilmIcon className="h-3 w-3" /> No clips yet</p>
-                ) : null}
-              </div>
-              {idea && (
-                <div className="flex shrink-0 flex-col gap-0.5 pointer-fine:opacity-0 pointer-fine:transition pointer-fine:group-hover:opacity-100 pointer-fine:focus-within:opacity-100">
-                  <Link href={`/idea/${idea.id}`} target="_blank" className="flex h-8 w-8 items-center justify-center rounded-lg text-fg-4 hover:bg-surface-sunken hover:text-fg" aria-label={`Open ${idea.title}`} title="Open idea">
-                    <ArrowTopRightOnSquareIcon className="h-4 w-4" />
-                  </Link>
-                  <button type="button" onClick={() => void removeIdea(idea)} className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-fg-4 hover:bg-danger-soft hover:text-rose-600" aria-label={`Remove ${idea.title} from project`} title="Remove from project">
-                    <TrashIcon className="h-4 w-4" />
-                  </button>
+                <div className="relative -mr-1 -mt-1 flex shrink-0 flex-col gap-0.5 sm:flex-row">
+                  {sectionClips.length > 0 && (
+                    <button type="button" onClick={() => void copy(sectionClips.map(({ asset }) => asset.url).filter(Boolean).join("\n"), "links")} className={iconButton} aria-label="Copy this idea's links" title="Copy this idea's links">
+                      <DocumentDuplicateIcon className="h-4 w-4" />
+                    </button>
+                  )}
+                  {idea && (
+                    <>
+                      <Link href={`/idea/${idea.id}`} target="_blank" className={iconButton} aria-label={`Open ${idea.title}`} title="Open idea">
+                        <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                      </Link>
+                      <button type="button" onClick={() => void removeIdea(idea)} className={`${iconButton} hover:bg-danger-soft hover:text-rose-600`} aria-label={`Remove ${idea.title} from project`} title="Remove from project">
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </>
+                  )}
                 </div>
-              )}
+              </div>
+              {sectionClips.length > 0
+                ? clipRows(sectionClips, color)
+                : idea && <p className="flex items-center gap-2 px-3 py-2.5 text-xs text-fg-4"><FilmIcon className="h-4 w-4" /> No clips yet. Add footage to this idea, or record it yourself.</p>}
             </li>
           );
         })}
+
+        {otherClips.length > 0 && (
+          <li className="overflow-hidden rounded-2xl border border-line bg-surface">
+            <div className="flex items-center gap-2 bg-surface-sunken px-3 py-2">
+              <FilmIcon className="h-4 w-4 text-fg-4" />
+              <p className="min-w-0 flex-1 text-sm font-semibold text-fg">Other clips <span className="font-normal text-fg-4">· not tied to a line</span></p>
+              <button type="button" onClick={() => void copy(otherClips.map(({ asset }) => asset.url).filter(Boolean).join("\n"), "links")} className={iconButton} aria-label="Copy these links" title="Copy these links"><DocumentDuplicateIcon className="h-4 w-4" /></button>
+            </div>
+            {clipRows(otherClips, NEUTRAL_COLOR)}
+          </li>
+        )}
 
         {unplaced.length > 0 && (
           <li className="pt-2">
@@ -673,95 +747,6 @@ export function ProjectEditor({
     </div>
   );
 
-  const clipsPanel = (
-    <div className="mx-auto w-full max-w-4xl space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-fg-3"><span className="font-semibold text-fg">{clipStats.clips} clips</span> · {assetAnalysis.uniqueLinkCount} source {assetAnalysis.uniqueLinkCount === 1 ? "video" : "videos"} to download</p>
-        <Button variant="secondary" size="sm" onClick={() => void copy(assetAnalysis.uniqueAssets.map((a) => a.url).filter(Boolean).join("\n"), "links")}><DocumentDuplicateIcon className="h-4 w-4" /> Copy unique links</Button>
-      </div>
-      {missingClips.length > 0 && (
-        <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900 sm:flex-row sm:items-center sm:justify-between dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
-          <p className="flex items-start gap-2 text-sm"><ExclamationTriangleIcon className="mt-0.5 h-5 w-5 shrink-0" /> <span><span className="font-semibold">{missingClips.length} clip{missingClips.length === 1 ? "" : "s"} on this project&apos;s ideas {missingClips.length === 1 ? "is" : "are"} not in the list</span><br /><span className="text-xs opacity-80">{Array.from(new Set(missingClips.map((m) => m.idea.title))).join(" · ")}</span></span></p>
-          <Button variant="accent" size="sm" onClick={addMissingClips} className="bg-amber-600 hover:bg-amber-700"><PlusIcon className="h-4 w-4" /> Add {missingClips.length === 1 ? "it" : "them"}</Button>
-        </div>
-      )}
-      {assets.length === 0 && match.placed.size === 0 ? (
-        <p className="rounded-2xl border border-dashed border-line-strong p-8 text-center text-sm text-fg-4">No clips yet. Clips come from the ideas&apos; footage.</p>
-      ) : (
-        (() => {
-          const groups = new Map<string, { title: string; subtitle: string; cover: string | null; order: number; items: { asset: ProjectAsset; index: number }[] }>();
-          // Every idea in the script gets its block, even before it has clips.
-          for (const section of match.sections) {
-            const idea = ideaById.get(match.bySection.get(section.id) ?? -1);
-            if (idea && section.number != null) groups.set(`i${idea.id}`, { title: idea.title, subtitle: idea.game_title, cover: idea.game_cover, order: section.number, items: [] });
-          }
-          assets.forEach((asset, index) => {
-            const section = match.sections.find((s) => s.number === asset.idea_order);
-            const idea = asset.idea_id ? ideaById.get(asset.idea_id) : section ? ideaById.get(match.bySection.get(section.id) ?? -1) : undefined;
-            const key = idea ? `i${idea.id}` : asset.idea_order != null ? `o${asset.idea_order}` : "other";
-            const group = groups.get(key) ?? {
-              title: idea?.title ?? asset.idea_title ?? (asset.idea_order != null ? `Idea ${asset.idea_order}` : "Other clips"),
-              subtitle: idea?.game_title ?? asset.game_title ?? "",
-              cover: idea?.game_cover ?? (ideas ?? []).find((i) => i.game_cover && i.game_title === asset.game_title)?.game_cover ?? null,
-              order: asset.idea_order ?? Number.MAX_SAFE_INTEGER,
-              items: [],
-            };
-            group.items.push({ asset, index });
-            groups.set(key, group);
-          });
-          return Array.from(groups.values()).sort((a, b) => a.order - b.order).map((group) => {
-            const color = ideaColor(group.order);
-            const hasNumber = group.order !== Number.MAX_SAFE_INTEGER;
-            return (
-            <section key={`${group.title}-${group.order}`} className={`overflow-hidden rounded-2xl border border-l-4 border-y-line border-r-line bg-surface ${color.bar}`}>
-              <header className={`relative flex items-center gap-3 overflow-hidden px-4 py-3 ${color.soft}`}>
-                {group.cover && (
-                  // The game's art fades in from the right edge of the header.
-                  <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-2/3 opacity-30 [mask-image:linear-gradient(to_left,black_10%,transparent)] dark:opacity-25 sm:w-1/2">
-                    <CoverImage src={group.cover} sizes="(max-width: 640px) 66vw, 450px" className="scale-110 blur-[2px]" />
-                  </span>
-                )}
-                <span className="relative shrink-0">
-                  <span className="relative flex h-16 w-12 items-center justify-center overflow-hidden rounded-lg bg-surface-sunken text-fg-4 shadow-md ring-1 ring-black/10 dark:ring-white/10">
-                    {group.cover ? <CoverImage src={group.cover} alt={group.subtitle} sizes="48px" /> : <PuzzlePieceIcon className="h-5 w-5" />}
-                  </span>
-                  {hasNumber && <span className={`absolute -right-2 -top-2 flex h-7 min-w-7 items-center justify-center rounded-lg px-1.5 text-sm font-bold shadow-md ring-2 ring-surface ${color.badge}`}>{group.order}</span>}
-                </span>
-                <span className="relative min-w-0 flex-1 pl-1">
-                  {group.subtitle && <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-fg-3">{group.subtitle}</span>}
-                  <span className={`line-clamp-2 text-base font-bold leading-snug ${color.title}`}>{hasNumber ? `Idea ${group.order} · ` : ""}{group.title}</span>
-                </span>
-                <span className="relative hidden shrink-0 text-xs font-medium text-fg-3 sm:inline">{group.items.length} clip{group.items.length === 1 ? "" : "s"}</span>
-                {group.items.length > 0 && <Button variant="ghost" size="sm" className="relative" onClick={() => void copy(group.items.map(({ asset }) => asset.url).filter(Boolean).join("\n"), "links")} title="Copy this idea's links"><DocumentDuplicateIcon className="h-4 w-4" /> <span className="hidden sm:inline">Copy links</span></Button>}
-              </header>
-              {group.items.length === 0 && <p className="flex items-center gap-2 px-4 py-3 text-sm text-fg-4"><FilmIcon className="h-4 w-4" /> No clips yet. Add footage to this idea, or record it yourself.</p>}
-              <ul className="divide-y divide-line-soft">
-                {group.items.map(({ asset, index }, i) => {
-                  const dup = assetAnalysis.duplicateMeta.get(index);
-                  return (
-                    <li key={`${asset.url}-${index}`} className="flex items-center gap-3 px-4 py-2.5">
-                      <span className="w-5 shrink-0 text-center text-xs font-semibold tabular-nums text-fg-4">{i + 1}</span>
-                      <div className="min-w-0 flex-1">
-                        <p className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm font-medium text-fg">
-                          <span className="truncate">{asset.name}</span>
-                          {asset.channel_name && <span className="rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">{asset.channel_name}</span>}
-                          {dup && <span className="rounded-full bg-surface-sunken px-1.5 py-0.5 text-[10px] font-semibold text-fg-3">{dup.isPrimary ? `Same source ×${dup.total}` : "Same source"}</span>}
-                        </p>
-                        <a href={asset.url} target="_blank" rel="noopener noreferrer" className={`block truncate rounded font-mono text-[11px] underline-offset-2 hover:underline ${hasNumber ? color.link.split(" ").filter((c) => !c.includes("hover:bg")).join(" ") : "text-fg-4"}`}>{asset.url}</a>
-                      </div>
-                      <a href={asset.url} target="_blank" rel="noopener noreferrer" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line text-fg-3 hover:text-fg" aria-label="Open clip"><LinkIcon className="h-4 w-4" /></a>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-            );
-          });
-        })()
-      )}
-    </div>
-  );
-
   const detailsPanel = (
     <div className="mx-auto w-full max-w-3xl space-y-5">
       <div>
@@ -785,8 +770,7 @@ export function ProjectEditor({
 
   const tabs = [
     { key: "script" as const, label: "Script", Icon: DocumentTextIcon, mobileOnly: false },
-    { key: "ideas" as const, label: `Ideas · ${ideas?.length ?? 0}`, Icon: LightBulbIcon, mobileOnly: true },
-    { key: "clips" as const, label: `Clips · ${clipStats.clips}`, Icon: FilmIcon, mobileOnly: false },
+    { key: "ideas" as const, label: `Ideas & clips · ${ideas?.length ?? 0}`, Icon: LightBulbIcon, mobileOnly: true },
     { key: "details" as const, label: "Details", Icon: InformationCircleIcon, mobileOnly: false },
   ];
 
@@ -853,13 +837,12 @@ export function ProjectEditor({
       {/* Body */}
       <div className="min-h-0 flex-1 overflow-y-auto bg-surface-muted p-3 sm:p-6">
         {tab === "script" && (
-          <div className="grid h-full min-h-0 gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
+          <div className="grid h-full min-h-0 gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
             {scriptPanel}
             <aside className="hidden min-h-0 rounded-2xl border border-line bg-surface p-3 lg:flex lg:flex-col">{ideasPanel}</aside>
           </div>
         )}
-        {tab === "ideas" && <div className="mx-auto max-w-xl rounded-2xl border border-line bg-surface p-3">{ideasPanel}</div>}
-        {tab === "clips" && clipsPanel}
+        {tab === "ideas" && <div className="mx-auto max-w-2xl rounded-2xl border border-line bg-surface p-3">{ideasPanel}</div>}
         {tab === "details" && detailsPanel}
       </div>
     </Modal>
