@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowPathIcon,
@@ -35,7 +36,7 @@ import { getScriptTopicValue } from "@/lib/scriptTopics";
 import { analyzeAssetLinks, countClips, getClipIdentity } from "@/lib/assetLinks";
 import { invalidateUsage } from "@/lib/ideaUsage";
 import { loadLinks } from "@/lib/ideaLinks";
-import { CAPTURE_META } from "@/lib/recording";
+import { CAPTURE_META, CAPTURE_STATUSES, RECORDING_SETUP_MESSAGE, captureStatusPatch, isMissingRecordingColumns, type CaptureStatus } from "@/lib/recording";
 import type { VideoTheme } from "@/lib/videoThemes";
 import {
   addIdeaToDraft,
@@ -299,6 +300,8 @@ export function ProjectEditor({
   const [activeRow, setActiveRow] = useState<number | null>(null);
   const rowRefs = useRef(new Map<number, HTMLTextAreaElement>());
   const [links, setLinks] = useState<Map<number, Set<number>>>(() => new Map());
+  const [recordMenuFor, setRecordMenuFor] = useState<number | null>(null);
+  const router = useRouter();
   const addIdeaRef = useRef<HTMLDivElement | null>(null);
   const [saveState, setSaveState] = useState<"saved" | "saving" | "error">("saved");
   const [ideas, setIdeas] = useState<ProjectIdea[] | null>(null);
@@ -428,6 +431,30 @@ export function ProjectEditor({
 
   const close = async () => {
     if (await flush()) onClose();
+  };
+
+  /** The idea's own page. Its back button returns to this project. */
+  const ideaHref = (ideaId: number) => `/idea/${ideaId}${script ? `?project=${script.id}` : ""}`;
+  const openIdea = async (event: React.MouseEvent, ideaId: number) => {
+    // Ctrl/Cmd/middle click still opens a new tab.
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+    event.preventDefault();
+    await flush();
+    router.push(ideaHref(ideaId));
+  };
+
+  const setCapture = async (idea: ProjectIdea, status: CaptureStatus | null) => {
+    setRecordMenuFor(null);
+    if ((idea.capture_status ?? null) === status) return;
+    const { data: previous } = await supabase.from("details").select("capture_added_at,recorded_at").eq("id", idea.id).single();
+    const patch = captureStatusPatch(status, (previous ?? undefined) as { capture_added_at?: string | null; recorded_at?: string | null } | undefined);
+    const { error } = await supabase.from("details").update(patch).eq("id", idea.id);
+    if (error) {
+      notifyError(isMissingRecordingColumns(error) ? RECORDING_SETUP_MESSAGE : error.message, "Recording not updated");
+      return;
+    }
+    setIdeas((current) => (current ?? []).map((item) => (item.id === idea.id ? { ...item, capture_status: status } : item)));
+    success(status ? `“${idea.title}” marked ${CAPTURE_META[status].label.toLowerCase()}.` : `“${idea.title}” taken off the Recording List.`, "Recording List");
   };
 
   /* ---------- derived ---------- */
@@ -705,12 +732,21 @@ export function ProjectEditor({
             </span>
           )}
           <Bars3Icon className="relative mt-4 h-4 w-4 shrink-0 cursor-grab text-fg-4 active:cursor-grabbing pointer-coarse:hidden" aria-hidden="true" />
-          <span className="relative mt-1 shrink-0">
-            <span className="relative flex h-14 w-11 items-center justify-center overflow-hidden rounded-lg bg-surface-sunken text-fg-4 shadow-md ring-1 ring-black/10 dark:ring-white/10">
-              {idea?.game_cover ? <CoverImage src={idea.game_cover} alt={idea.game_title} sizes="44px" /> : <PuzzlePieceIcon className="h-5 w-5" />}
-            </span>
-            <span className={`absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-md px-1 text-xs font-bold tabular-nums shadow-md ring-2 ring-surface ${color.badge}`}>{section.number}</span>
-          </span>
+          {(() => {
+            const thumb = (
+              <>
+                <span className="relative flex h-14 w-11 items-center justify-center overflow-hidden rounded-lg bg-surface-sunken text-fg-4 shadow-md ring-1 ring-black/10 transition group-hover/thumb:ring-2 group-hover/thumb:ring-blue-500 dark:ring-white/10">
+                  {idea?.game_cover ? <CoverImage src={idea.game_cover} alt={idea.game_title} sizes="44px" /> : <PuzzlePieceIcon className="h-5 w-5" />}
+                </span>
+                <span className={`absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-md px-1 text-xs font-bold tabular-nums shadow-md ring-2 ring-surface ${color.badge}`}>{section.number}</span>
+              </>
+            );
+            return idea ? (
+              <Link href={ideaHref(idea.id)} onClick={(e) => void openIdea(e, idea.id)} className="group/thumb relative mt-1 shrink-0" title="Open idea page" aria-label={`Open idea page: ${idea.title}`}>{thumb}</Link>
+            ) : (
+              <span className="relative mt-1 shrink-0">{thumb}</span>
+            );
+          })()}
           <div className="relative min-w-0 flex-1 pl-1">
             <button type="button" onClick={onJump} className="block w-full cursor-pointer text-left" title="Go to this line in the script">
               {idea ? (
@@ -729,10 +765,32 @@ export function ProjectEditor({
             {idea && (
               <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-fg-3">
                 <span className="inline-flex items-center gap-1"><FilmIcon className="h-3 w-3" /> {sectionClips.length} clip{sectionClips.length === 1 ? "" : "s"}</span>
-                {capture && <span className={`inline-flex items-center gap-1 rounded px-1 font-semibold ${capture.pill}`}><VideoCameraIcon className="h-3 w-3" /> {capture.short}</span>}
+                <button
+                  type="button"
+                  onClick={() => setRecordMenuFor((current) => (current === idea.id ? null : idea.id))}
+                  aria-expanded={recordMenuFor === idea.id}
+                  title="Recording List"
+                  className={`inline-flex cursor-pointer items-center gap-1 rounded px-1 font-semibold transition ${capture ? capture.pill : "bg-surface/80 text-fg-3 ring-1 ring-line hover:text-rose-600"}`}
+                >
+                  <VideoCameraIcon className="h-3 w-3" /> {capture ? capture.short : "Record?"}
+                </button>
                 {relatedOutside(idea.id).length > 0 && (
                   <button type="button" onClick={openPicker} className="inline-flex cursor-pointer items-center gap-1 rounded bg-surface/80 px-1 font-semibold text-accent ring-1 ring-blue-500/25 transition hover:bg-accent-soft" title="Related ideas not in this project yet">
                     <LinkIcon className="h-3 w-3" /> {relatedOutside(idea.id).length} related
+                  </button>
+                )}
+              </span>
+            )}
+            {idea && recordMenuFor === idea.id && (
+              <span className="mt-1.5 flex flex-wrap gap-1" role="group" aria-label="Recording status">
+                {CAPTURE_STATUSES.map((status) => (
+                  <button key={status} type="button" aria-pressed={idea.capture_status === status} onClick={() => void setCapture(idea, status)} className={`inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-[11px] font-semibold ring-1 transition ${idea.capture_status === status ? `${CAPTURE_META[status].pill} ring-transparent` : "bg-surface text-fg-2 ring-line hover:ring-line-strong"}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${CAPTURE_META[status].dot}`} /> {CAPTURE_META[status].short}
+                  </button>
+                ))}
+                {idea.capture_status && (
+                  <button type="button" onClick={() => void setCapture(idea, null)} className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-lg bg-surface px-2 text-[11px] font-semibold text-fg-3 ring-1 ring-line transition hover:text-rose-600">
+                    <XMarkIcon className="h-3 w-3" /> Off the list
                   </button>
                 )}
               </span>
@@ -746,7 +804,7 @@ export function ProjectEditor({
             )}
             {idea && (
               <>
-                <Link href={`/idea/${idea.id}`} target="_blank" className={iconButton} aria-label={`Open ${idea.title}`} title="Open idea">
+                <Link href={ideaHref(idea.id)} onClick={(e) => void openIdea(e, idea.id)} className={iconButton} aria-label={`Open idea page: ${idea.title}`} title="Open idea page">
                   <ArrowTopRightOnSquareIcon className="h-4 w-4" />
                 </Link>
                 <button type="button" onClick={() => void removeIdea(idea)} className={`${iconButton} hover:bg-danger-soft hover:text-rose-600`} aria-label={`Remove ${idea.title} from project`} title="Remove from project">
@@ -811,7 +869,7 @@ export function ProjectEditor({
           <li key={idea.id} className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2 dark:border-amber-500/30 dark:bg-amber-500/10">
             <GameThumb src={idea.game_cover} className="h-8 w-6" />
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-semibold text-fg">{idea.title}</span>
+              <Link href={ideaHref(idea.id)} onClick={(e) => void openIdea(e, idea.id)} className="block truncate text-sm font-semibold text-fg hover:text-accent hover:underline" title="Open idea page">{idea.title}</Link>
               <span className="block truncate text-[11px] text-fg-3">{idea.game_title}</span>
             </span>
             <Button variant="ghost" size="sm" onClick={() => addLineFor(idea)} title="Add its line to the end of the script">Add line</Button>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeftIcon,
@@ -91,6 +91,15 @@ type FootageRow = {
 type SourceRow = { id: number; detail_id: number; url: string; note: string | null; created_at: string | null };
 type Group = { id: number; name: string; description: string | null };
 /* ================= HELPERS ================= */
+
+const subscribeNothing = () => () => {};
+
+/** Project id when the idea was opened from a Short Project (?project=<id>). */
+function useFromProject() {
+  const search = useSyncExternalStore(subscribeNothing, () => window.location.search, () => "");
+  const id = Number(new URLSearchParams(search).get("project"));
+  return Number.isFinite(id) && id > 0 ? id : null;
+}
 
 const cardClass = "rounded-3xl border border-line bg-surface p-5 shadow-sm sm:p-6";
 
@@ -411,7 +420,13 @@ export default function IdeaDetailPage() {
 
   useEffect(() => { if (detail) document.title = `${detail.title} | NinjaPlay`; }, [detail]);
 
+  const fromProject = useFromProject();
   const goBack = () => {
+    // Opened from a Short Project: return to that project, open where you left it.
+    if (fromProject) {
+      router.push(`/scripts?open=${fromProject}`);
+      return;
+    }
     // Coming from the library: go back so its filters and scroll position are kept.
     if (preview && window.history.length > 1) router.back();
     else router.push("/");
@@ -620,7 +635,7 @@ export default function IdeaDetailPage() {
             <div className="relative z-10 p-4 sm:p-6 lg:p-8">
               <div className="flex items-center justify-between gap-2">
                 <button type="button" onClick={goBack} className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3.5 text-sm font-semibold text-white backdrop-blur-md transition hover:bg-white/20">
-                  <ArrowLeftIcon className="h-4 w-4" /> <span>All Ideas</span>
+                  <ArrowLeftIcon className="h-4 w-4" /> <span>{fromProject ? "Back to project" : "All Ideas"}</span>
                 </button>
                 {detail && (
                   <MoreMenu onDelete={() => void deleteIdea()} onEditGame={game ? () => router.push(`/games/${game.id}/edit`) : undefined} />

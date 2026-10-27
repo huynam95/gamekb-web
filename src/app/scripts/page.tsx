@@ -155,7 +155,7 @@ export default function ScriptsPage() {
         setEditingScript(toOpen);
         setIsModalOpen(true);
       }
-      if (openId) window.history.replaceState({}, "", "/scripts");
+      if (openId && !toOpen) window.history.replaceState({}, "", "/scripts");
     }
     load();
   }, []);
@@ -260,10 +260,16 @@ export default function ScriptsPage() {
     return true;
   };
 
-  const openProject = (script: ScriptProject) => {
-    if (pendingTopicIds.current.has(script.id)) return;
+  // The open project stays in the address (?open=<id>), so going to an idea and back returns to it.
+  const showProject = (script: ScriptProject) => {
     setEditingScript(script);
     setIsModalOpen(true);
+    window.history.replaceState({}, "", `/scripts?open=${script.id}`);
+  };
+
+  const openProject = (script: ScriptProject) => {
+    if (pendingTopicIds.current.has(script.id)) return;
+    showProject(script);
   };
 
   const createProject = async () => {
@@ -277,8 +283,7 @@ export default function ScriptsPage() {
       const project = data as ScriptProject;
       setScripts((current) => [project, ...current]);
       setSearchQuery("");
-      setEditingScript(project);
-      setIsModalOpen(true);
+      showProject(project);
     } catch (error) {
       notifyError(error instanceof Error ? error.message : "Could not create project", "Project not created");
     } finally {
@@ -392,7 +397,7 @@ export default function ScriptsPage() {
     <div className={`${appPageRootClass} xl:flex`}>
       <ProjectEditor
         isOpen={isModalOpen}
-        onClose={() => { setIsModalOpen(false); setLinksVersion((v) => v + 1); }}
+        onClose={() => { setIsModalOpen(false); setLinksVersion((v) => v + 1); window.history.replaceState({}, "", "/scripts"); }}
         script={editingScript}
         onSave={handleUpdate}
         onRefresh={refreshScriptProject}
