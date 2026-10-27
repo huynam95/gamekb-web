@@ -1,6 +1,5 @@
 "use client";
 
-import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Dropdown, type DropdownOption } from "@/components/ui/Dropdown";
 import { useDismiss } from "@/components/ui/useDismiss";
@@ -10,26 +9,19 @@ import { supabase } from "@/lib/supabaseClient";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppPageHeader, appPageMainClass, appPageRootClass } from "@/components/AppPage";
 import { useNotifications } from "@/components/NotificationCenter";
-import { analyzeAssetLinks, countClips, getClipIdentity } from "@/lib/assetLinks";
-import { buildScriptGuide } from "@/lib/scriptGuide";
+import { countClips } from "@/lib/assetLinks";
 import { getScriptTopic, getScriptTopicValue } from "@/lib/scriptTopics";
 import { useProjectTopics } from "@/lib/useProjectTopics";
-import { ProjectTopicSelect } from "@/components/ProjectTopicSelect";
+import { ProjectEditor } from "@/components/ProjectEditor";
 import type { VideoTheme } from "@/lib/videoThemes";
 import {
   TrashIcon,
   MagnifyingGlassIcon,
   DocumentTextIcon,
   PencilSquareIcon,
-  InformationCircleIcon,
-  Squares2X2Icon,
-  LinkIcon,
   CheckIcon,
   XMarkIcon,
-  DocumentDuplicateIcon,
-  ExclamationTriangleIcon,
   VideoCameraIcon,
-  Bars3Icon,
   ArrowPathIcon,
   PlusIcon,
   ChevronDownIcon,
@@ -60,12 +52,6 @@ type ScriptProject = {
   created_at: string;
 };
 
-const STATUS_STYLE: Record<string, string> = {
-  Draft: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
-  Filming: "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800",
-  Edited: "bg-indigo-100 text-indigo-800 border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800",
-  Published: "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800",
-};
 
 
 function getScriptChannels(script: ScriptProject) {
@@ -136,666 +122,6 @@ function getTopicVisual(topic: string) {
 
 /* ================= MODAL: STUDIO WORKSPACE ================= */
 
-function ScriptEditorModal({ isOpen, onClose, script, onSave, onRefresh, topics, topicsLoading, topicsError, onRetryTopics, ideaClips = [] }: {
-  isOpen: boolean;
-  /** Clips on this project's ideas, so ones missing from the assets list can be added. */
-  ideaClips?: IdeaClip[];
-  onClose: () => void;
-  script: ScriptProject | null;
-  onSave: (data: Partial<ScriptProject>) => Promise<boolean>;
-  onRefresh: (id: number) => Promise<ScriptProject | null>;
-  topics: VideoTheme[];
-  topicsLoading: boolean;
-  topicsError: string;
-  onRetryTopics: () => void;
-}) {
-  const [formData, setFormData] = useState<Partial<ScriptProject>>({
-    title: "",
-    content: "",
-    description: "",
-    hashtags: [],
-    tags: [],
-    status: "Draft",
-    assets: [],
-  });
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [activeTab, setActiveTab] = useState<"script" | "metadata" | "assets">("script");
-  const [draggedSectionId, setDraggedSectionId] = useState<string | null>(null);
-  const [dragOverSectionId, setDragOverSectionId] = useState<string | null>(null);
-  const scriptTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const assetSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastAssetSyncedContentRef = useRef("");
-  const lastSavedSnapshotRef = useRef("");
-  const latestFormDataRef = useRef<Partial<ScriptProject>>(formData);
-  const saveVersionRef = useRef(0);
-  const hydratedScriptIdRef = useRef<number | null>(null);
-  const onSaveRef = useRef(onSave);
-  const [saveState, setSaveState] = useState<"saved" | "saving" | "error">("saved");
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const { success, error: notifyError } = useNotifications();
-
-  const assetAnalysis = useMemo(() => analyzeAssetLinks(formData.assets || []), [formData.assets]);
-  const scriptGuide = useMemo(() => buildScriptGuide(String(formData.content || "")), [formData.content]);
-  const missingIdeaClips = useMemo(() => {
-    const have = new Set((formData.assets || []).map((asset) => getClipIdentity(asset.url || "")).filter(Boolean));
-    const seen = new Set<string>();
-    return ideaClips.filter((clip) => {
-      const id = getClipIdentity(clip.file_path);
-      if (!id || have.has(id) || seen.has(id)) return false;
-      seen.add(id);
-      return true;
-    });
-  }, [formData.assets, ideaClips]);
-
-  const addMissingIdeaClips = () => {
-    const sectionForGame = (game: string) =>
-      scriptGuide.find((section) => !section.isHook && section.label.trim().toLowerCase() === game.trim().toLowerCase())?.number ?? null;
-    const added = missingIdeaClips.map((clip) => ({
-      url: clip.file_path,
-      name: clip.title || clip.file_path.split("/").pop() || "Video",
-      channel_name: clip.channel_name,
-      idea_id: clip.detail_id,
-      idea_title: clip.idea_title,
-      game_title: clip.game_title,
-      idea_order: sectionForGame(clip.game_title),
-    }));
-    setFormData((current) => ({ ...current, assets: [...(current.assets || []), ...added] }));
-    success(`${added.length} clip${added.length === 1 ? "" : "s"} added to the project.`, "Assets updated");
-  };
-
-  useEffect(() => {
-    onSaveRef.current = onSave;
-  }, [onSave]);
-
-  useEffect(() => {
-    if (isOpen && script) {
-      hydratedScriptIdRef.current = null;
-      setFormData(script);
-      latestFormDataRef.current = script;
-      lastAssetSyncedContentRef.current = String(script.content || "");
-      lastSavedSnapshotRef.current = JSON.stringify(script);
-      setSaveState("saved");
-      setIsEditingTitle(false);
-      setActiveTab("script");
-      setDraggedSectionId(null);
-      setDragOverSectionId(null);
-    }
-  }, [isOpen, script?.id]);
-
-  const saveNow = async (data: Partial<ScriptProject>) => {
-    if (!script) return true;
-    const snapshot = JSON.stringify(data);
-    if (snapshot === lastSavedSnapshotRef.current) {
-      setSaveState("saved");
-      return true;
-    }
-
-    const version = ++saveVersionRef.current;
-    setSaveState("saving");
-    const ok = await onSaveRef.current(data);
-    if (ok === false) {
-      if (version === saveVersionRef.current) setSaveState("error");
-      return false;
-    }
-
-    lastSavedSnapshotRef.current = snapshot;
-    if (version === saveVersionRef.current) {
-      const latestSnapshot = JSON.stringify(latestFormDataRef.current);
-      setSaveState(latestSnapshot === snapshot ? "saved" : "saving");
-    }
-    return true;
-  };
-
-  useEffect(() => {
-    latestFormDataRef.current = formData;
-    if (!isOpen || !script) return;
-
-    const snapshot = JSON.stringify(formData);
-    const initialSnapshot = JSON.stringify(script);
-    if (hydratedScriptIdRef.current !== script.id) {
-      if (snapshot === initialSnapshot) hydratedScriptIdRef.current = script.id;
-      return;
-    }
-    if (snapshot === lastSavedSnapshotRef.current) return;
-
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    setSaveState("saving");
-    saveTimerRef.current = setTimeout(() => {
-      saveTimerRef.current = null;
-      void saveNow(latestFormDataRef.current);
-    }, 350);
-
-    return () => {
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current);
-        saveTimerRef.current = null;
-      }
-    };
-  }, [formData, isOpen, script?.id]);
-
-  const closeWithSave = async () => {
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = null;
-    }
-    if (assetSyncTimerRef.current) {
-      clearTimeout(assetSyncTimerRef.current);
-      assetSyncTimerRef.current = null;
-    }
-
-    const latest = latestFormDataRef.current;
-    const latestContent = String(latest.content || "");
-    const syncedAssets = reconcileAssetsWithScript(
-      lastAssetSyncedContentRef.current,
-      latestContent,
-      latest.assets || [],
-    );
-    const dataToSave = JSON.stringify(syncedAssets) === JSON.stringify(latest.assets || [])
-      ? latest
-      : { ...latest, assets: syncedAssets };
-
-    latestFormDataRef.current = dataToSave;
-    lastAssetSyncedContentRef.current = latestContent;
-    const saved = await saveNow(dataToSave);
-    if (saved) onClose();
-  };
-
-  const jumpToScriptSection = (start: number, end: number) => {
-    setActiveTab("script");
-    requestAnimationFrame(() => {
-      const textarea = scriptTextareaRef.current;
-      if (!textarea) return;
-      textarea.focus();
-      textarea.setSelectionRange(start, end);
-    });
-  };
-
-  const getSectionChannels = (section: (typeof scriptGuide)[number]) => {
-    if (section.isHook) return [] as string[];
-    const assets = formData.assets || [];
-    const normalizedLabel = section.label.trim().toLowerCase();
-    const matched = assets.filter((asset) =>
-      (section.number != null && asset.idea_order === section.number) ||
-      Boolean(asset.game_title && asset.game_title.trim().toLowerCase() === normalizedLabel),
-    );
-    const fallback = matched.length > 0
-      ? matched
-      : section.number != null && assets[section.number - 1]
-        ? [assets[section.number - 1]]
-        : [];
-
-    return Array.from(
-      new Set(
-        fallback
-          .map((asset) => asset.channel_name?.trim())
-          .filter((channel): channel is string => Boolean(channel)),
-      ),
-    );
-  };
-
-  const moveScriptSection = (sourceId: string, targetId: string) => {
-    if (sourceId === targetId) return;
-    const content = String(formData.content || "");
-    const sections = buildScriptGuide(content);
-    const hook = sections.find((section) => section.isHook);
-    const ideaSections = sections.filter((section) => !section.isHook);
-    const sourceIndex = ideaSections.findIndex((section) => section.id === sourceId);
-    const targetIndex = ideaSections.findIndex((section) => section.id === targetId);
-    if (sourceIndex < 0 || targetIndex < 0) return;
-
-    const blocks = new Map(sections.map((section) => [section.id, content.slice(section.start, section.end).trim()]));
-    const nextSections = [...ideaSections];
-    const [moved] = nextSections.splice(sourceIndex, 1);
-    nextSections.splice(targetIndex, 0, moved);
-
-    const nextContent = [
-      hook ? blocks.get(hook.id) : null,
-      ...nextSections.map((section) => blocks.get(section.id)),
-    ].filter((block): block is string => Boolean(block)).join("\n\n");
-
-    const nextOrderByOldNumber = new Map<number, number>();
-    nextSections.forEach((section, index) => {
-      if (section.number != null) nextOrderByOldNumber.set(section.number, index + 1);
-    });
-
-    const nextAssets = [...(formData.assets || [])].map((asset) => ({
-      ...asset,
-      idea_order: asset.idea_order != null
-        ? nextOrderByOldNumber.get(asset.idea_order) ?? asset.idea_order
-        : asset.idea_order,
-    })).sort((a, b) => (a.idea_order ?? Number.MAX_SAFE_INTEGER) - (b.idea_order ?? Number.MAX_SAFE_INTEGER));
-
-    const nextFormData = { ...latestFormDataRef.current, content: nextContent, assets: nextAssets };
-    latestFormDataRef.current = nextFormData;
-    lastAssetSyncedContentRef.current = nextContent;
-    setFormData(nextFormData);
-  };
-
-  const normalizeSectionBlock = (content: string, section: (typeof scriptGuide)[number]) =>
-    content.slice(section.start, section.end).replace(/\s+/g, " ").trim().toLowerCase();
-
-  const reconcileAssetsWithScript = (previousContent: string, nextContent: string, assets: ScriptProject["assets"]) => {
-    const previousSections = buildScriptGuide(previousContent).filter((section) => !section.isHook);
-    const nextSections = buildScriptGuide(nextContent).filter((section) => !section.isHook);
-
-    if (nextSections.length >= previousSections.length) return assets;
-
-    const usedPreviousIds = new Set<string>();
-    const newOrderByOldOrder = new Map<number, number>();
-
-    for (const nextSection of nextSections) {
-      const exactText = normalizeSectionBlock(nextContent, nextSection);
-      let previousSection = previousSections.find(
-        (candidate) => !usedPreviousIds.has(candidate.id) && normalizeSectionBlock(previousContent, candidate) === exactText,
-      );
-
-      if (!previousSection) {
-        const normalizedLabel = nextSection.label.trim().toLowerCase();
-        const labelMatches = previousSections.filter(
-          (candidate) => !usedPreviousIds.has(candidate.id) && candidate.label.trim().toLowerCase() === normalizedLabel,
-        );
-        if (labelMatches.length === 1) previousSection = labelMatches[0];
-      }
-
-      if (previousSection?.number != null && nextSection.number != null) {
-        usedPreviousIds.add(previousSection.id);
-        newOrderByOldOrder.set(previousSection.number, nextSection.number);
-      }
-    }
-
-    const previousOrders = new Set(
-      previousSections.map((section) => section.number).filter((value): value is number => value != null),
-    );
-
-    return assets
-      .filter((asset) => asset.idea_order == null || !previousOrders.has(asset.idea_order) || newOrderByOldOrder.has(asset.idea_order))
-      .map((asset) => ({
-        ...asset,
-        idea_order: asset.idea_order != null
-          ? newOrderByOldOrder.get(asset.idea_order) ?? asset.idea_order
-          : asset.idea_order,
-      }))
-      .sort((a, b) => (a.idea_order ?? Number.MAX_SAFE_INTEGER) - (b.idea_order ?? Number.MAX_SAFE_INTEGER));
-  };
-
-  const handleScriptContentChange = (nextContent: string) => {
-    const nextFormData = { ...latestFormDataRef.current, content: nextContent };
-    latestFormDataRef.current = nextFormData;
-    setFormData(nextFormData);
-
-    if (assetSyncTimerRef.current) clearTimeout(assetSyncTimerRef.current);
-    assetSyncTimerRef.current = setTimeout(() => {
-      assetSyncTimerRef.current = null;
-      const previousContent = lastAssetSyncedContentRef.current;
-      const latest = latestFormDataRef.current;
-      const latestContent = String(latest.content || "");
-      const nextAssets = reconcileAssetsWithScript(previousContent, latestContent, latest.assets || []);
-      lastAssetSyncedContentRef.current = latestContent;
-
-      if (JSON.stringify(nextAssets) !== JSON.stringify(latest.assets || [])) {
-        const nextFormData = { ...latestFormDataRef.current, assets: nextAssets };
-        latestFormDataRef.current = nextFormData;
-        setFormData(nextFormData);
-      }
-    }, 650);
-  };
-
-  const refreshProject = async () => {
-    if (!script || isRefreshing) return;
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = null;
-    }
-    if (assetSyncTimerRef.current) {
-      clearTimeout(assetSyncTimerRef.current);
-      assetSyncTimerRef.current = null;
-    }
-
-    const latest = latestFormDataRef.current;
-    const latestContent = String(latest.content || "");
-    const syncedAssets = reconcileAssetsWithScript(
-      lastAssetSyncedContentRef.current,
-      latestContent,
-      latest.assets || [],
-    );
-    const dataToSave = JSON.stringify(syncedAssets) === JSON.stringify(latest.assets || [])
-      ? latest
-      : { ...latest, assets: syncedAssets };
-    latestFormDataRef.current = dataToSave;
-    lastAssetSyncedContentRef.current = latestContent;
-    await saveNow(dataToSave);
-    setIsRefreshing(true);
-    try {
-      const fresh = await onRefresh?.(script.id);
-      if (!fresh) return;
-      setFormData(fresh);
-      latestFormDataRef.current = fresh;
-      lastAssetSyncedContentRef.current = String(fresh.content || "");
-      lastSavedSnapshotRef.current = JSON.stringify(fresh);
-      setSaveState("saved");
-      success("Project refreshed from the database.", "Refreshed");
-    } catch {
-      notifyError("Could not refresh the latest project data.", "Refresh failed");
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
-  const copyWholeScript = async () => {
-    const content = String(formData.content || "").trim();
-    if (!content) {
-      notifyError("There is no script content to copy.", "Nothing to copy");
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(content);
-      success("The full script is ready on your clipboard.", "Script copied");
-    } catch {
-      notifyError("The browser could not copy the script. Please select the text manually.", "Copy failed");
-    }
-  };
-
-  return (
-    <Modal open={isOpen} onClose={() => void closeWithSave()} size="editor" zClass="z-[150]" className="max-w-[min(1300px,calc(100vw-1rem))] rounded-[1.5rem] sm:rounded-[2rem] lg:rounded-[2.5rem]">
-        <div className="flex flex-col gap-4 border-b border-slate-100 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-10 lg:py-7 dark:border-slate-800">
-          <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-5">
-            <div className="rounded-2xl bg-blue-600 p-3 text-white shadow-lg shadow-blue-100 dark:shadow-blue-950/40">
-              <DocumentTextIcon className="h-7 w-7" />
-            </div>
-            <div className="min-w-0 flex flex-1 flex-col">
-              <div className="flex min-w-0 items-center gap-3">
-                {isEditingTitle ? (
-                  <input
-                    autoFocus
-                    className="w-full max-w-xl rounded-xl border-2 border-blue-500 bg-slate-50 px-4 py-2 text-2xl font-black text-slate-900 outline-none dark:bg-slate-900 dark:text-slate-50"
-                    value={formData.title || ""}
-                    onChange={(event) => setFormData({ ...formData, title: event.target.value })}
-                    onBlur={() => setIsEditingTitle(false)}
-                  />
-                ) : (
-                  <h2 title={String(formData.title || "Untitled project")} className="min-w-0 flex-1 truncate whitespace-nowrap text-xl font-bold tracking-tight text-slate-900 sm:text-2xl dark:text-slate-50">{formData.title}</h2>
-                )}
-                <button
-                  onClick={() => setIsEditingTitle(!isEditingTitle)}
-                  className="cursor-pointer rounded-xl p-2 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800"
-                  type="button"
-                >
-                  {isEditingTitle ? <CheckIcon className="h-6 w-6 text-green-600" /> : <PencilSquareIcon className="h-5 w-5 text-fg-4" />}
-                </button>
-              </div>
-              <p className="mt-1 text-xs font-semibold uppercase tracking-wider text-fg-4">Video Project Studio</p>
-              <div className="mt-3 grid max-w-2xl gap-3 sm:grid-cols-2">
-                <div className="min-w-0">
-                <ProjectTopicSelect label="Topic" value={getScriptTopicValue(formData)} topics={topics} loading={topicsLoading} onChange={(topic) => setFormData((current) => ({ ...current, topic }))} />
-                {topicsError && <p role="alert" className="mt-2 text-xs text-rose-500">{topicsError} <button type="button" onClick={onRetryTopics} className="cursor-pointer font-bold underline">Retry</button></p>}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 lg:gap-5">
-            <select
-              className="h-11 cursor-pointer rounded-2xl bg-slate-100 px-4 text-sm font-semibold outline-none dark:bg-slate-900 dark:text-slate-100"
-              value={formData.status || "Draft"}
-              onChange={(event) => setFormData({ ...formData, status: event.target.value as any })}
-            >
-              {Object.keys(STATUS_STYLE).map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => void refreshProject()}
-              disabled={isRefreshing}
-              title="Refresh project from database"
-              className="inline-flex h-11 cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-xs font-semibold uppercase tracking-wider text-slate-600 shadow-sm transition hover:border-blue-300 hover:text-blue-600 disabled:cursor-wait disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-blue-700 dark:hover:text-blue-300"
-            >
-              <ArrowPathIcon className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-              <span className="hidden sm:inline">Refresh</span>
-            </button>
-            <div
-              className={`inline-flex h-11 items-center gap-2 rounded-2xl border px-4 text-xs font-semibold uppercase tracking-wider ${
-                saveState === "error"
-                  ? "border-rose-200 bg-rose-50 text-rose-600 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300"
-                  : saveState === "saving"
-                    ? "border-blue-200 bg-blue-50 text-blue-600 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-300"
-                    : "border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300"
-              }`}
-              title="Changes are saved automatically"
-            >
-              <CheckIcon className={`h-4 w-4 ${saveState === "saving" ? "animate-pulse" : ""}`} />
-              {saveState === "error" ? "Save failed" : saveState === "saving" ? "Saving" : "Saved"}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex overflow-x-auto border-b border-slate-100 bg-slate-50/50 px-2 sm:px-4 lg:px-10 dark:border-slate-800 dark:bg-slate-900/60">
-          {[
-            { id: "script", label: "Script", icon: DocumentTextIcon },
-            { id: "metadata", label: "Metadata", icon: InformationCircleIcon },
-            { id: "assets", label: "Assets", icon: Squares2X2Icon },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex shrink-0 cursor-pointer items-center gap-2 border-b-4 px-4 py-4 text-xs font-semibold uppercase tracking-wider transition-all sm:gap-3 sm:px-6 lg:px-8 lg:py-5 lg:tracking-wider ${
-                activeTab === tab.id ? "border-blue-600 text-blue-600 dark:text-blue-400" : "border-transparent text-fg-4 hover:text-slate-700 dark:hover:text-slate-100"
-              }`}
-              type="button"
-            >
-              <tab.icon className="h-5 w-5" /> {tab.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex-1 overflow-y-auto bg-white p-4 sm:p-6 lg:p-12 dark:bg-slate-950">
-          {activeTab === "script" && (
-            <div className="grid min-h-[420px] gap-4 lg:min-h-[560px] xl:grid-cols-[340px_minmax(0,1fr)] xl:gap-5">
-              <aside className="flex min-h-0 max-h-[300px] flex-col rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm sm:p-4 xl:max-h-none xl:rounded-3xl dark:border-slate-800 dark:bg-slate-900">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-blue-500 dark:text-blue-300">Script Order</p>
-                    <p className="mt-1 text-xs font-medium text-slate-400 dark:text-slate-500">Drag to reorder. Click a card to jump to that section.</p>
-                  </div>
-                  <span className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-500 shadow-sm dark:bg-slate-800 dark:text-slate-300">{scriptGuide.filter((section) => !section.isHook).length}</span>
-                </div>
-
-                <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-                  {scriptGuide.length === 0 && (
-                    <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-xs font-medium text-slate-400 dark:border-slate-700 dark:text-slate-500">No script sections found.</div>
-                  )}
-                  {scriptGuide.map((section) => {
-                    const channels = getSectionChannels(section);
-                    const isDragOver = dragOverSectionId === section.id && draggedSectionId !== section.id;
-                    return (
-                      <div
-                        key={section.id}
-                        draggable={!section.isHook}
-                        onClick={() => jumpToScriptSection(section.start, section.end)}
-                        onDragStart={(event) => {
-                          if (section.isHook) return;
-                          setDraggedSectionId(section.id);
-                          event.dataTransfer.effectAllowed = "move";
-                          event.dataTransfer.setData("text/plain", section.id);
-                        }}
-                        onDragOver={(event) => {
-                          if (section.isHook) return;
-                          event.preventDefault();
-                          event.dataTransfer.dropEffect = "move";
-                          setDragOverSectionId(section.id);
-                        }}
-                        onDragLeave={() => setDragOverSectionId((current) => current === section.id ? null : current)}
-                        onDrop={(event) => {
-                          if (section.isHook) return;
-                          event.preventDefault();
-                          const sourceId = event.dataTransfer.getData("text/plain") || draggedSectionId;
-                          if (sourceId) moveScriptSection(sourceId, section.id);
-                          setDraggedSectionId(null);
-                          setDragOverSectionId(null);
-                        }}
-                        onDragEnd={() => {
-                          setDraggedSectionId(null);
-                          setDragOverSectionId(null);
-                        }}
-                        className={`group flex items-start gap-3 rounded-2xl border p-3 text-left shadow-sm transition ${section.isHook ? "cursor-pointer border-violet-200 bg-violet-50 hover:bg-violet-100 dark:border-violet-500/25 dark:bg-violet-500/10 dark:hover:bg-violet-500/15" : `cursor-grab active:cursor-grabbing ${isDragOver ? "border-blue-400 bg-blue-50 ring-2 ring-blue-100 dark:border-blue-500 dark:bg-blue-500/10 dark:ring-blue-500/20" : "border-slate-200 bg-white hover:border-slate-300 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-slate-700"}`}`}
-                      >
-                        <div className={`flex h-8 min-w-8 shrink-0 items-center justify-center rounded-xl px-1 text-xs font-semibold shadow-sm ${section.isHook ? "bg-violet-600 text-white" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300"}`}>
-                          {section.isHook ? "H" : section.number}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <p className={`truncate text-sm font-semibold ${section.isHook ? "text-violet-800 dark:text-violet-200" : "text-slate-800 dark:text-slate-100"}`}>{section.label}</p>
-                            {!section.isHook && <Bars3Icon className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:text-slate-500 dark:text-slate-600 dark:group-hover:text-slate-300" />}
-                          </div>
-                          <p className="mt-1 line-clamp-2 text-xs font-medium leading-5 text-slate-500 dark:text-slate-400">{section.preview}</p>
-                          {channels.length > 0 && (
-                            <div className="mt-2 flex min-w-0 items-center gap-1.5 text-[11px] font-semibold text-rose-600 dark:text-rose-300" title={channels.join(", ")}>
-                              <VideoCameraIcon className="h-3.5 w-3.5 shrink-0" />
-                              <span className="truncate">{channels[0]}</span>
-                              {channels.length > 1 && <span className="shrink-0 text-slate-400 dark:text-slate-500">+{channels.length - 1}</span>}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </aside>
-
-              <div className="flex min-w-0 flex-col gap-3">
-                <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-wider text-fg-4">Script Content</p>
-                    <p className="mt-1 text-xs font-medium text-slate-400 dark:text-slate-500">The order panel stays outside the copied script.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={copyWholeScript}
-                    className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white pointer-coarse:min-h-11 shadow-sm transition hover:bg-black dark:bg-blue-600 dark:hover:bg-blue-700"
-                  >
-                    <DocumentDuplicateIcon className="h-4 w-4" /> Copy Script
-                  </button>
-                </div>
-
-                <textarea
-                  ref={scriptTextareaRef}
-                  className="min-h-[420px] w-full flex-1 resize-none rounded-2xl border border-slate-200 bg-white p-5 font-sans text-base leading-7 text-slate-800 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 sm:p-6 sm:text-[17px] sm:leading-8 lg:min-h-[500px] lg:rounded-3xl lg:p-8 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-600"
-                  value={formData.content || ""}
-                  onChange={(event) => handleScriptContentChange(event.target.value)}
-                />
-              </div>
-            </div>
-          )}
-
-          {activeTab === "metadata" && (
-            <div className="mx-auto max-w-4xl space-y-8">
-              <div className="space-y-4">
-                <label className="ml-4 block text-xs font-semibold uppercase tracking-wider text-fg-4">Video Summary Description</label>
-                <textarea
-                  className="h-64 w-full resize-none rounded-[1.5rem] border border-slate-100 bg-slate-50 p-5 text-base font-bold leading-relaxed text-slate-700 outline-none sm:p-8 lg:rounded-[2rem] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
-                  value={formData.description || ""}
-                  onChange={(event) => setFormData({ ...formData, description: event.target.value })}
-                />
-                <div className="flex flex-wrap gap-2 pt-4">
-                  {formData.hashtags?.map((tag, index) => (
-                    <span key={index} className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-semibold text-blue-600 dark:border-blue-900 dark:bg-blue-950/60 dark:text-blue-300">
-                      {tag.startsWith("#") ? tag : `#${tag}`}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === "assets" && (
-            <div className="mx-auto max-w-4xl space-y-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-fg-4">Project Assets</p>
-                  <p className="mt-1 text-xs font-medium text-slate-400 dark:text-slate-500">
-                    {countClips((formData.assets || []).map((asset) => asset.url)).clips} clips · {assetAnalysis.uniqueLinkCount} source {assetAnalysis.uniqueLinkCount === 1 ? "video" : "videos"} to download
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => navigator.clipboard.writeText(assetAnalysis.uniqueAssets.map((asset) => asset.url).filter(Boolean).join("\n"))}
-                  className="inline-flex cursor-pointer items-center gap-2 self-start rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 sm:self-auto dark:border-blue-500/25 dark:bg-blue-500/10 dark:text-blue-300"
-                >
-                  <DocumentDuplicateIcon className="h-4 w-4" /> Copy Unique Links
-                </button>
-              </div>
-
-              {missingIdeaClips.length > 0 && (
-                <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900 sm:flex-row sm:items-center sm:justify-between dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
-                  <div className="flex items-start gap-3">
-                    <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 shrink-0" />
-                    <div>
-                      <p className="text-sm font-semibold">{missingIdeaClips.length} clip{missingIdeaClips.length === 1 ? "" : "s"} from this project&apos;s ideas {missingIdeaClips.length === 1 ? "isn't" : "aren't"} in the list</p>
-                      <p className="mt-1 text-xs leading-5 opacity-80">{missingIdeaClips.map((clip) => clip.idea_title).filter((v, i, a) => a.indexOf(v) === i).join(" · ")}</p>
-                    </div>
-                  </div>
-                  <button type="button" onClick={addMissingIdeaClips} className="inline-flex shrink-0 cursor-pointer items-center gap-2 self-start rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-amber-700 sm:self-auto">
-                    <PlusIcon className="h-4 w-4" /> Add {missingIdeaClips.length === 1 ? "it" : "them"}
-                  </button>
-                </div>
-              )}
-
-              {assetAnalysis.repeatedLinkCount > 0 && (
-                <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-100/80 p-4 text-slate-700 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-200">
-                  <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 shrink-0 text-slate-500 dark:text-slate-300" />
-                  <div>
-                    <p className="text-sm font-semibold">{assetAnalysis.repeatedLinkCount} duplicate {assetAnalysis.repeatedLinkCount === 1 ? "link" : "links"} detected</p>
-                    <p className="mt-1 text-xs font-medium leading-5 text-slate-500 dark:text-slate-400">
-                      Download only the first occurrence. Equivalent YouTube watch, Shorts, embed, live, and youtu.be URLs are treated as the same source video.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              <div className="grid gap-3">
-                {formData.assets?.map((asset, index) => {
-                  const duplicate = assetAnalysis.duplicateMeta.get(index);
-                  const isRepeated = duplicate && !duplicate.isPrimary;
-                  const displayNumber = assetAnalysis.uniqueOrdinalByIndex.get(index);
-
-                  return (
-                    <div key={`${asset.url}-${index}`} className={`group flex items-center gap-4 rounded-2xl border p-4 transition-all sm:gap-5 sm:p-5 ${isRepeated ? "border-slate-300 bg-slate-100/80 dark:border-slate-700 dark:bg-slate-800/60" : "border-slate-200 bg-slate-50 hover:border-blue-500 dark:border-slate-800 dark:bg-slate-900"}`}>
-                      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border font-black shadow-sm transition-all ${isRepeated ? "border-slate-300 bg-slate-200 text-slate-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300" : "border-slate-100 bg-white text-fg-4 group-hover:bg-blue-600 group-hover:text-white dark:border-slate-800 dark:bg-slate-950"}`}>
-                        {isRepeated ? <LinkIcon className="h-5 w-5" /> : `#${displayNumber ?? ""}`}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex min-w-0 flex-wrap items-center gap-2">
-                          <p className="truncate text-base font-bold text-slate-900 dark:text-slate-50">{asset.name}</p>
-                          {asset.channel_name && (
-                            <span className="shrink-0 rounded-full border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] font-semibold text-rose-700 dark:border-rose-500/25 dark:bg-rose-500/10 dark:text-rose-300">
-                              {asset.channel_name}
-                            </span>
-                          )}
-                          {duplicate && (
-                            <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold uppercase tracking-wide ${isRepeated ? "bg-slate-500 text-white dark:bg-slate-600" : "border border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}>
-                              {isRepeated ? "Duplicate" : `Same source ×${duplicate.total}`}
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-1 truncate font-mono text-xs font-medium text-fg-3">{asset.url}</p>
-                      </div>
-                      <a href={asset.url} target="_blank" rel="noopener noreferrer" className="shrink-0 cursor-pointer rounded-xl border border-slate-200 bg-white p-3 text-fg-4 shadow-sm hover:text-blue-600 dark:border-slate-800 dark:bg-slate-950">
-                        <LinkIcon className="h-5 w-5" />
-                      </a>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-    </Modal>
-  );
-}
-
 /* ================= MAIN PAGE ================= */
 
 export default function ScriptsPage() {
@@ -834,60 +160,46 @@ export default function ScriptsPage() {
     load();
   }, []);
 
-  // Clips on each project's ideas (via script_ideas), so the Clips column counts clips added after the project was made.
+  // The ideas in each project (script_ideas): their clips feed the Clips column and
+  // their recording status feeds "still to record". Reloaded when the editor closes.
+  const [linksVersion, setLinksVersion] = useState(0);
   const [ideaClipsByScript, setIdeaClipsByScript] = useState<Map<number, IdeaClip[]>>(new Map());
+  const [toRecordByScript, setToRecordByScript] = useState<Map<number, number>>(new Map());
   useEffect(() => {
     let active = true;
     (async () => {
       const { data: links, error } = await supabase.from("script_ideas").select("script_id,detail_id");
-      if (error || !links?.length || !active) return;
-      const ideaIds = Array.from(new Set((links as { detail_id: number }[]).map((link) => link.detail_id)));
-      const clips: (IdeaClip & { detail_id: number })[] = [];
+      if (error || !active) return;
+      const linkRows = (links ?? []) as { script_id: number; detail_id: number }[];
+      const ideaIds = Array.from(new Set(linkRows.map((link) => link.detail_id)));
+      const clips: IdeaClip[] = [];
+      const toRecord = new Set<number>();
       for (let i = 0; i < ideaIds.length; i += 200) {
-        const { data } = await supabase
-          .from("footage")
-          .select("detail_id,file_path,title,channel_name,detail:details(title,game:games(title))")
-          .in("detail_id", ideaIds.slice(i, i + 200));
-        for (const row of (data ?? []) as unknown as { detail_id: number; file_path: string | null; title: string | null; channel_name: string | null; detail: { title: string; game: { title: string } | null } | null }[]) {
+        const batch = ideaIds.slice(i, i + 200);
+        const [footageResult, ideasResult] = await Promise.all([
+          supabase.from("footage").select("detail_id,file_path,title,channel_name,detail:details(title,game:games(title))").in("detail_id", batch),
+          supabase.from("details").select("id,capture_status").in("id", batch),
+        ]);
+        for (const row of (footageResult.data ?? []) as unknown as { detail_id: number; file_path: string | null; title: string | null; channel_name: string | null; detail: { title: string; game: { title: string } | null } | null }[]) {
           if (!row.file_path?.trim()) continue;
           clips.push({ detail_id: row.detail_id, file_path: row.file_path, title: row.title, channel_name: row.channel_name, idea_title: row.detail?.title ?? "", game_title: row.detail?.game?.title ?? "" });
         }
+        for (const row of (ideasResult.data ?? []) as { id: number; capture_status: string | null }[]) if (row.capture_status === "to_record") toRecord.add(row.id);
       }
       if (!active) return;
       const byIdea = new Map<number, IdeaClip[]>();
       for (const clip of clips) byIdea.set(clip.detail_id, [...(byIdea.get(clip.detail_id) ?? []), clip]);
-      const result = new Map<number, IdeaClip[]>();
-      for (const link of links as { script_id: number; detail_id: number }[]) {
-        result.set(link.script_id, [...(result.get(link.script_id) ?? []), ...(byIdea.get(link.detail_id) ?? [])]);
+      const clipsResult = new Map<number, IdeaClip[]>();
+      const recordResult = new Map<number, number>();
+      for (const link of linkRows) {
+        clipsResult.set(link.script_id, [...(clipsResult.get(link.script_id) ?? []), ...(byIdea.get(link.detail_id) ?? [])]);
+        if (toRecord.has(link.detail_id)) recordResult.set(link.script_id, (recordResult.get(link.script_id) ?? 0) + 1);
       }
-      setIdeaClipsByScript(result);
+      setIdeaClipsByScript(clipsResult);
+      setToRecordByScript(recordResult);
     })();
     return () => { active = false; };
-  }, [scripts.length]);
-
-  // Ideas still on the Recording List, matched to projects by footage or by their "• Game: title" line.
-  const [toRecordIdeas, setToRecordIdeas] = useState<{ id: number; line: string }[]>([]);
-  useEffect(() => {
-    supabase
-      .from("details")
-      .select("id,title,game:games(title)")
-      .eq("capture_status", "to_record")
-      .then(({ data, error }) => {
-        if (error || !data) return;
-        setToRecordIdeas((data as unknown as { id: number; title: string; game: { title: string } | null }[]).map((row) => ({ id: row.id, line: `• ${row.game?.title || "Unknown Game"}: ${row.title}` })));
-      });
-  }, []);
-  const toRecordByScript = useMemo(() => {
-    const result = new Map<number, number>();
-    if (!toRecordIdeas.length) return result;
-    for (const script of scripts) {
-      const assetIdeaIds = new Set((script.assets || []).map((asset) => asset.idea_id).filter(Boolean));
-      const description = script.description || "";
-      const count = toRecordIdeas.filter((idea) => assetIdeaIds.has(idea.id) || description.includes(idea.line)).length;
-      if (count) result.set(script.id, count);
-    }
-    return result;
-  }, [scripts, toRecordIdeas]);
+  }, [scripts.length, linksVersion]);
 
   const filteredScripts = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -1078,7 +390,17 @@ export default function ScriptsPage() {
 
   return (
     <div className={`${appPageRootClass} xl:flex`}>
-      <ScriptEditorModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} script={editingScript} onSave={handleUpdate} onRefresh={refreshScriptProject} topics={topics} topicsLoading={topicsLoading} topicsError={topicsError} onRetryTopics={retryTopics} ideaClips={editingScript ? ideaClipsByScript.get(editingScript.id) ?? [] : []} />
+      <ProjectEditor
+        isOpen={isModalOpen}
+        onClose={() => { setIsModalOpen(false); setLinksVersion((v) => v + 1); }}
+        script={editingScript}
+        onSave={handleUpdate}
+        onRefresh={refreshScriptProject}
+        topics={topics}
+        topicsLoading={topicsLoading}
+        topicsError={topicsError}
+        onRetryTopics={retryTopics}
+      />
 
       <AppSidebar activePage="scripts" hideTabBar={selecting} />
 

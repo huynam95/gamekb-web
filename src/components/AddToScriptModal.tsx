@@ -172,6 +172,7 @@ export function AddToScriptModal({
   const { success, error: notifyError } = useNotifications();
   const [activeTab, setActiveTab] = useState<"existing" | "new">("existing");
   const [scripts, setScripts] = useState<ScriptRow[] | null>(null);
+  const [linkedScriptIds, setLinkedScriptIds] = useState<Set<number> | null>(null);
   const [selectedScriptId, setSelectedScriptId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
@@ -218,12 +219,20 @@ export function AddToScriptModal({
         setScripts(rows);
         if (rows.length === 0) setActiveTab("new");
       });
+    // Which projects really contain this idea (removing it from a project unlinks it).
+    supabase.from("script_ideas").select("script_id").eq("detail_id", detail.id).then(({ data, error }) => {
+      if (!active || error) return;
+      setLinkedScriptIds(new Set(((data ?? []) as { script_id: number }[]).map((row) => row.script_id)));
+    });
     return () => { active = false; };
-  }, [isOpen]);
+  }, [isOpen, detail.id]);
 
   const summaries = useMemo(
-    () => (scripts ?? []).map((script) => summarise(script, detail, gameName, scriptLine)),
-    [scripts, detail, gameName, scriptLine],
+    () => (scripts ?? []).map((script) => {
+      const summary = summarise(script, detail, gameName, scriptLine);
+      return linkedScriptIds ? { ...summary, alreadyHasIdea: linkedScriptIds.has(script.id) } : summary;
+    }),
+    [scripts, detail, gameName, scriptLine, linkedScriptIds],
   );
 
   // Until the user picks one, suggest the newest project that is still being worked on and doesn't have this idea yet.
