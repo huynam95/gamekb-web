@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowPathIcon,
   ArrowTopRightOnSquareIcon,
@@ -15,7 +15,6 @@ import {
   ExclamationTriangleIcon,
   FilmIcon,
   InformationCircleIcon,
-  LightBulbIcon,
   LinkIcon,
   MagnifyingGlassIcon,
   PlusIcon,
@@ -31,7 +30,7 @@ import { Button } from "@/components/ui/Button";
 import { CoverImage } from "@/components/CoverImage";
 import { ProjectTopicSelect } from "@/components/ProjectTopicSelect";
 import { useDismiss } from "@/components/ui/useDismiss";
-import { buildScriptGuide } from "@/lib/scriptGuide";
+import { buildScriptGuide, type ScriptGuideSection } from "@/lib/scriptGuide";
 import { getScriptTopicValue } from "@/lib/scriptTopics";
 import { analyzeAssetLinks, countClips, getClipIdentity } from "@/lib/assetLinks";
 import { invalidateUsage } from "@/lib/ideaUsage";
@@ -117,6 +116,47 @@ function formatDuration(seconds: number) {
 }
 
 /* ================= SMALL PIECES ================= */
+
+/** A text box that grows with its text, so a script line and its idea card share one row. */
+function AutoTextarea({ value, onChange, onFocus, onBlur, inputRef, placeholder, ariaLabel }: {
+  value: string;
+  onChange: (value: string) => void;
+  onFocus: () => void;
+  onBlur: () => void;
+  inputRef: (el: HTMLTextAreaElement | null) => void;
+  placeholder: string;
+  ariaLabel: string;
+}) {
+  const ref = useRef<HTMLTextAreaElement | null>(null);
+  const resize = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, []);
+  useLayoutEffect(resize, [value, resize]);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    let width = el.clientWidth;
+    const observer = new ResizeObserver(() => { if (el.clientWidth !== width) { width = el.clientWidth; resize(); } });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [resize]);
+  return (
+    <textarea
+      ref={(el) => { ref.current = el; inputRef(el); }}
+      rows={1}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onFocus={onFocus}
+      onBlur={onBlur}
+      placeholder={placeholder}
+      aria-label={ariaLabel}
+      className="block min-w-0 flex-1 resize-none overflow-hidden bg-transparent text-base leading-7 text-fg outline-none placeholder:text-fg-4 sm:text-[17px] sm:leading-8"
+    />
+  );
+}
 
 function GameThumb({ src, className = "h-9 w-7" }: { src: string | null; className?: string }) {
   return (
@@ -239,7 +279,13 @@ export function ProjectEditor({
 }) {
   const { success, error: notifyError, confirm } = useNotifications();
   const [formData, setFormData] = useState<Partial<EditorScript>>({});
-  const [tab, setTab] = useState<"script" | "ideas" | "details">("script");
+  const [tab, setTab] = useState<"script" | "details">("script");
+  const [viewMode, setViewMode] = useState<"aligned" | "plain">(() => {
+    try { return typeof window !== "undefined" && window.localStorage.getItem("ninjaplay-script-view") === "plain" ? "plain" : "aligned"; } catch { return "aligned"; }
+  });
+  const [editingRow, setEditingRow] = useState<{ row: number; text: string; skip: number } | null>(null);
+  const [activeRow, setActiveRow] = useState<number | null>(null);
+  const rowRefs = useRef(new Map<number, HTMLTextAreaElement>());
   const [saveState, setSaveState] = useState<"saved" | "saving" | "error">("saved");
   const [ideas, setIdeas] = useState<ProjectIdea[] | null>(null);
   const [picking, setPicking] = useState(false);
@@ -565,185 +611,303 @@ export function ProjectEditor({
     </ul>
   );
 
+  const changeView = (mode: "aligned" | "plain") => {
+    setViewMode(mode);
+    setEditingRow(null);
+    try { window.localStorage.setItem("ninjaplay-script-view", mode); } catch { /* ignore */ }
+  };
+
+  const scriptToolbar = (
+    <>
+      <p className={`inline-flex items-center gap-1.5 text-xs font-medium ${length.seconds > 60 ? "text-amber-700 dark:text-amber-300" : "text-fg-3"}`} title="Estimated at about 2.6 words per second">
+        <ClockIcon className="h-4 w-4" /> ≈ {formatDuration(length.seconds)} · {length.words} words{length.seconds > 60 ? " · over 60s" : ""}
+      </p>
+      <div className="flex items-center gap-1.5">
+        <div className="flex gap-0.5 rounded-lg bg-surface-sunken p-0.5" role="radiogroup" aria-label="Script view">
+          {([["aligned", "Line by line"], ["plain", "Plain text"]] as const).map(([mode, label]) => (
+            <button key={mode} type="button" role="radio" aria-checked={viewMode === mode} onClick={() => changeView(mode)} className={`h-8 cursor-pointer rounded-md px-2.5 text-xs font-semibold transition ${viewMode === mode ? "bg-surface text-fg shadow-sm ring-1 ring-line" : "text-fg-3 hover:text-fg"}`}>{label}</button>
+          ))}
+        </div>
+        <Button variant="primary" size="sm" onClick={() => void copy(content, "script")}><DocumentDuplicateIcon className="h-4 w-4" /> Copy script</Button>
+      </div>
+    </>
+  );
+
   const iconButton = "flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-fg-4 transition hover:bg-surface/80 hover:text-fg";
 
-  const ideasPanel = (
-    <div className="flex min-h-0 flex-col">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold text-fg">Ideas & clips <span className="font-normal text-fg-4">· {ideas?.length ?? "…"} ideas · {clipStats.clips} clips · {assetAnalysis.uniqueLinkCount} {assetAnalysis.uniqueLinkCount === 1 ? "video" : "videos"}</span></p>
-          <p className="text-[11px] text-fg-4">Drag to reorder · click a title to jump to its line</p>
-        </div>
-        <div className="flex items-center gap-1.5">
-          {toRecord > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-md bg-rose-100 px-1.5 py-0.5 text-[11px] font-semibold text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">
-              <VideoCameraIcon className="h-3 w-3" /> {toRecord} to record
+  const renderHookCard = (section: ScriptGuideSection, onJump: () => void, active = false) => (
+    <button type="button" onClick={onJump} className={`flex h-full w-full cursor-pointer items-start gap-2.5 rounded-2xl border border-violet-200 bg-violet-50 p-3 text-left transition hover:bg-violet-100 dark:border-violet-500/25 dark:bg-violet-500/10 ${active ? "ring-2 ring-violet-500" : ""}`}>
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-violet-600 text-xs font-bold text-white">H</span>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-violet-800 dark:text-violet-200">Opening hook</span>
+        <span className="line-clamp-2 text-xs text-violet-700/80 dark:text-violet-200/70">{section.preview}</span>
+      </span>
+    </button>
+  );
+
+  const renderSectionCard = (section: ScriptGuideSection, onJump: () => void, active = false) => {
+    const ideaId = match.bySection.get(section.id);
+    const idea = ideaId != null ? ideaById.get(ideaId) : undefined;
+    const sectionClips = clipsBySection.get(section.id) ?? [];
+    const color = idea ? ideaColor(section.number) : NEUTRAL_COLOR;
+    const isOver = dragOverId === section.id && draggedId !== section.id;
+    const capture = idea?.capture_status ? CAPTURE_META[idea.capture_status as keyof typeof CAPTURE_META] : undefined;
+    return (
+      <div
+        draggable
+        onDragStart={(e) => { setDraggedId(section.id); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", section.id); }}
+        onDragOver={(e) => { e.preventDefault(); setDragOverId(section.id); }}
+        onDragLeave={() => setDragOverId((c) => (c === section.id ? null : c))}
+        onDrop={(e) => { e.preventDefault(); const src = e.dataTransfer.getData("text/plain") || draggedId; if (src) moveSection(src, section.id); setDraggedId(null); setDragOverId(null); }}
+        onDragEnd={() => { setDraggedId(null); setDragOverId(null); }}
+        className={`group h-full overflow-hidden rounded-2xl border border-l-4 bg-surface transition ${color.bar} ${isOver ? "border-y-blue-500 border-r-blue-500 ring-2 ring-blue-500" : active ? "border-y-line-strong border-r-line-strong ring-2 ring-blue-500/50" : "border-y-line border-r-line"}`}
+      >
+        <div className={`relative flex items-start gap-3 overflow-hidden p-3 ${color.soft}`}>
+          {idea?.game_cover && (
+            // The game's art fades in from the right edge.
+            <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-1/2 opacity-30 [mask-image:linear-gradient(to_left,black_10%,transparent)] dark:opacity-25">
+              <CoverImage src={idea.game_cover} sizes="300px" className="scale-110 blur-[2px]" />
             </span>
           )}
-          {assets.length > 0 && (
-            <Button variant="secondary" size="sm" onClick={() => void copy(assetAnalysis.uniqueAssets.map((a) => a.url).filter(Boolean).join("\n"), "links")} title="Copy every source video once">
-              <DocumentDuplicateIcon className="h-4 w-4" /> Copy all links
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {missingClips.length > 0 && (
-        <div className="mb-3 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
-          <ExclamationTriangleIcon className="h-5 w-5 shrink-0" />
-          <p className="min-w-0 flex-1 text-xs"><span className="font-semibold">{missingClips.length} clip{missingClips.length === 1 ? "" : "s"} from these ideas {missingClips.length === 1 ? "is" : "are"} not in the list</span><span className="block truncate opacity-80">{Array.from(new Set(missingClips.map((m) => m.idea.title))).join(" · ")}</span></p>
-          <Button variant="accent" size="sm" onClick={addMissingClips} className="shrink-0 bg-amber-600 hover:bg-amber-700"><PlusIcon className="h-4 w-4" /> Add</Button>
-        </div>
-      )}
-
-      <ol className="min-h-0 flex-1 space-y-2.5 overflow-y-auto pr-0.5">
-        {guide.length === 0 && <li className="rounded-2xl border border-dashed border-line-strong p-5 text-center text-xs text-fg-4">The script is empty. Add an idea below.</li>}
-        {guide.map((section) => {
-          const ideaId = match.bySection.get(section.id);
-          const idea = ideaId != null ? ideaById.get(ideaId) : undefined;
-          const sectionClips = clipsBySection.get(section.id) ?? [];
-          const color = idea ? ideaColor(section.number) : NEUTRAL_COLOR;
-          const isOver = dragOverId === section.id && draggedId !== section.id;
-          const capture = idea?.capture_status ? CAPTURE_META[idea.capture_status as keyof typeof CAPTURE_META] : undefined;
-          if (section.isHook) {
-            return (
-              <li key={section.id}>
-                <button type="button" onClick={() => jumpTo(section.start, section.end)} className="flex w-full cursor-pointer items-start gap-2.5 rounded-xl border border-violet-200 bg-violet-50 p-2.5 text-left transition hover:bg-violet-100 dark:border-violet-500/25 dark:bg-violet-500/10">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-violet-600 text-xs font-bold text-white">H</span>
-                  <span className="min-w-0">
-                    <span className="block text-xs font-semibold text-violet-800 dark:text-violet-200">Opening hook</span>
-                    <span className="line-clamp-2 text-xs text-violet-700/80 dark:text-violet-200/70">{section.preview}</span>
-                  </span>
-                </button>
-              </li>
-            );
-          }
-          return (
-            <li
-              key={section.id}
-              draggable
-              onDragStart={(e) => { setDraggedId(section.id); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", section.id); }}
-              onDragOver={(e) => { e.preventDefault(); setDragOverId(section.id); }}
-              onDragLeave={() => setDragOverId((c) => (c === section.id ? null : c))}
-              onDrop={(e) => { e.preventDefault(); const src = e.dataTransfer.getData("text/plain") || draggedId; if (src) moveSection(src, section.id); setDraggedId(null); setDragOverId(null); }}
-              onDragEnd={() => { setDraggedId(null); setDragOverId(null); }}
-              className={`group overflow-hidden rounded-2xl border border-l-4 bg-surface transition ${color.bar} ${isOver ? "border-y-blue-500 border-r-blue-500 ring-2 ring-blue-500" : "border-y-line border-r-line"}`}
-            >
-              <div className={`relative flex items-start gap-3 overflow-hidden p-3 ${color.soft}`}>
-                {idea?.game_cover && (
-                  // The game's art fades in from the right edge.
-                  <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-1/2 opacity-30 [mask-image:linear-gradient(to_left,black_10%,transparent)] dark:opacity-25">
-                    <CoverImage src={idea.game_cover} sizes="300px" className="scale-110 blur-[2px]" />
-                  </span>
-                )}
-                <Bars3Icon className="relative mt-4 h-4 w-4 shrink-0 cursor-grab text-fg-4 active:cursor-grabbing pointer-coarse:hidden" aria-hidden="true" />
-                <span className="relative mt-1 shrink-0">
-                  <span className="relative flex h-14 w-11 items-center justify-center overflow-hidden rounded-lg bg-surface-sunken text-fg-4 shadow-md ring-1 ring-black/10 dark:ring-white/10">
-                    {idea?.game_cover ? <CoverImage src={idea.game_cover} alt={idea.game_title} sizes="44px" /> : <PuzzlePieceIcon className="h-5 w-5" />}
-                  </span>
-                  <span className={`absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-md px-1 text-xs font-bold tabular-nums shadow-md ring-2 ring-surface ${color.badge}`}>{section.number}</span>
+          <Bars3Icon className="relative mt-4 h-4 w-4 shrink-0 cursor-grab text-fg-4 active:cursor-grabbing pointer-coarse:hidden" aria-hidden="true" />
+          <span className="relative mt-1 shrink-0">
+            <span className="relative flex h-14 w-11 items-center justify-center overflow-hidden rounded-lg bg-surface-sunken text-fg-4 shadow-md ring-1 ring-black/10 dark:ring-white/10">
+              {idea?.game_cover ? <CoverImage src={idea.game_cover} alt={idea.game_title} sizes="44px" /> : <PuzzlePieceIcon className="h-5 w-5" />}
+            </span>
+            <span className={`absolute -right-2 -top-2 flex h-6 min-w-6 items-center justify-center rounded-md px-1 text-xs font-bold tabular-nums shadow-md ring-2 ring-surface ${color.badge}`}>{section.number}</span>
+          </span>
+          <button type="button" onClick={onJump} className="relative min-w-0 flex-1 cursor-pointer pl-1 text-left" title="Go to this line in the script">
+            {idea ? (
+              <>
+                <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-fg-3">{idea.game_title}</span>
+                <span className={`line-clamp-2 text-[15px] font-bold leading-snug ${color.title}`}>{idea.title}</span>
+                <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-fg-3">
+                  <span className="inline-flex items-center gap-1"><FilmIcon className="h-3 w-3" /> {sectionClips.length} clip{sectionClips.length === 1 ? "" : "s"}</span>
+                  {capture && <span className={`inline-flex items-center gap-1 rounded px-1 font-semibold ${capture.pill}`}><VideoCameraIcon className="h-3 w-3" /> {capture.short}</span>}
                 </span>
-                <button type="button" onClick={() => jumpTo(section.start, section.end)} className="relative min-w-0 flex-1 cursor-pointer pl-1 text-left">
-                  {idea ? (
-                    <>
-                      <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-fg-3">{idea.game_title}</span>
-                      <span className={`line-clamp-2 text-[15px] font-bold leading-snug ${color.title}`}>{idea.title}</span>
-                      <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-fg-3">
-                        <span className="inline-flex items-center gap-1"><FilmIcon className="h-3 w-3" /> {sectionClips.length} clip{sectionClips.length === 1 ? "" : "s"}</span>
-                        {capture && <span className={`inline-flex items-center gap-1 rounded px-1 font-semibold ${capture.pill}`}><VideoCameraIcon className="h-3 w-3" /> {capture.short}</span>}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-fg-4">{section.label}</span>
-                      <span className="line-clamp-2 text-xs leading-5 text-fg-3">{section.preview}</span>
-                      <span className="mt-1 block text-[11px] italic text-fg-4">Not linked to an idea</span>
-                    </>
-                  )}
+              </>
+            ) : (
+              <>
+                <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-fg-4">{section.label}</span>
+                <span className="line-clamp-2 text-xs leading-5 text-fg-3">{section.preview}</span>
+                <span className="mt-1 block text-[11px] italic text-fg-4">Not linked to an idea</span>
+              </>
+            )}
+          </button>
+          <div className="relative -mr-1 -mt-1 flex shrink-0 flex-col gap-0.5 sm:flex-row">
+            {sectionClips.length > 0 && (
+              <button type="button" onClick={() => void copy(sectionClips.map(({ asset }) => asset.url).filter(Boolean).join("\n"), "links")} className={iconButton} aria-label="Copy this idea's links" title="Copy this idea's links">
+                <DocumentDuplicateIcon className="h-4 w-4" />
+              </button>
+            )}
+            {idea && (
+              <>
+                <Link href={`/idea/${idea.id}`} target="_blank" className={iconButton} aria-label={`Open ${idea.title}`} title="Open idea">
+                  <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+                </Link>
+                <button type="button" onClick={() => void removeIdea(idea)} className={`${iconButton} hover:bg-danger-soft hover:text-rose-600`} aria-label={`Remove ${idea.title} from project`} title="Remove from project">
+                  <TrashIcon className="h-4 w-4" />
                 </button>
-                <div className="relative -mr-1 -mt-1 flex shrink-0 flex-col gap-0.5 sm:flex-row">
-                  {sectionClips.length > 0 && (
-                    <button type="button" onClick={() => void copy(sectionClips.map(({ asset }) => asset.url).filter(Boolean).join("\n"), "links")} className={iconButton} aria-label="Copy this idea's links" title="Copy this idea's links">
-                      <DocumentDuplicateIcon className="h-4 w-4" />
-                    </button>
-                  )}
-                  {idea && (
-                    <>
-                      <Link href={`/idea/${idea.id}`} target="_blank" className={iconButton} aria-label={`Open ${idea.title}`} title="Open idea">
-                        <ArrowTopRightOnSquareIcon className="h-4 w-4" />
-                      </Link>
-                      <button type="button" onClick={() => void removeIdea(idea)} className={`${iconButton} hover:bg-danger-soft hover:text-rose-600`} aria-label={`Remove ${idea.title} from project`} title="Remove from project">
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-              {sectionClips.length > 0
-                ? clipRows(sectionClips, color)
-                : idea && <p className="flex items-center gap-2 px-3 py-2.5 text-xs text-fg-4"><FilmIcon className="h-4 w-4" /> No clips yet. Add footage to this idea, or record it yourself.</p>}
-            </li>
-          );
-        })}
+              </>
+            )}
+          </div>
+        </div>
+        {sectionClips.length > 0
+          ? clipRows(sectionClips, color)
+          : idea && <p className="flex items-center gap-2 px-3 py-2.5 text-xs text-fg-4"><FilmIcon className="h-4 w-4" /> No clips yet. Add footage to this idea, or record it yourself.</p>}
+      </div>
+    );
+  };
 
-        {otherClips.length > 0 && (
-          <li className="overflow-hidden rounded-2xl border border-line bg-surface">
-            <div className="flex items-center gap-2 bg-surface-sunken px-3 py-2">
-              <FilmIcon className="h-4 w-4 text-fg-4" />
-              <p className="min-w-0 flex-1 text-sm font-semibold text-fg">Other clips <span className="font-normal text-fg-4">· not tied to a line</span></p>
-              <button type="button" onClick={() => void copy(otherClips.map(({ asset }) => asset.url).filter(Boolean).join("\n"), "links")} className={iconButton} aria-label="Copy these links" title="Copy these links"><DocumentDuplicateIcon className="h-4 w-4" /></button>
-            </div>
-            {clipRows(otherClips, NEUTRAL_COLOR)}
-          </li>
+  const ideasSummary = (
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-fg">Ideas & clips <span className="font-normal text-fg-4">· {ideas?.length ?? "…"} ideas · {clipStats.clips} clips · {assetAnalysis.uniqueLinkCount} {assetAnalysis.uniqueLinkCount === 1 ? "video" : "videos"}</span></p>
+        <p className="text-[11px] text-fg-4">Drag a card to reorder · click a title to go to its line</p>
+      </div>
+      <div className="flex items-center gap-1.5">
+        {toRecord > 0 && (
+          <span className="inline-flex items-center gap-1 rounded-md bg-rose-100 px-1.5 py-0.5 text-[11px] font-semibold text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">
+            <VideoCameraIcon className="h-3 w-3" /> {toRecord} to record
+          </span>
         )}
-
-        {unplaced.length > 0 && (
-          <li className="pt-2">
-            <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300"><ExclamationTriangleIcon className="h-3.5 w-3.5" /> In the project but not in the script</p>
-            <ul className="space-y-1.5">
-              {unplaced.map((idea) => (
-                <li key={idea.id} className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2 dark:border-amber-500/30 dark:bg-amber-500/10">
-                  <GameThumb src={idea.game_cover} className="h-8 w-6" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-fg">{idea.title}</span>
-                    <span className="block truncate text-[11px] text-fg-3">{idea.game_title}</span>
-                  </span>
-                  <Button variant="ghost" size="sm" onClick={() => addLineFor(idea)} title="Add its line to the end of the script">Add line</Button>
-                  <button type="button" onClick={() => void removeIdea(idea)} className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-fg-4 hover:bg-danger-soft hover:text-rose-600" aria-label={`Remove ${idea.title} from project`}>
-                    <TrashIcon className="h-4 w-4" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </li>
+        {assets.length > 0 && (
+          <Button variant="secondary" size="sm" onClick={() => void copy(assetAnalysis.uniqueAssets.map((a) => a.url).filter(Boolean).join("\n"), "links")} title="Copy every source video once">
+            <DocumentDuplicateIcon className="h-4 w-4" /> Copy all links
+          </Button>
         )}
-      </ol>
-
-      <div className="relative mt-3">
-        {picking && <IdeaPicker excludeIds={new Set((ideas ?? []).map((i) => i.id))} onPick={addIdea} onClose={() => setPicking(false)} />}
-        <Button variant="secondary" className="w-full" onClick={() => setPicking((v) => !v)} aria-expanded={picking}>
-          <PlusIcon className="h-4 w-4" /> Add idea
-        </Button>
       </div>
     </div>
   );
 
-  const scriptPanel = (
-    <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className={`inline-flex items-center gap-1.5 text-xs font-medium ${length.seconds > 60 ? "text-amber-700 dark:text-amber-300" : "text-fg-3"}`} title="Estimated at about 2.6 words per second">
-          <ClockIcon className="h-4 w-4" /> ≈ {formatDuration(length.seconds)} · {length.words} words{length.seconds > 60 ? " · over 60s" : ""}
-        </p>
-        <Button variant="primary" size="sm" onClick={() => void copy(content, "script")}><DocumentDuplicateIcon className="h-4 w-4" /> Copy script</Button>
+  const missingBanner = missingClips.length > 0 && (
+    <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+      <ExclamationTriangleIcon className="h-5 w-5 shrink-0" />
+      <p className="min-w-0 flex-1 text-xs"><span className="font-semibold">{missingClips.length} clip{missingClips.length === 1 ? "" : "s"} from these ideas {missingClips.length === 1 ? "is" : "are"} not in the list</span><span className="block truncate opacity-80">{Array.from(new Set(missingClips.map((m) => m.idea.title))).join(" · ")}</span></p>
+      <Button variant="accent" size="sm" onClick={addMissingClips} className="shrink-0 bg-amber-600 hover:bg-amber-700"><PlusIcon className="h-4 w-4" /> Add</Button>
+    </div>
+  );
+
+  const otherClipsBlock = otherClips.length > 0 && (
+    <div className="overflow-hidden rounded-2xl border border-line bg-surface">
+      <div className="flex items-center gap-2 bg-surface-sunken px-3 py-2">
+        <FilmIcon className="h-4 w-4 text-fg-4" />
+        <p className="min-w-0 flex-1 text-sm font-semibold text-fg">Other clips <span className="font-normal text-fg-4">· not tied to a line</span></p>
+        <button type="button" onClick={() => void copy(otherClips.map(({ asset }) => asset.url).filter(Boolean).join("\n"), "links")} className={iconButton} aria-label="Copy these links" title="Copy these links"><DocumentDuplicateIcon className="h-4 w-4" /></button>
       </div>
-      <textarea
-        ref={textareaRef}
-        value={content}
-        onChange={(e) => onContentChange(e.target.value)}
-        placeholder="Opening hook, then one line per idea…"
-        aria-label="Script"
-        className="min-h-[50dvh] w-full flex-1 resize-none rounded-2xl border border-line bg-surface p-4 text-base leading-7 text-fg outline-none transition placeholder:text-fg-4 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 sm:p-6 sm:text-[17px] sm:leading-8 lg:min-h-0"
-      />
+      {clipRows(otherClips, NEUTRAL_COLOR)}
+    </div>
+  );
+
+  const unplacedBlock = unplaced.length > 0 && (
+    <div>
+      <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300"><ExclamationTriangleIcon className="h-3.5 w-3.5" /> In the project but not in the script</p>
+      <ul className="space-y-1.5">
+        {unplaced.map((idea) => (
+          <li key={idea.id} className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2 dark:border-amber-500/30 dark:bg-amber-500/10">
+            <GameThumb src={idea.game_cover} className="h-8 w-6" />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold text-fg">{idea.title}</span>
+              <span className="block truncate text-[11px] text-fg-3">{idea.game_title}</span>
+            </span>
+            <Button variant="ghost" size="sm" onClick={() => addLineFor(idea)} title="Add its line to the end of the script">Add line</Button>
+            <button type="button" onClick={() => void removeIdea(idea)} className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-fg-4 hover:bg-danger-soft hover:text-rose-600" aria-label={`Remove ${idea.title} from project`}>
+              <TrashIcon className="h-4 w-4" />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+
+  const addIdeaBlock = (
+    <div className="relative">
+      {picking && <IdeaPicker excludeIds={new Set((ideas ?? []).map((i) => i.id))} onPick={addIdea} onClose={() => setPicking(false)} />}
+      <Button variant="secondary" className="w-full" onClick={() => setPicking((v) => !v)} aria-expanded={picking}>
+        <PlusIcon className="h-4 w-4" /> Add idea
+      </Button>
+    </div>
+  );
+
+  /* ---------- aligned view: one row per script block ---------- */
+
+  // Script blocks as they are in the text (separated by blank lines), lined up with the guide.
+  const blocks = content.split(/\n{2,}/).filter((block) => block.trim());
+  type Row = { key: string; text: string; section: ScriptGuideSection | null; index: number };
+  const rows: Row[] = [];
+  if (editingRow && editingRow.row <= blocks.length) {
+    blocks.slice(0, editingRow.row).forEach((text, i) => rows.push({ key: `r${i}`, text: text.trim(), section: guide[i] ?? null, index: i }));
+    rows.push({ key: `r${editingRow.row}`, text: editingRow.text, section: editingRow.skip > 0 ? guide[editingRow.row] ?? null : null, index: editingRow.row });
+    blocks.slice(editingRow.row + editingRow.skip).forEach((text, j) => {
+      const i = editingRow.row + editingRow.skip + j;
+      rows.push({ key: `r${editingRow.row + 1 + j}`, text: text.trim(), section: guide[i] ?? null, index: editingRow.row + 1 + j });
+    });
+  } else {
+    blocks.forEach((text, i) => rows.push({ key: `r${i}`, text: text.trim(), section: guide[i] ?? null, index: i }));
+  }
+  if (rows.length === 0) rows.push({ key: "r0", text: "", section: null, index: 0 });
+
+  const countBlocks = (text: string) => text.split(/\n{2,}/).filter((block) => block.trim()).length;
+
+  const editRow = (rowIndex: number, text: string) => {
+    const current = String(latestRef.current.content || "").split(/\n{2,}/).filter((block) => block.trim());
+    const skip = editingRow && editingRow.row === rowIndex ? editingRow.skip : 1;
+    const next = [...current.slice(0, rowIndex), text, ...current.slice(rowIndex + skip)].join("\n\n");
+    setEditingRow({ row: rowIndex, text, skip: countBlocks(text) });
+    onContentChange(next);
+  };
+
+  const focusRow = (rowIndex: number) => {
+    const el = rowRefs.current.get(rowIndex);
+    if (!el) return;
+    el.focus({ preventScroll: true });
+    el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    const end = el.value.length;
+    el.setSelectionRange(end, end);
+  };
+
+  const columns = "grid-cols-1 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]";
+
+  const alignedView = (
+    <div className="mx-auto w-full space-y-5 lg:space-y-3">
+      <div className={`grid gap-3 ${columns} lg:gap-4`}>
+        <div className="flex flex-wrap items-center justify-between gap-2">{scriptToolbar}</div>
+        <div>{ideasSummary}</div>
+      </div>
+      {rows.map((row) => {
+        const section = row.section;
+        const ideaId = section ? match.bySection.get(section.id) : undefined;
+        const color = section && !section.isHook && ideaId != null ? ideaColor(section.number) : NEUTRAL_COLOR;
+        const active = activeRow === row.index;
+        return (
+          <div key={row.key} className={`grid items-stretch gap-2 ${columns} lg:gap-4`}>
+            <div
+              onClick={() => rowRefs.current.get(row.index)?.focus()}
+              className={`flex h-full cursor-text gap-3 rounded-2xl border border-l-4 bg-surface p-3 transition sm:p-4 ${section?.isHook ? "border-l-violet-500" : color.bar} ${active ? "border-y-blue-500 border-r-blue-500 ring-4 ring-blue-500/10" : "border-y-line border-r-line hover:border-y-line-strong hover:border-r-line-strong"}`}
+            >
+              <span className={`mt-1 flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md px-1 text-xs font-bold tabular-nums ${section?.isHook ? "bg-violet-600 text-white" : section ? color.badge : NEUTRAL_COLOR.badge}`}>{section?.isHook ? "H" : section?.number ?? "·"}</span>
+              <AutoTextarea
+                value={row.text}
+                inputRef={(el) => { if (el) rowRefs.current.set(row.index, el); else rowRefs.current.delete(row.index); }}
+                onChange={(value) => editRow(row.index, value)}
+                onFocus={() => { setActiveRow(row.index); setEditingRow({ row: row.index, text: row.text, skip: row.text.trim() ? 1 : 0 }); }}
+                onBlur={() => { setEditingRow(null); setActiveRow((current) => (current === row.index ? null : current)); }}
+                placeholder={rows.length === 1 ? "Opening hook, then one paragraph per idea…" : "Write this line…"}
+                ariaLabel={section?.isHook ? "Opening hook" : `Script line ${section?.number ?? row.index + 1}`}
+              />
+            </div>
+            <div className={`min-w-0 ${section?.isHook ? "hidden lg:block" : ""}`}>
+              {section ? (section.isHook ? renderHookCard(section, () => focusRow(row.index), active) : renderSectionCard(section, () => focusRow(row.index), active)) : null}
+            </div>
+          </div>
+        );
+      })}
+      <div className={`grid gap-3 ${columns} lg:gap-4`}>
+        <p className="self-start text-xs text-fg-4 lg:pt-2">Leave a blank line inside a box to split it into a new line.</p>
+        <div className="min-w-0 space-y-3">
+          {missingBanner}
+          {otherClipsBlock}
+          {unplacedBlock}
+          {addIdeaBlock}
+        </div>
+      </div>
+    </div>
+  );
+
+  /* ---------- plain view: one text box + the list ---------- */
+
+  const ideasPanel = (
+    <div className="flex min-h-0 flex-col gap-3">
+      {ideasSummary}
+      {missingBanner}
+      <ol className="min-h-0 flex-1 space-y-2.5 overflow-y-auto pr-0.5">
+        {guide.length === 0 && <li className="rounded-2xl border border-dashed border-line-strong p-5 text-center text-xs text-fg-4">The script is empty. Add an idea below.</li>}
+        {guide.map((section) => (
+          <li key={section.id}>
+            {section.isHook ? renderHookCard(section, () => jumpTo(section.start, section.end)) : renderSectionCard(section, () => jumpTo(section.start, section.end))}
+          </li>
+        ))}
+        {otherClipsBlock && <li>{otherClipsBlock}</li>}
+        {unplacedBlock && <li className="pt-2">{unplacedBlock}</li>}
+      </ol>
+      {addIdeaBlock}
+    </div>
+  );
+
+  const plainView = (
+    <div className={`grid h-full min-h-0 gap-4 ${columns}`}>
+      <div className="flex min-h-0 flex-1 flex-col gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">{scriptToolbar}</div>
+        <textarea
+          ref={textareaRef}
+          value={content}
+          onChange={(e) => onContentChange(e.target.value)}
+          placeholder="Opening hook, then one line per idea…"
+          aria-label="Script"
+          className="min-h-[50dvh] w-full flex-1 resize-none rounded-2xl border border-line bg-surface p-4 text-base leading-7 text-fg outline-none transition placeholder:text-fg-4 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 sm:p-6 sm:text-[17px] sm:leading-8 lg:min-h-0"
+        />
+      </div>
+      <aside className="flex min-h-0 flex-col rounded-2xl border border-line bg-surface p-3">{ideasPanel}</aside>
     </div>
   );
 
@@ -770,7 +934,6 @@ export function ProjectEditor({
 
   const tabs = [
     { key: "script" as const, label: "Script", Icon: DocumentTextIcon, mobileOnly: false },
-    { key: "ideas" as const, label: `Ideas & clips · ${ideas?.length ?? 0}`, Icon: LightBulbIcon, mobileOnly: true },
     { key: "details" as const, label: "Details", Icon: InformationCircleIcon, mobileOnly: false },
   ];
 
@@ -836,13 +999,7 @@ export function ProjectEditor({
 
       {/* Body */}
       <div className="min-h-0 flex-1 overflow-y-auto bg-surface-muted p-3 sm:p-6">
-        {tab === "script" && (
-          <div className="grid h-full min-h-0 gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-            {scriptPanel}
-            <aside className="hidden min-h-0 rounded-2xl border border-line bg-surface p-3 lg:flex lg:flex-col">{ideasPanel}</aside>
-          </div>
-        )}
-        {tab === "ideas" && <div className="mx-auto max-w-2xl rounded-2xl border border-line bg-surface p-3">{ideasPanel}</div>}
+        {tab === "script" && (viewMode === "aligned" ? alignedView : plainView)}
         {tab === "details" && detailsPanel}
       </div>
     </Modal>
