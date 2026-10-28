@@ -7,7 +7,7 @@ export async function GET() {
     const supabase = getAdminSupabase();
     const { data, error } = await supabase
       .from("audience_requests")
-      .select("*, game:games(id,title,cover_url)")
+      .select("*, game:games(id,title,cover_url), linked_idea:details(id,title), linked_short_project:scripts(id,title,status)")
       .order("created_at", { ascending: false });
     if (error) throw error;
     return NextResponse.json({ data: data ?? [] });

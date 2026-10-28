@@ -81,7 +81,7 @@ export type AudienceRequest = {
   created_at?: string;
   game?: Game | null;
   linked_idea?: { id: number; title: string } | null;
-  linked_short_project?: { id: number; title: string } | null;
+  linked_short_project?: { id: number; title: string; status?: string | null } | null;
   linked_long_project?: { id: number; title: string } | null;
 };
 
