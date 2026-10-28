@@ -1370,7 +1370,17 @@ export default function Home() {
                           className="min-w-0 flex-1 cursor-pointer text-left"
                         >
                           <p className="truncate text-sm font-bold text-slate-800 transition group-hover:text-blue-600 dark:text-slate-100 dark:group-hover:text-blue-400">{idea.title}</p>
-                          {game && <p className="mt-0.5 truncate text-[11px] font-medium text-fg-4">{game.title}</p>}
+                          <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] font-medium text-fg-4">
+                            {game && <span className="truncate">{game.title}</span>}
+                            {usageData && (() => {
+                              const used = usageOf(idea.id);
+                              return (
+                                <span className={`shrink-0 rounded px-1 font-semibold ${used.total === 0 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" : used.published ? "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300" : "bg-surface-sunken text-fg-3"}`}>
+                                  {used.total === 0 ? "Not used yet" : `Used ${used.total}×${used.published ? ` · ${used.published} published` : ""}`}
+                                </span>
+                              );
+                            })()}
+                          </p>
                         </button>
                         <button
                           type="button"
@@ -1698,7 +1708,7 @@ export default function Home() {
           ) : (
             <ul className={`idea-grid transition-opacity duration-150 ${loading ? "opacity-60" : ""}`} aria-busy={loading}>
               {currentIdeas.map((r, index) => (
-                 <IdeaItem key={r.id} priority={index < 6} r={r} game={games.find(g => g.id === r.game_id)} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={togglePin} usage={usageOf(r.id)} onToggleRecord={(idea) => void toggleRecord(idea)} onEditGame={setEditingGame} onQuickView={setPreviewIdea} onRemoveFromGroup={groupId && loadedGroupId === groupId ? removeIdeaFromGroup : undefined} groupName={activeGroup?.name} removingFromGroup={removingGroupItems.has(`${groupId}:${r.id}`)} />
+                 <IdeaItem key={r.id} priority={index < 6} r={r} game={games.find(g => g.id === r.game_id)} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={togglePin} usage={usageData ? usageOf(r.id) : null} onToggleRecord={(idea) => void toggleRecord(idea)} onEditGame={setEditingGame} onQuickView={setPreviewIdea} onRemoveFromGroup={groupId && loadedGroupId === groupId ? removeIdeaFromGroup : undefined} groupName={activeGroup?.name} removingFromGroup={removingGroupItems.has(`${groupId}:${r.id}`)} />
               ))}
             </ul>
           )}
