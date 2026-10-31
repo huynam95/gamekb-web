@@ -20,6 +20,7 @@ import { Modal, ModalBody, ModalFooter, ModalHeader } from "@/components/ui/Moda
 import { AppPageHeader, appPageMainClass, appPagePrimaryActionClass, appPageRootClass } from "@/components/AppPage";
 import { useNotifications } from "@/components/NotificationCenter";
 import { supabase } from "@/lib/supabaseClient";
+import { getYoutubeVideoId } from "@/lib/mediaLinks";
 import type { AudienceRequest, Game } from "@/types/gamekb";
 
 type RequestForm = {
@@ -279,6 +280,13 @@ function timeAgo(value?: string) {
   return months < 12 ? `${months} month${months === 1 ? "" : "s"} ago` : `${Math.floor(months / 12)} year${months < 24 ? "" : "s"} ago`;
 }
 
+/** Requests under the same video share a key, whether the link is to the video or to a comment on it. */
+function videoKey(url?: string | null) {
+  const trimmed = url?.trim();
+  if (!trimmed) return null;
+  return getYoutubeVideoId(trimmed) ?? trimmed.replace(/\/+$/, "").toLowerCase();
+}
+
 function replyText(item: AudienceRequest) {
   const who = item.commenter_name ? `@${item.commenter_name.replace(/^@/, "")} ` : "";
   return `${who}Thanks for the idea! The video is up now: ${item.published_url ?? ""}`.trim();
@@ -404,9 +412,20 @@ export default function AudienceRequestsPage() {
     return map;
   }, [requests]);
 
+  const byVideo = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const item of requests) {
+      const key = videoKey(item.source_url);
+      if (key) map.set(key, (map.get(key) ?? 0) + 1);
+    }
+    return map;
+  }, [requests]);
+  const [videoFilter, setVideoFilter] = useState<string | null>(null);
+
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const rows = requests.filter((item) => {
+      if (videoFilter && videoKey(item.source_url) !== videoFilter) return false;
       if (filter === "promised" ? !(item.promised && item.status !== "replied") : filter !== "all" && item.status !== filter) return false;
       if (!needle) return true;
       return [item.comment_text, item.commenter_name, item.game?.title, item.notes, item.linked_idea?.title, item.linked_short_project?.title]
@@ -417,7 +436,7 @@ export default function AudienceRequestsPage() {
       const diff = String(a.created_at ?? "").localeCompare(String(b.created_at ?? ""));
       return sort === "newest" ? -diff : diff;
     });
-  }, [query, requests, filter, sort]);
+  }, [query, requests, filter, sort, videoFilter]);
 
   /** Update one request in place, then on the server. */
   const patch = async (item: AudienceRequest, changes: Partial<AudienceRequest>, done?: string) => {
@@ -603,6 +622,14 @@ export default function AudienceRequestsPage() {
             </div>
           </div>
 
+          {videoFilter && (
+            <div className="mb-4 flex items-center gap-2 rounded-2xl border border-fuchsia-200 bg-fuchsia-50 px-4 py-2.5 text-sm text-fuchsia-900 dark:border-fuchsia-500/30 dark:bg-fuchsia-500/10 dark:text-fuchsia-100">
+              <ChatBubbleLeftRightIcon className="h-4 w-4 shrink-0" />
+              <span className="min-w-0 flex-1">Showing the {byVideo.get(videoFilter) ?? 0} requests from one video.</span>
+              <button type="button" onClick={() => setVideoFilter(null)} className="inline-flex cursor-pointer items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold hover:bg-fuchsia-100 dark:hover:bg-fuchsia-500/20"><XMarkIcon className="h-4 w-4" /> Show all</button>
+            </div>
+          )}
+
           {loading ? (
             <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">{[0, 1, 2].map((i) => <div key={i} className="h-64 animate-pulse rounded-3xl bg-surface-sunken" />)}</div>
           ) : filtered.length === 0 ? (
@@ -660,9 +687,19 @@ export default function AudienceRequestsPage() {
                         {item.created_at && <span>{timeAgo(item.created_at)}</span>}
                         {item.source_url && (
                           <a href={item.source_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-semibold text-accent hover:underline">
-                            <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" /> Comment
+                            <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" /> Link
                           </a>
                         )}
+                        {(() => {
+                          const key = videoKey(item.source_url);
+                          const others = key ? (byVideo.get(key) ?? 1) - 1 : 0;
+                          if (!key || others <= 0 || videoFilter) return null;
+                          return (
+                            <button type="button" onClick={() => { setVideoFilter(key); setFilter("all"); }} className="cursor-pointer rounded-md bg-fuchsia-100 px-1.5 py-0.5 font-semibold text-fuchsia-800 hover:bg-fuchsia-200 dark:bg-fuchsia-500/15 dark:text-fuchsia-200" title="Show every request from this video">
+                              +{others} on this video
+                            </button>
+                          );
+                        })()}
                       </p>
                       {item.notes && <p className="mt-2 rounded-xl bg-surface-muted px-3 py-2 text-xs leading-5 text-fg-3">{item.notes}</p>}
 
@@ -755,8 +792,13 @@ export default function AudienceRequestsPage() {
 
           <GameSearchPicker games={games} value={form.game_id} onChange={(game_id) => setForm({ ...form, game_id })} />
 
-          <Field label="Link to the comment" className="sm:col-span-2">
+          <Field label="Comment or video link" className="sm:col-span-2">
             <Input value={form.source_url} onChange={(event) => setForm({ ...form, source_url: event.target.value })} placeholder="https://youtube.com/..." />
+            {(() => {
+              const key = videoKey(form.source_url);
+              const others = key ? (byVideo.get(key) ?? 0) - (editing && videoKey(editing.source_url) === key ? 1 : 0) : 0;
+              return others > 0 ? <p className="mt-1.5 text-xs text-fuchsia-700 dark:text-fuchsia-300">{others} other request{others === 1 ? "" : "s"} already from this video. That&apos;s fine, each viewer gets their own card.</p> : null;
+            })()}
           </Field>
 
           <div className="sm:col-span-2">

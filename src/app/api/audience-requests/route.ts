@@ -24,10 +24,7 @@ export async function POST(request: Request) {
     if (!commentText) return NextResponse.json({ error: "Comment is required" }, { status: 400 });
     const supabase = getAdminSupabase();
     const sourceUrl = String(body.source_url ?? "").trim() || null;
-    if (sourceUrl) {
-      const { data: duplicate } = await supabase.from("audience_requests").select("id").eq("source_url", sourceUrl).maybeSingle();
-      if (duplicate) return NextResponse.json({ error: "This comment or video link is already saved." }, { status: 409 });
-    }
+    // Several viewers can ask under the same video, so the same link may be saved more than once.
     const payload = {
       comment_text: commentText,
       commenter_name: String(body.commenter_name ?? "").trim() || null,
