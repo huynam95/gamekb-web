@@ -635,7 +635,8 @@ export function IdeaItem({
               )}
             </div>
           )}
-          <div className="flex items-center gap-2">
+          {/* Each badge stays on one line; the row wraps instead of squeezing them. */}
+          <div className="flex flex-wrap items-center gap-1.5 [&>*]:shrink-0 [&>*]:whitespace-nowrap">
             <TypePill typeKey={r.detail_type} />
             {r.pinned && <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-300"><StarSolidIcon className="h-3 w-3" aria-hidden="true" /> Pinned</span>}
             {!isSelectMode && usage && usage.total > 0 && (
