@@ -31,6 +31,7 @@ import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import { supabase } from "@/lib/supabaseClient";
 import { fetchYoutubeMetadata } from "@/lib/youtube";
 import { getYoutubeVideoId } from "@/lib/mediaLinks";
+import { formatTimestamp, getStartSeconds } from "@/lib/assetLinks";
 import { readIdeaPreview } from "@/lib/ideaPreviewCache";
 import { getGameStudio } from "@/lib/studios";
 import { statusDot, useIdeaUsage, videoHref } from "@/lib/ideaUsage";
@@ -781,6 +782,12 @@ export default function IdeaDetailPage() {
                             {href && (
                               <span className="absolute inset-0 flex items-center justify-center bg-black/10 transition group-hover:bg-black/30">
                                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur"><PlayIcon className="ml-0.5 h-4 w-4" /></span>
+                              </span>
+                            )}
+                            {href && getStartSeconds(href) > 0 && (
+                              // Where the shared link starts, like YouTube's own time badge.
+                              <span className="absolute bottom-1 right-1 rounded bg-black/80 px-1 py-0.5 font-mono text-[10px] font-semibold tabular-nums text-white" title={`Starts at ${formatTimestamp(getStartSeconds(href))}`}>
+                                {formatTimestamp(getStartSeconds(href))}
                               </span>
                             )}
                           </Thumb>

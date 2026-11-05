@@ -34,7 +34,7 @@ import { ProjectTopicSelect } from "@/components/ProjectTopicSelect";
 import { useDismiss } from "@/components/ui/useDismiss";
 import { buildScriptGuide, type ScriptGuideSection } from "@/lib/scriptGuide";
 import { getScriptTopicValue } from "@/lib/scriptTopics";
-import { analyzeAssetLinks, countClips, getClipIdentity } from "@/lib/assetLinks";
+import { analyzeAssetLinks, countClips, formatTimestamp, getClipIdentity, getStartSeconds } from "@/lib/assetLinks";
 import { invalidateUsage } from "@/lib/ideaUsage";
 import { loadLinks } from "@/lib/ideaLinks";
 import { CAPTURE_META, CAPTURE_STATUSES, RECORDING_SETUP_MESSAGE, captureStatusPatch, isMissingRecordingColumns, type CaptureStatus } from "@/lib/recording";
@@ -666,12 +666,20 @@ export function ProjectEditor({
               href={asset.url}
               target="_blank"
               rel="noopener noreferrer"
-              title={`${clipLabel(asset)}\n${asset.url}`}
+              title={`${clipLabel(asset)}${getStartSeconds(asset.url) ? ` (from ${formatTimestamp(getStartSeconds(asset.url))})` : ""}\n${asset.url}`}
               aria-label={`Open clip ${i + 1}: ${clipLabel(asset)}`}
               className={`inline-flex h-8 max-w-full items-center gap-1.5 rounded-lg border border-line bg-surface px-2 text-xs font-semibold transition hover:border-line-strong ${color.link}`}
             >
               <PlayIcon className="h-3.5 w-3.5 shrink-0" />
               <span className="shrink-0 tabular-nums">Clip {i + 1}</span>
+              {(() => {
+                const start = getStartSeconds(asset.url);
+                return start > 0 ? (
+                  <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-surface-sunken px-1 font-mono text-[11px] tabular-nums text-fg-2" title={`Starts at ${formatTimestamp(start)}`}>
+                    <ClockIcon className="h-3 w-3" aria-hidden="true" />{formatTimestamp(start)}
+                  </span>
+                ) : null;
+              })()}
               {asset.channel_name && <span className="min-w-0 truncate font-medium text-fg-3">· {asset.channel_name}</span>}
               {dup && <span className="shrink-0 rounded bg-surface-sunken px-1 text-[10px] text-fg-3" title="Same source video as another clip">{dup.isPrimary ? `×${dup.total}` : "dup"}</span>}
             </a>

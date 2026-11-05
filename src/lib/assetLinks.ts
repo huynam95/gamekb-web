@@ -66,7 +66,7 @@ export function getAssetIdentity(rawUrl: string) {
 }
 
 /** Start time of a link in seconds (?t=228, ?t=3m48s, &start=228, #t=228), or 0. */
-function getStartSeconds(rawUrl: string) {
+export function getStartSeconds(rawUrl: string) {
   try {
     const url = new URL(/^https?:\/\//i.test(rawUrl.trim()) ? rawUrl.trim() : `https://${rawUrl.trim()}`);
     const raw = url.searchParams.get("t") || url.searchParams.get("start") || new URLSearchParams(url.hash.replace(/^#/, "")).get("t") || "";
@@ -77,6 +77,15 @@ function getStartSeconds(rawUrl: string) {
   } catch {
     return 0;
   }
+}
+
+/** 228 → "3:48", 3725 → "1:02:05". */
+export function formatTimestamp(seconds: number) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  const ss = String(s).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
 }
 
 /**
