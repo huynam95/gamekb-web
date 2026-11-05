@@ -85,6 +85,17 @@ const IDEA_COLORS = [
 const NEUTRAL_COLOR = { badge: "bg-surface-sunken text-fg-2", bar: "border-l-line-strong", soft: "bg-surface-sunken", title: "text-fg", link: "text-fg-3 hover:bg-surface-sunken" };
 const ideaColor = (number: number | null | undefined) => (number != null && number > 0 && number < Number.MAX_SAFE_INTEGER ? IDEA_COLORS[(number - 1) % IDEA_COLORS.length] : NEUTRAL_COLOR);
 
+/** First few words of a clip's video title, e.g. "GTA 5 Police Chase…". */
+function titleSnippet(title: string | null | undefined, maxWords = 4, maxChars = 30) {
+  const clean = (title ?? "").replace(/\s+/g, " ").trim();
+  // Untitled clips fall back to a piece of the link ("watch?v=…"); that isn't a title.
+  if (!clean || /^https?:\/\//i.test(clean) || (!/\s/.test(clean) && /[=?/]/.test(clean))) return "";
+  const words = clean.split(" ");
+  let text = words.slice(0, maxWords).join(" ");
+  if (text.length > maxChars) text = text.slice(0, maxChars).replace(/\s+\S*$/, "") || text.slice(0, maxChars);
+  return text.length < clean.length ? `${text.replace(/[\s,.:;!?|-]+$/, "")}…` : text;
+}
+
 /** Short readable label for a clip link: channel, then the video name. */
 function clipLabel(asset: ProjectAsset) {
   return asset.name || asset.url.replace(/^https?:\/\/(www\.)?/, "").slice(0, 40);
@@ -680,7 +691,8 @@ export function ProjectEditor({
                   </span>
                 ) : null;
               })()}
-              {asset.channel_name && <span className="min-w-0 truncate font-medium text-fg-3">· {asset.channel_name}</span>}
+              {titleSnippet(asset.name) && <span className="min-w-0 truncate font-medium text-fg-2">{titleSnippet(asset.name)}</span>}
+              {asset.channel_name && <span className="min-w-0 max-w-[10rem] shrink-[2] truncate font-medium text-fg-4">· {asset.channel_name}</span>}
               {dup && <span className="shrink-0 rounded bg-surface-sunken px-1 text-[10px] text-fg-3" title="Same source video as another clip">{dup.isPrimary ? `×${dup.total}` : "dup"}</span>}
             </a>
           </li>
