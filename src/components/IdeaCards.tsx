@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { Bars3Icon, CheckIcon, FilmIcon, DocumentDuplicateIcon, ExclamationTriangleIcon, EyeIcon, FolderIcon, HashtagIcon, LinkIcon, PencilSquareIcon, StarIcon, TagIcon, TrashIcon, VideoCameraIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { Bars3Icon, CheckIcon, FilmIcon, DocumentDuplicateIcon, ExclamationTriangleIcon, EyeIcon, FolderIcon, HashtagIcon, LinkIcon, PencilSquareIcon, SparklesIcon, StarIcon, TagIcon, TrashIcon, VideoCameraIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import { supabase } from "@/lib/supabaseClient";
 import type { DetailRow, Game, ScriptProject } from "@/types/gamekb";
@@ -565,6 +565,23 @@ export function IdeaItem({
         <CoverBackdrop src={game?.cover_url} alt="" imageClassName="opacity-60" priority={priority} />
       </div>
       <div className={`absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/60 to-transparent ${isSelected ? "opacity-90 bg-blue-900/20" : ""}`} />
+      {/* Usage sits apart from the tags: a solid corner label plus an edge stripe, so used ideas stand out at a glance. */}
+      {usage && usage.total > 0 && <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 z-20 w-1.5 bg-amber-400" />}
+      {usage && (usage.total > 0 || isSelectMode) && (
+        <span
+          className={`pointer-events-none absolute top-3.5 z-30 inline-flex h-7 items-stretch overflow-hidden rounded-lg text-[11px] font-black uppercase tracking-wide tabular-nums shadow-lg shadow-black/40 ${isSelectMode || onRemoveFromGroup ? "left-16" : "left-4"}`}
+          title={usage.total === 0 ? "Not used in any video yet" : `Used in ${usage.total} video${usage.total === 1 ? "" : "s"}${usage.published ? ` · ${usage.published} published` : ""}`}
+        >
+          {usage.total === 0 ? (
+            <span className="inline-flex items-center gap-1 bg-emerald-500 px-2 text-white"><SparklesIcon className="h-3.5 w-3.5" aria-hidden="true" /> New</span>
+          ) : (
+            <>
+              <span className="inline-flex items-center gap-1 bg-amber-400 px-2 text-slate-950"><FilmIcon className="h-3.5 w-3.5" aria-hidden="true" /> Used {usage.total}×</span>
+              {usage.published > 0 && <span className="inline-flex items-center bg-emerald-500 px-2 text-white">{usage.published} published</span>}
+            </>
+          )}
+        </span>
+      )}
       {isSelectMode && (
         <>
           <button
@@ -576,16 +593,6 @@ export function IdeaItem({
           >
             <EyeIcon className="h-4 w-4" />
           </button>
-          {/* How often this idea is already used, so picks avoid repeats. */}
-          {usage && (
-            <span
-              className={`pointer-events-none absolute left-14 top-3.5 z-30 inline-flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-xs font-bold tabular-nums shadow-lg backdrop-blur-md ${usage.total === 0 ? "border-emerald-300/40 bg-emerald-500/30 text-emerald-50" : usage.published ? "border-amber-300/50 bg-amber-500/35 text-amber-50" : "border-white/25 bg-black/45 text-white"}`}
-              title={usage.total === 0 ? "Not used in any video yet" : `Used in ${usage.total} video${usage.total === 1 ? "" : "s"}${usage.published ? ` · ${usage.published} published` : ""}`}
-            >
-              <FilmIcon className="h-3.5 w-3.5" aria-hidden="true" />
-              {usage.total === 0 ? "Not used yet" : `Used ${usage.total}×${usage.published ? ` · ${usage.published} published` : ""}`}
-            </span>
-          )}
           <div className="absolute top-3 right-3 z-30">
             <div className={`flex h-7 w-7 items-center justify-center rounded-full border-2 transition-all ${isSelected ? "border-blue-500 bg-blue-500 text-white shadow-lg shadow-blue-500/30" : "border-white/60 bg-black/25 backdrop-blur-md"}`}>
               {isSelected && <CheckIcon className="h-4 w-4 stroke-[3]" />}
@@ -639,14 +646,6 @@ export function IdeaItem({
           <div className="flex flex-wrap items-center gap-1.5 [&>*]:shrink-0 [&>*]:whitespace-nowrap">
             <TypePill typeKey={r.detail_type} />
             {r.pinned && <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-300"><StarSolidIcon className="h-3 w-3" aria-hidden="true" /> Pinned</span>}
-            {!isSelectMode && usage && usage.total > 0 && (
-              <span
-                className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-semibold tabular-nums backdrop-blur-md ${usage.published ? "border-emerald-400/30 bg-emerald-500/20 text-emerald-100" : "border-white/15 bg-white/10 text-white/85"}`}
-                title={`Used in ${usage.total} video${usage.total === 1 ? "" : "s"}${usage.published ? ` · ${usage.published} published` : ""}`}
-              >
-                <FilmIcon className="h-3 w-3" aria-hidden="true" /> Used {usage.total}×
-              </span>
-            )}
             {r.capture_status && CAPTURE_META[r.capture_status] && (
               <span className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-semibold backdrop-blur-md ${CAPTURE_META[r.capture_status].onDark}`}>
                 <VideoCameraIcon className="h-3 w-3" aria-hidden="true" /> {CAPTURE_META[r.capture_status].short}
