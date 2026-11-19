@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { Bars3Icon, CheckIcon, FilmIcon, DocumentDuplicateIcon, ExclamationTriangleIcon, EyeIcon, FolderIcon, HashtagIcon, LinkIcon, PencilSquareIcon, SparklesIcon, StarIcon, TagIcon, TrashIcon, VideoCameraIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { Bars3Icon, CheckIcon, FilmIcon, DocumentDuplicateIcon, ExclamationTriangleIcon, EyeIcon, FolderIcon, FolderPlusIcon, HashtagIcon, LinkIcon, PencilSquareIcon, SparklesIcon, StarIcon, TagIcon, TrashIcon, VideoCameraIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import { supabase } from "@/lib/supabaseClient";
 import type { DetailRow, Game, ScriptProject } from "@/types/gamekb";
@@ -528,6 +528,7 @@ export function IdeaItem({
   onToggleSelect,
   onTogglePin,
   onToggleRecord,
+  onEditCollections,
   usage,
   onEditGame,
   onQuickView,
@@ -544,6 +545,8 @@ export function IdeaItem({
   onTogglePin: (id: number, current: boolean) => void;
   /** Add to / take off the Recording List. */
   onToggleRecord?: (idea: DetailRow) => void;
+  /** Opens the collection picker for this idea. */
+  onEditCollections?: (idea: DetailRow) => void;
   /** How many videos already use this idea. */
   usage?: { total: number; published: number } | null;
   onEditGame: (game: Game) => void;
@@ -626,13 +629,24 @@ export function IdeaItem({
           <h3 className="mb-2 line-clamp-2 text-base font-bold leading-snug text-white">{r.title}</h3>
           {(primaryGroup || primaryChannel) && (
             <div className="mb-2 flex min-w-0 items-center gap-1.5 overflow-hidden">
-              {primaryGroup && (
+              {primaryGroup && (onEditCollections && !isSelectMode ? (
+                <button
+                  type="button"
+                  onClick={(event) => { event.stopPropagation(); event.preventDefault(); onEditCollections(r); }}
+                  className="relative z-20 inline-flex min-w-0 max-w-[55%] cursor-pointer items-center gap-1 rounded-md border border-white/10 bg-white/10 px-1.5 py-1 text-[11px] font-medium text-white/85 backdrop-blur-sm transition hover:border-sky-300/60 hover:bg-sky-500/30"
+                  title={`${ideaGroups.map((group) => group.name).join(", ")} (click to change)`}
+                >
+                  <FolderIcon className="h-3 w-3 shrink-0 text-sky-300" />
+                  <span className="truncate">{primaryGroup.name}</span>
+                  {ideaGroups.length > 1 && <span className="shrink-0 text-white/55">+{ideaGroups.length - 1}</span>}
+                </button>
+              ) : (
                 <span className="inline-flex min-w-0 max-w-[55%] items-center gap-1 rounded-md border border-white/10 bg-white/10 px-1.5 py-1 text-[11px] font-medium text-white/85 backdrop-blur-sm" title={ideaGroups.map((group) => group.name).join(", ")}>
                   <FolderIcon className="h-3 w-3 shrink-0 text-sky-300" />
                   <span className="truncate">{primaryGroup.name}</span>
                   {ideaGroups.length > 1 && <span className="shrink-0 text-white/55">+{ideaGroups.length - 1}</span>}
                 </span>
-              )}
+              ))}
               {primaryChannel && (
                 <span className="inline-flex min-w-0 max-w-[55%] items-center gap-1 rounded-md border border-white/10 bg-black/20 px-1.5 py-1 text-[11px] font-medium text-white/75 backdrop-blur-sm" title={channelNames.join(", ")}>
                   <VideoCameraIcon className="h-3 w-3 shrink-0 text-rose-300" />
@@ -662,6 +676,11 @@ export function IdeaItem({
           {onToggleRecord && (
             <button onClick={(event) => { event.stopPropagation(); onToggleRecord(r); }} className={`touch-target flex h-8 w-8 cursor-pointer items-center justify-center rounded-full shadow-lg backdrop-blur-md transition-colors duration-150 ${r.capture_status ? "bg-rose-500 text-white" : "bg-white/10 text-white hover:bg-white/20"}`} type="button" aria-pressed={Boolean(r.capture_status)} aria-label={r.capture_status ? `Remove ${r.title} from the Recording List` : `Record ${r.title} myself`} title={r.capture_status ? "On your Recording List (click to remove)" : "Record myself"}>
               <VideoCameraIcon className="h-4 w-4" />
+            </button>
+          )}
+          {onEditCollections && (
+            <button onClick={(event) => { event.stopPropagation(); event.preventDefault(); onEditCollections(r); }} className={`touch-target flex h-8 w-8 cursor-pointer items-center justify-center rounded-full shadow-lg backdrop-blur-md transition-colors duration-150 ${ideaGroups.length ? "bg-sky-500 text-white" : "bg-white/10 text-white hover:bg-white/20"}`} type="button" aria-label={`Collections for ${r.title}`} title={ideaGroups.length ? `In ${ideaGroups.map((group) => group.name).join(", ")} (click to change)` : "Add to a collection"}>
+              <FolderPlusIcon className="h-4 w-4" />
             </button>
           )}
           <button onClick={(event) => { event.stopPropagation(); onQuickView(r); }} className="touch-target flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white shadow-lg backdrop-blur-md transition-colors duration-150 hover:bg-emerald-500" title="Quick preview" aria-label={`Quick preview: ${r.title}`} type="button">

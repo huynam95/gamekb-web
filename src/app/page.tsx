@@ -8,7 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { ACTIVE_VIDEO_THEME_STORAGE_KEY, DEFAULT_VIDEO_THEMES, VIDEO_THEMES_STORAGE_KEY, VIDEO_TOPICS_TABLE, getVideoThemeById, makeVideoThemeId, normalizeVideoTheme, parseVideoThemes, rowToVideoTheme, videoThemeToRow } from "@/lib/videoThemes";
 import type { VideoTheme } from "@/lib/videoThemes";
 import { PlayCircleIcon, StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
-import { AdjustmentsHorizontalIcon, ArrowDownIcon, BuildingOffice2Icon, ArrowPathIcon, ArrowUpIcon, CalendarDaysIcon, CheckCircleIcon, CheckIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, FilmIcon, FolderPlusIcon, MagnifyingGlassIcon, PencilSquareIcon, PlusIcon, PuzzlePieceIcon, Squares2X2Icon, TrashIcon, VideoCameraIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { AdjustmentsHorizontalIcon, ArrowDownIcon, BuildingOffice2Icon, ArrowPathIcon, ArrowUpIcon, CalendarDaysIcon, CheckCircleIcon, CheckIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, FilmIcon, FolderIcon, FolderPlusIcon, MagnifyingGlassIcon, PencilSquareIcon, PlusIcon, PuzzlePieceIcon, Squares2X2Icon, TrashIcon, VideoCameraIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { captureStatusPatch, isMissingRecordingColumns, RECORDING_SETUP_MESSAGE } from "@/lib/recording";
 import { buildUsageIndex, linkIdeasToScript, loadUsage, useIdeaUsage } from "@/lib/ideaUsage";
 import { getGameStudio } from "@/lib/studios";
@@ -16,6 +16,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { AppPageHeader, appPageMainClass, appPageRootClass } from "@/components/AppPage";
 import { GameEditorModal, IdeaItem, QuickViewModal, ScriptEditorModal } from "@/components/IdeaCards";
 import { AddIdeasToProjectModal } from "@/components/AddIdeasToProjectModal";
+import { CollectionPicker, type CollectionChange } from "@/components/CollectionPicker";
 import { useNotifications } from "@/components/NotificationCenter";
 import { Button } from "@/components/ui/Button";
 import { Dropdown, menuItemClass, menuPanelClass, pillTriggerClass, type DropdownOption } from "@/components/ui/Dropdown";
@@ -561,6 +562,8 @@ export default function Home() {
   const [selectedIdeas, setSelectedIdeas] = useState<DetailRow[]>([]);
   const [showSelectedReview, setShowSelectedReview] = useState(false);
   const [showAddToProject, setShowAddToProject] = useState(false);
+  /** Ideas whose collections are being changed from the library. */
+  const [collectionTarget, setCollectionTarget] = useState<{ ids: number[]; label: string } | null>(null);
   const addedToProjectRef = useRef(false);
   const [showEditor, setShowEditor] = useState(false);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
@@ -1133,6 +1136,27 @@ export default function Home() {
     success("Collection renamed.", "Saved");
   }
 
+  /** A tick in the collection picker: update cards, the tray and sidebar counts. */
+  function applyCollectionChange({ group, ideaIds, added }: CollectionChange) {
+    if (!ideaIds.length) return;
+    const ids = new Set(ideaIds);
+    const update = (row: DetailRow) => {
+      if (!ids.has(row.id)) return row;
+      const current = row.groups ?? [];
+      const next = added
+        ? current.some((g) => g.id === group.id) ? current : [...current, group].sort((a, b) => a.name.localeCompare(b.name))
+        : current.filter((g) => g.id !== group.id);
+      return { ...row, groups: next };
+    };
+    setIdeas((prev) => prev.map(update));
+    patchCachedRows(update);
+    setSelectedIdeas((prev) => prev.map(update));
+    setProjectIdeas((prev) => prev.map(update));
+    setGroupCounts((current) => new Map(current).set(group.id, Math.max(0, (current.get(group.id) ?? 0) + (added ? ideaIds.length : -ideaIds.length))));
+    // Viewing that collection: reload so cards join or leave it.
+    if (groupId === group.id) setIdeasRevision((current) => current + 1);
+  }
+
   async function removeIdeaFromGroup(idea: DetailRow) {
     if (!groupId || loadedGroupId !== groupId) return;
     const targetGroupId = groupId;
@@ -1297,6 +1321,19 @@ export default function Home() {
       <ScriptEditorModal isOpen={showEditor} onClose={() => { setShowEditor(false); setProjectIdeas([]); }} onSave={handleSaveScript} initialData={{ ids: projectIdeas.map((idea) => idea.id), ideas: projectIdeas, games: games, theme: selectedTheme }} />
       <GameEditorModal game={editingGame} isOpen={!!editingGame} onClose={() => setEditingGame(null)} onUpdate={(updatedGame) => { setGames(prev => prev.map(g => g.id === updatedGame.id ? updatedGame : g)); }} />
       <QuickViewModal idea={previewIdea} isOpen={!!previewIdea} onClose={() => setPreviewIdea(null)} />
+      {collectionTarget && (
+        <CollectionPicker
+          ideaIds={collectionTarget.ids}
+          label={collectionTarget.label}
+          groups={groups}
+          onChange={applyCollectionChange}
+          onCreateGroup={(group) => {
+            setGroups((current) => [...current, group].sort((a, b) => a.name.localeCompare(b.name)));
+            setGroupCounts((current) => new Map(current).set(group.id, 0));
+          }}
+          onClose={() => setCollectionTarget(null)}
+        />
+      )}
       {showAddToProject && (
         <AddIdeasToProjectModal
           isOpen
@@ -1463,6 +1500,7 @@ export default function Home() {
               </button>
                 <>
                 <button disabled={selectedIds.length === 0} onClick={() => void addSelectedToRecording()} className="flex h-11 cursor-pointer items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-bold text-rose-700 transition hover:bg-rose-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 max-sm:w-11 max-sm:justify-center max-sm:px-0 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-200 dark:hover:bg-rose-500/20" aria-label="Add selected ideas to the Recording List" title="Record these myself"><VideoCameraIcon className="h-5 w-5" /> <span className="max-sm:hidden">Record</span></button>
+                <button disabled={selectedIds.length === 0} onClick={() => { setShowSelectedReview(false); setCollectionTarget({ ids: [...selectedIds], label: selectedIds.map((id) => (selectedIdeas.find((idea) => idea.id === id) ?? ideas.find((idea) => idea.id === id))?.title ?? `Idea #${id}`).slice(0, 3).join(" · ") + (selectedIds.length > 3 ? ` · +${selectedIds.length - 3} more` : "") }); }} className="flex h-11 cursor-pointer items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 text-sm font-bold text-sky-700 transition hover:bg-sky-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 max-sm:w-11 max-sm:justify-center max-sm:px-0 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-200 dark:hover:bg-sky-500/20" aria-label="Put selected ideas in a collection" title="Put in a collection"><FolderIcon className="h-5 w-5" /> <span className="max-sm:hidden">Collection</span></button>
                 <button disabled={selectedIds.length === 0} onClick={() => { setShowSelectedReview(false); setShowAddToProject(true); }} className="flex h-11 cursor-pointer items-center gap-2 rounded-xl border border-blue-200 bg-accent-soft px-4 text-sm font-bold text-accent transition hover:bg-blue-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 max-sm:w-11 max-sm:justify-center max-sm:px-0 dark:border-blue-500/30 dark:hover:bg-blue-500/20" aria-label="Add selected ideas to an existing project" title="Add to an existing project"><FolderPlusIcon className="h-5 w-5" /> <span className="max-sm:hidden">Add to project</span></button>
                 <button disabled={selectedIds.length === 0} onClick={() => void openScriptEditor()} className="flex h-11 cursor-pointer items-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-bold text-white shadow-lg transition hover:bg-blue-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"><PlayCircleIcon className="h-5 w-5" /> <span className="max-sm:hidden">Create Script</span><span className="sm:hidden">Create</span></button>
                 </>
@@ -1708,7 +1746,7 @@ export default function Home() {
           ) : (
             <ul className={`idea-grid transition-opacity duration-150 ${loading ? "opacity-60" : ""}`} aria-busy={loading}>
               {currentIdeas.map((r, index) => (
-                 <IdeaItem key={r.id} priority={index < 6} r={r} game={games.find(g => g.id === r.game_id)} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={togglePin} usage={usageData ? usageOf(r.id) : null} onToggleRecord={(idea) => void toggleRecord(idea)} onEditGame={setEditingGame} onQuickView={setPreviewIdea} onRemoveFromGroup={groupId && loadedGroupId === groupId ? removeIdeaFromGroup : undefined} groupName={activeGroup?.name} removingFromGroup={removingGroupItems.has(`${groupId}:${r.id}`)} />
+                 <IdeaItem key={r.id} priority={index < 6} r={r} game={games.find(g => g.id === r.game_id)} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={togglePin} usage={usageData ? usageOf(r.id) : null} onToggleRecord={(idea) => void toggleRecord(idea)} onEditCollections={(idea) => setCollectionTarget({ ids: [idea.id], label: idea.title })} onEditGame={setEditingGame} onQuickView={setPreviewIdea} onRemoveFromGroup={groupId && loadedGroupId === groupId ? removeIdeaFromGroup : undefined} groupName={activeGroup?.name} removingFromGroup={removingGroupItems.has(`${groupId}:${r.id}`)} />
               ))}
             </ul>
           )}
