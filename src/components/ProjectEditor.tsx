@@ -79,13 +79,13 @@ const STATUS_DOT: Record<string, string> = { Draft: "bg-slate-400", Filming: "bg
  * One colour per idea number, shared by the Ideas list and the Clips tab so
  * "idea 2" reads the same everywhere.
  */
+/**
+ * Ideas share one calm brand colour. Each line sits beside its idea, so colour
+ * no longer has to pair them up; colour is kept for meaning (to record,
+ * recorded, missing clips, published) and the game art tells ideas apart.
+ */
 const IDEA_COLORS = [
-  { badge: "bg-blue-600 text-white", bar: "border-l-blue-500", soft: "bg-blue-50 dark:bg-blue-500/10", title: "text-blue-900 dark:text-blue-100", link: "text-blue-700 hover:bg-blue-100 dark:text-blue-300 dark:hover:bg-blue-500/15" },
-  { badge: "bg-orange-500 text-white", bar: "border-l-orange-500", soft: "bg-orange-50 dark:bg-orange-500/10", title: "text-orange-900 dark:text-orange-100", link: "text-orange-700 hover:bg-orange-100 dark:text-orange-300 dark:hover:bg-orange-500/15" },
-  { badge: "bg-emerald-600 text-white", bar: "border-l-emerald-500", soft: "bg-emerald-50 dark:bg-emerald-500/10", title: "text-emerald-900 dark:text-emerald-100", link: "text-emerald-700 hover:bg-emerald-100 dark:text-emerald-300 dark:hover:bg-emerald-500/15" },
-  { badge: "bg-pink-600 text-white", bar: "border-l-pink-500", soft: "bg-pink-50 dark:bg-pink-500/10", title: "text-pink-900 dark:text-pink-100", link: "text-pink-700 hover:bg-pink-100 dark:text-pink-300 dark:hover:bg-pink-500/15" },
-  { badge: "bg-sky-500 text-white", bar: "border-l-sky-500", soft: "bg-sky-50 dark:bg-sky-500/10", title: "text-sky-900 dark:text-sky-100", link: "text-sky-700 hover:bg-sky-100 dark:text-sky-300 dark:hover:bg-sky-500/15" },
-  { badge: "bg-lime-500 text-lime-950", bar: "border-l-lime-500", soft: "bg-lime-50 dark:bg-lime-500/10", title: "text-lime-900 dark:text-lime-100", link: "text-lime-800 hover:bg-lime-100 dark:text-lime-300 dark:hover:bg-lime-500/15" },
+  { badge: "bg-blue-600 text-white", bar: "border-l-blue-500/45", soft: "bg-surface-muted", title: "text-fg", link: "text-accent hover:bg-accent-soft" },
 ] as const;
 const NEUTRAL_COLOR = { badge: "bg-surface-sunken text-fg-2", bar: "border-l-line-strong", soft: "bg-surface-sunken", title: "text-fg", link: "text-fg-3 hover:bg-surface-sunken" };
 const ideaColor = (number: number | null | undefined) => (number != null && number > 0 && number < Number.MAX_SAFE_INTEGER ? IDEA_COLORS[(number - 1) % IDEA_COLORS.length] : NEUTRAL_COLOR);
@@ -893,11 +893,11 @@ export function ProjectEditor({
   const iconButton = "flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-fg-4 transition hover:bg-surface/80 hover:text-fg";
 
   const renderHookCard = (section: ScriptGuideSection, onJump: () => void, active = false) => (
-    <button type="button" onClick={onJump} className={`flex h-full w-full cursor-pointer items-start gap-2.5 rounded-2xl border border-violet-200 bg-violet-50 p-3 text-left transition hover:bg-violet-100 dark:border-violet-500/25 dark:bg-violet-500/10 ${active ? "ring-2 ring-violet-500" : ""}`}>
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-violet-600 text-xs font-bold text-white">H</span>
+    <button type="button" onClick={onJump} className={`flex h-full w-full cursor-pointer items-start gap-2.5 rounded-2xl border border-cyan-200 bg-cyan-50/70 p-3 text-left transition hover:bg-cyan-50 dark:border-cyan-400/25 dark:bg-cyan-400/10 ${active ? "ring-2 ring-cyan-500" : ""}`}>
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-brand-cyan text-xs font-black text-slate-950">H</span>
       <span className="min-w-0">
-        <span className="block text-sm font-semibold text-violet-800 dark:text-violet-200">Opening hook</span>
-        <span className="line-clamp-2 text-xs text-violet-700/80 dark:text-violet-200/70">{section.preview}</span>
+        <span className="block text-sm font-semibold text-cyan-900 dark:text-cyan-100">Opening hook</span>
+        <span className="line-clamp-2 text-xs text-cyan-800/75 dark:text-cyan-100/70">{section.preview}</span>
       </span>
     </button>
   );
@@ -1145,9 +1145,9 @@ export function ProjectEditor({
           <div key={row.key} className={`grid items-stretch gap-2 ${columns} lg:gap-4`}>
             <div
               onClick={() => rowRefs.current.get(row.index)?.focus()}
-              className={`flex h-full cursor-text gap-3 rounded-2xl border border-l-4 bg-surface p-3 transition sm:p-4 ${section?.isHook ? "border-l-violet-500" : color.bar} ${active ? "border-y-blue-500 border-r-blue-500 ring-4 ring-blue-500/10" : "border-y-line border-r-line hover:border-y-line-strong hover:border-r-line-strong"}`}
+              className={`flex h-full cursor-text gap-3 rounded-2xl border border-l-4 bg-surface p-3 transition sm:p-4 ${section?.isHook ? "border-l-cyan-400" : color.bar} ${active ? "border-y-blue-500 border-r-blue-500 ring-4 ring-blue-500/10" : "border-y-line border-r-line hover:border-y-line-strong hover:border-r-line-strong"}`}
             >
-              <span className={`mt-1 flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md px-1 text-xs font-bold tabular-nums ${section?.isHook ? "bg-violet-600 text-white" : section ? color.badge : NEUTRAL_COLOR.badge}`}>{section?.isHook ? "H" : section?.number ?? "·"}</span>
+              <span className={`mt-1 flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md px-1 text-xs font-bold tabular-nums ${section?.isHook ? "bg-brand-cyan text-slate-950" : section ? color.badge : NEUTRAL_COLOR.badge}`}>{section?.isHook ? "H" : section?.number ?? "·"}</span>
               <AutoTextarea
                 value={row.text}
                 inputRef={(el) => { if (el) rowRefs.current.set(row.index, el); else rowRefs.current.delete(row.index); }}
