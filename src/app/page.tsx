@@ -32,6 +32,7 @@ import { fetchYoutubeMetadata, isYoutubeUrl } from "@/lib/youtube";
 
 /* ================= CONFIG ================= */
 
+const GTA6_TITLE = /^(gta|grand theft auto)\s*(vi|6)\b/i;
 const ITEMS_PER_PAGE = 24;
 /** How long a loaded page may be reused before it is fetched again. */
 const PAGE_CACHE_TTL_MS = 2 * 60 * 1000;
@@ -582,6 +583,8 @@ export default function Home() {
   const [type, setType] = useState<string | "">("");
   const [usageFilter, setUsageFilter] = useState<UsageFilter>("");
   const [studioFilter, setStudioFilter] = useState("");
+  /** Quick access: only GTA VI ideas (every GTA VI entry in the games list). */
+  const [gta6Only, setGta6Only] = useState(false);
   const { usageOf, data: usageData } = useIdeaUsage();
   const [releaseYear, setReleaseYear] = useState<number | "" | "unknown">("");
   const [selectedThemeId, setSelectedThemeId] = useState<string | "">("");
@@ -772,7 +775,7 @@ export default function Home() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedQ, gameId, groupId, type, releaseYear, sortOrder, pinnedOnly, usageFilter, studioFilter]);
+  }, [debouncedQ, gameId, groupId, type, releaseYear, sortOrder, pinnedOnly, usageFilter, studioFilter, gta6Only]);
 
   /*
    * Page loading. Every loaded page is kept for a short while and the next page
@@ -780,10 +783,23 @@ export default function Home() {
    * usually instant. The shuffled id list for Random is kept too instead of
    * being re-downloaded on every page change.
    */
+  // "Grand Theft Auto VI", "GTA 6", "Grand Theft Auto VI: An Extended Look"… but never GTA V or Vice City.
+  const gta6Games = games.filter((game) => GTA6_TITLE.test(game.title.trim()));
+  const gta6GameIds = gta6Games.map((game) => game.id);
+  const gta6Cover = gta6Games.find((game) => game.cover_url)?.cover_url ?? null;
+  const toggleGta6 = () => {
+    if (gta6Only) { setGta6Only(false); return; }
+    if (!gta6GameIds.length) { notifyError("There is no GTA VI game in the library yet.", "GTA VI not found"); return; }
+    // Start from a clean view of GTA VI: other game, studio and year filters would hide it.
+    setGameId(""); setStudioFilter(""); setReleaseYear(""); setQ("");
+    setGta6Only(true);
+  };
+  const selectGame = (id: number | "") => { setGameId(id); if (id) setGta6Only(false); };
+
   const pageCacheRef = useRef(new Map<string, { result: IdeasPageResult; at: number }>());
   const idListCacheRef = useRef(new Map<string, { ids: number[]; total: number; at: number }>());
   const filterKey = JSON.stringify({
-    q: debouncedQ, gameId, groupId, type, releaseYear, sortOrder, pinnedOnly, usageFilter, studioFilter,
+    q: debouncedQ, gameId, groupId, type, releaseYear, sortOrder, pinnedOnly, usageFilter, studioFilter, gta6Only,
     usage: usageFilter && usageData ? usageData.links.length : 0,
     seed: sortOrder === "random" ? randomSeed : 0,
     rev: ideasRevision,
@@ -831,6 +847,7 @@ export default function Home() {
       else if (usageIds) nextQuery = nextQuery.in("id", usageIds);
       if (groupDetailIds) nextQuery = nextQuery.in("id", groupDetailIds);
       if (gameId) nextQuery = nextQuery.eq("game_id", gameId);
+      if (gta6Only) nextQuery = nextQuery.in("game_id", gta6GameIds.length > 0 ? gta6GameIds : [-1]);
       if (releaseYear !== "") {
         const yearGameIds = games
           .filter((game) => releaseYear === "unknown" ? game.release_year == null : game.release_year === releaseYear)
@@ -1318,7 +1335,7 @@ export default function Home() {
   };
 
   const activeGroup = groups.find((group) => group.id === groupId);
-  const phoneFilterCount = [Boolean(gameId), Boolean(studioFilter), releaseYear !== "", Boolean(type), Boolean(usageFilter), Boolean(groupId) || pinnedOnly, sortOrder !== "newest"].filter(Boolean).length;
+  const phoneFilterCount = [Boolean(gameId) || gta6Only, Boolean(studioFilter), releaseYear !== "", Boolean(type), Boolean(usageFilter), Boolean(groupId) || pinnedOnly, sortOrder !== "newest"].filter(Boolean).length;
 
   const goToPage = (p: number) => {
     setCurrentPage(p);
@@ -1552,12 +1569,29 @@ export default function Home() {
       <main className={`${appPageMainClass} pb-32`}>
         <div className="app-container library-container">
           <AppPageHeader
-            title={pinnedOnly ? "Pinned" : activeGroup?.name || "All Ideas"}
+            title={pinnedOnly ? "Pinned" : activeGroup?.name || (gta6Only ? "GTA VI Ideas" : "All Ideas")}
             description={pinnedOnly ? (isSelectMode ? "Pick from your pinned ideas. Ideas you already selected stay selected." : "Every idea you starred. Unpin a card to take it out of this list.") : activeGroup ? "Remove ideas that don't fit this collection. They stay in All Ideas." : "Choose a topic, search your library, and build the next video from the ideas you already have."}
             icon={pinnedOnly ? <StarSolidIcon className="h-5 w-5 text-amber-500" /> : <Squares2X2Icon className="h-5 w-5" />}
             className="mb-4"
             action={
-              <span className="flex items-center gap-2">
+              <span className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={toggleGta6}
+                  aria-pressed={gta6Only}
+                  title={gta6Only ? "Show all games again" : `Only GTA VI ideas${gta6Games.length > 1 ? ` (${gta6Games.map((game) => game.title).join(", ")})` : ""}`}
+                  className={`inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full pl-1 pr-3 text-sm font-black tracking-tight transition active:scale-[0.98] ${
+                    gta6Only
+                      ? "bg-gradient-to-r from-pink-500 via-fuchsia-500 to-orange-400 text-white shadow-md shadow-pink-500/30 ring-2 ring-pink-300/60"
+                      : "border border-pink-300 bg-pink-50 text-pink-700 hover:bg-pink-100 dark:border-pink-500/40 dark:bg-pink-500/10 dark:text-pink-200 dark:hover:bg-pink-500/20"
+                  }`}
+                >
+                  <span className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-pink-500 to-orange-400 text-[10px] font-black text-white">
+                    {gta6Cover ? <CoverImage src={gta6Cover} sizes="28px" /> : "VI"}
+                  </span>
+                  GTA VI
+                  {gta6Only && <XMarkIcon className="h-4 w-4" aria-hidden="true" />}
+                </button>
                 <span className="inline-flex h-9 items-center rounded-full bg-surface-sunken px-3.5 text-sm font-semibold tabular-nums text-fg-2" aria-live="polite">
                   {loading && ideas.length === 0 ? "Loading…" : `${totalCount.toLocaleString()} ${totalCount === 1 ? "idea" : "ideas"}`}
                 </span>
@@ -1617,7 +1651,7 @@ export default function Home() {
                 </button>
               </div>
               <div className="library-game max-sm:hidden">
-                <ComboBox placeholder="All games" items={games.map(g=>({id:g.id, name:g.title, coverUrl:g.cover_url}))} selectedId={gameId} onChange={setGameId} />
+                <ComboBox placeholder="All games" items={games.map(g=>({id:g.id, name:g.title, coverUrl:g.cover_url}))} selectedId={gameId} onChange={selectGame} />
               </div>
               <div className="library-studio max-sm:hidden">
                 <StudioFilterDropdown value={studioFilter} games={games} onChange={setStudioFilter} />
@@ -1637,10 +1671,10 @@ export default function Home() {
               </div>
               <div className="library-sort flex min-w-0 items-center justify-between gap-2 max-sm:hidden">
                 <SortToggle value={sortOrder} onChange={handleSortChange} />
-                {(q||gameId||groupId||type||releaseYear!==""||pinnedOnly||usageFilter||studioFilter) && (
+                {(q||gameId||groupId||type||releaseYear!==""||pinnedOnly||usageFilter||studioFilter||gta6Only) && (
                   <button
                     type="button"
-                    onClick={()=>{setQ("");setGameId("");setGroupId("");setType("");setReleaseYear("");setPinnedOnly(false);setUsageFilter("");setStudioFilter("")}}
+                    onClick={()=>{setQ("");setGameId("");setGroupId("");setType("");setReleaseYear("");setPinnedOnly(false);setUsageFilter("");setStudioFilter("");setGta6Only(false)}}
                     className="h-10 shrink-0 cursor-pointer rounded-full px-3 text-sm font-semibold text-rose-500 transition hover:bg-danger-soft hover:text-rose-600 dark:hover:text-rose-300"
                   >
                     Clear filters
@@ -1683,7 +1717,7 @@ export default function Home() {
                 </div>
               <div>
                 <FieldLabel>Game</FieldLabel>
-                <ComboBox placeholder="All games" items={games.map(g=>({id:g.id, name:g.title, coverUrl:g.cover_url}))} selectedId={gameId} onChange={setGameId} />
+                <ComboBox placeholder="All games" items={games.map(g=>({id:g.id, name:g.title, coverUrl:g.cover_url}))} selectedId={gameId} onChange={selectGame} />
               </div>
               <div>
                 <FieldLabel>Studio</FieldLabel>
@@ -1750,7 +1784,7 @@ export default function Home() {
               <Button
                 variant="ghost"
                 disabled={phoneFilterCount === 0}
-                onClick={() => { setGameId(""); setGroupId(""); setType(""); setReleaseYear(""); setPinnedOnly(false); handleSortChange("newest"); }}
+                onClick={() => { setGameId(""); setGta6Only(false); setGroupId(""); setType(""); setReleaseYear(""); setPinnedOnly(false); handleSortChange("newest"); }}
               >
                 Reset
               </Button>
