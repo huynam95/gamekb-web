@@ -619,7 +619,8 @@ export function IdeaItem({
           <XMarkIcon className="h-4 w-4 shrink-0" />
         </button>
       )}
-      <div className="absolute inset-0 flex flex-col justify-end p-5">
+      {/* The right padding keeps the game name, title and chips clear of the action column. */}
+      <div className={`absolute inset-0 flex flex-col justify-end p-5 ${isSelectMode ? "" : "pr-[3.25rem] pointer-coarse:pr-[3.75rem]"}`}>
         <div className="z-10">
           <div className="relative z-20 mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-white/65">
             <span className="truncate max-w-[80%]">{game?.title}</span>
@@ -671,27 +672,28 @@ export function IdeaItem({
           </div>
         </div>
       </div>
+      {/* Five actions fit inside the card on phones too: 38px buttons with tighter gaps on touch screens. */}
       {!isSelectMode && (
-        <div className="touch-reveal absolute top-3 right-3 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity z-20 flex flex-col gap-2">
-          <button onClick={(event) => { event.stopPropagation(); onTogglePin(r.id, !!r.pinned); }} className={`touch-target flex h-8 w-8 cursor-pointer items-center justify-center rounded-full shadow-lg backdrop-blur-md transition-colors duration-150 ${r.pinned ? "bg-amber-400 text-white" : "bg-white/10 text-white hover:bg-white/20"}`} type="button" aria-pressed={!!r.pinned} aria-label={r.pinned ? `Unpin ${r.title}` : `Pin ${r.title}`} title={r.pinned ? "Unpin" : "Pin"}>
+        <div className="touch-reveal absolute top-3 right-3 z-20 flex flex-col gap-2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:top-2 pointer-coarse:gap-1">
+          <button onClick={(event) => { event.stopPropagation(); onTogglePin(r.id, !!r.pinned); }} className={`flex h-8 w-8 pointer-coarse:h-[38px] pointer-coarse:w-[38px] cursor-pointer items-center justify-center rounded-full shadow-lg backdrop-blur-md transition-colors duration-150 ${r.pinned ? "bg-amber-400 text-white" : "bg-white/10 text-white hover:bg-white/20"}`} type="button" aria-pressed={!!r.pinned} aria-label={r.pinned ? `Unpin ${r.title}` : `Pin ${r.title}`} title={r.pinned ? "Unpin" : "Pin"}>
             {r.pinned ? <StarSolidIcon className="h-4 w-4" /> : <StarIcon className="h-4 w-4" />}
           </button>
           {onToggleRecord && (
-            <button onClick={(event) => { event.stopPropagation(); onToggleRecord(r); }} className={`touch-target flex h-8 w-8 cursor-pointer items-center justify-center rounded-full shadow-lg backdrop-blur-md transition-colors duration-150 ${r.capture_status ? "bg-rose-500 text-white" : "bg-white/10 text-white hover:bg-white/20"}`} type="button" aria-pressed={Boolean(r.capture_status)} aria-label={r.capture_status ? `Remove ${r.title} from the Recording List` : `Record ${r.title} myself`} title={r.capture_status ? "On your Recording List (click to remove)" : "Record myself"}>
+            <button onClick={(event) => { event.stopPropagation(); onToggleRecord(r); }} className={`flex h-8 w-8 pointer-coarse:h-[38px] pointer-coarse:w-[38px] cursor-pointer items-center justify-center rounded-full shadow-lg backdrop-blur-md transition-colors duration-150 ${r.capture_status ? "bg-rose-500 text-white" : "bg-white/10 text-white hover:bg-white/20"}`} type="button" aria-pressed={Boolean(r.capture_status)} aria-label={r.capture_status ? `Remove ${r.title} from the Recording List` : `Record ${r.title} myself`} title={r.capture_status ? "On your Recording List (click to remove)" : "Record myself"}>
               <VideoCameraIcon className="h-4 w-4" />
             </button>
           )}
           {onAddToProject && (
-            <button onClick={(event) => { event.stopPropagation(); event.preventDefault(); onAddToProject(r); }} className="touch-target flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white shadow-lg backdrop-blur-md transition-colors duration-150 hover:bg-blue-600" type="button" aria-label={`Add ${r.title} to a Short Project`} title="Add to a Short Project">
+            <button onClick={(event) => { event.stopPropagation(); event.preventDefault(); onAddToProject(r); }} className="flex h-8 w-8 pointer-coarse:h-[38px] pointer-coarse:w-[38px] cursor-pointer items-center justify-center rounded-full bg-white/10 text-white shadow-lg backdrop-blur-md transition-colors duration-150 hover:bg-blue-600" type="button" aria-label={`Add ${r.title} to a Short Project`} title="Add to a Short Project">
               <DocumentPlusIcon className="h-4 w-4" />
             </button>
           )}
           {onEditCollections && (
-            <button onClick={(event) => { event.stopPropagation(); event.preventDefault(); onEditCollections(r); }} className={`touch-target flex h-8 w-8 cursor-pointer items-center justify-center rounded-full shadow-lg backdrop-blur-md transition-colors duration-150 ${ideaGroups.length ? "bg-sky-500 text-white" : "bg-white/10 text-white hover:bg-white/20"}`} type="button" aria-label={`Collections for ${r.title}`} title={ideaGroups.length ? `In ${ideaGroups.map((group) => group.name).join(", ")} (click to change)` : "Add to a collection"}>
+            <button onClick={(event) => { event.stopPropagation(); event.preventDefault(); onEditCollections(r); }} className={`flex h-8 w-8 pointer-coarse:h-[38px] pointer-coarse:w-[38px] cursor-pointer items-center justify-center rounded-full shadow-lg backdrop-blur-md transition-colors duration-150 ${ideaGroups.length ? "bg-sky-500 text-white" : "bg-white/10 text-white hover:bg-white/20"}`} type="button" aria-label={`Collections for ${r.title}`} title={ideaGroups.length ? `In ${ideaGroups.map((group) => group.name).join(", ")} (click to change)` : "Add to a collection"}>
               <FolderPlusIcon className="h-4 w-4" />
             </button>
           )}
-          <button onClick={(event) => { event.stopPropagation(); onQuickView(r); }} className="touch-target flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white shadow-lg backdrop-blur-md transition-colors duration-150 hover:bg-emerald-500" title="Quick preview" aria-label={`Quick preview: ${r.title}`} type="button">
+          <button onClick={(event) => { event.stopPropagation(); onQuickView(r); }} className="flex h-8 w-8 pointer-coarse:h-[38px] pointer-coarse:w-[38px] cursor-pointer items-center justify-center rounded-full bg-white/10 text-white shadow-lg backdrop-blur-md transition-colors duration-150 hover:bg-emerald-500" title="Quick preview" aria-label={`Quick preview: ${r.title}`} type="button">
             <EyeIcon className="h-4 w-4" />
           </button>
         </div>
