@@ -212,7 +212,7 @@ function ReorderPanel({ items, onSave, onClose }: { items: ReorderItem[]; onSave
   const [drag, setDrag] = useState<{ id: string; from: number; to: number; offset: number; step: number } | null>(null);
   const listRef = useRef<HTMLOListElement | null>(null);
   const rowRefs = useRef(new Map<string, HTMLLIElement>());
-  const dragStart = useRef({ pointerY: 0, scrollTop: 0, centers: [] as number[] });
+  const dragStart = useRef({ pointerY: 0, scrollTop: 0, maxScroll: 0, centers: [] as number[] });
   const pointerY = useRef(0);
   const scrollTimer = useRef<number | null>(null);
   // Where each row was drawn last time, for sliding rows into their new place (FLIP).
@@ -255,11 +255,16 @@ function ReorderPanel({ items, onSave, onClose }: { items: ReorderItem[]; onSave
     setDrag((current) => {
       if (!current) return current;
       const list = listRef.current;
-      const offset = pointerY.current - dragStart.current.pointerY + ((list?.scrollTop ?? 0) - dragStart.current.scrollTop);
       const centers = dragStart.current.centers;
+      // Keep the row between the first and last slot, so it can't push the list into empty space.
+      const raw = pointerY.current - dragStart.current.pointerY + ((list?.scrollTop ?? 0) - dragStart.current.scrollTop);
+      const offset = Math.max(centers[0] - centers[current.from], Math.min(centers[centers.length - 1] - centers[current.from], raw));
       const myCenter = centers[current.from] + offset;
       let to = 0;
-      centers.forEach((center, i) => { if (i !== current.from && myCenter > center) to += 1; });
+      // Rows above stay above until passed; rows below are passed once reached, so the ends are reachable.
+      centers.forEach((center, i) => {
+        if (i < current.from ? myCenter > center : i > current.from && myCenter >= center) to += 1;
+      });
       return { ...current, offset, to };
     });
   };
@@ -278,8 +283,10 @@ function ReorderPanel({ items, onSave, onClose }: { items: ReorderItem[]; onSave
         const edge = 56;
         const y = pointerY.current;
         const speed = y < rect.top + edge ? -Math.ceil((rect.top + edge - y) / 5) : y > rect.bottom - edge ? Math.ceil((y - (rect.bottom - edge)) / 5) : 0;
-        if (speed) {
-          list.scrollTop += speed;
+        // Scroll only as far as the list really goes (the lifted row must not stretch it).
+        const next = Math.max(0, Math.min(dragStart.current.maxScroll, list.scrollTop + speed));
+        if (speed && next !== list.scrollTop) {
+          list.scrollTop = next;
           track();
         }
       }
@@ -299,6 +306,7 @@ function ReorderPanel({ items, onSave, onClose }: { items: ReorderItem[]; onSave
     dragStart.current = {
       pointerY: clientY,
       scrollTop: list?.scrollTop ?? 0,
+      maxScroll: list ? list.scrollHeight - list.clientHeight : 0,
       centers: rects.map((r) => (r ? r.top + r.height / 2 : 0)),
     };
     pointerY.current = clientY;
