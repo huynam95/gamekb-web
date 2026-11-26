@@ -208,12 +208,35 @@ type ReorderItem = { id: string; title: string; game: string; linked: boolean };
  */
 function ReorderPanel({ items, onSave, onClose }: { items: ReorderItem[]; onSave: (ids: string[]) => void; onClose: () => void }) {
   const [order, setOrder] = useState(items);
-  const [dragId, setDragId] = useState<string | null>(null);
+  // While dragging: which row, how far it has moved, and the slot it would drop into.
+  const [drag, setDrag] = useState<{ id: string; from: number; to: number; offset: number; step: number } | null>(null);
   const listRef = useRef<HTMLOListElement | null>(null);
   const rowRefs = useRef(new Map<string, HTMLLIElement>());
+  const dragStart = useRef({ pointerY: 0, scrollTop: 0, centers: [] as number[] });
   const pointerY = useRef(0);
   const scrollTimer = useRef<number | null>(null);
+  // Where each row was drawn last time, for sliding rows into their new place (FLIP).
+  const lastTops = useRef(new Map<string, number>());
   const changed = order.some((item, i) => item.id !== items[i]?.id);
+
+  const rowTop = (el: HTMLElement) => el.getBoundingClientRect().top + (listRef.current?.scrollTop ?? 0);
+
+  // After any reorder, slide each row from where it was to where it is now.
+  useLayoutEffect(() => {
+    const next = new Map<string, number>();
+    rowRefs.current.forEach((el, id) => {
+      const top = rowTop(el);
+      next.set(id, top);
+      const before = lastTops.current.get(id);
+      if (before == null || Math.abs(before - top) < 1) return;
+      el.style.transition = "none";
+      el.style.transform = `translateY(${before - top}px)`;
+      void el.offsetHeight; // apply the start position before animating
+      el.style.transition = "transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1)";
+      el.style.transform = "";
+    });
+    lastTops.current = next;
+  }, [order]);
 
   const move = (id: string, to: number) => {
     setOrder((current) => {
@@ -227,16 +250,18 @@ function ReorderPanel({ items, onSave, onClose }: { items: ReorderItem[]; onSave
     });
   };
 
-  // While dragging, the row follows the pointer: it takes the slot whose middle the pointer has passed.
-  const placeAtPointer = (id: string) => {
-    const y = pointerY.current;
-    let target = 0;
-    for (const item of order) {
-      if (item.id === id) continue;
-      const rect = rowRefs.current.get(item.id)?.getBoundingClientRect();
-      if (rect && y > rect.top + rect.height / 2) target += 1;
-    }
-    move(id, target);
+  // The dragged row follows the pointer; the slot is the one whose middle its middle has passed.
+  const track = () => {
+    setDrag((current) => {
+      if (!current) return current;
+      const list = listRef.current;
+      const offset = pointerY.current - dragStart.current.pointerY + ((list?.scrollTop ?? 0) - dragStart.current.scrollTop);
+      const centers = dragStart.current.centers;
+      const myCenter = centers[current.from] + offset;
+      let to = 0;
+      centers.forEach((center, i) => { if (i !== current.from && myCenter > center) to += 1; });
+      return { ...current, offset, to };
+    });
   };
 
   const stopAutoScroll = () => {
@@ -244,18 +269,19 @@ function ReorderPanel({ items, onSave, onClose }: { items: ReorderItem[]; onSave
     scrollTimer.current = null;
   };
 
-  const autoScroll = (id: string) => {
+  const startAutoScroll = () => {
     stopAutoScroll();
     const tick = () => {
       const list = listRef.current;
-      if (!list) return;
-      const rect = list.getBoundingClientRect();
-      const edge = 48;
-      const y = pointerY.current;
-      const speed = y < rect.top + edge ? -Math.ceil((rect.top + edge - y) / 4) : y > rect.bottom - edge ? Math.ceil((y - (rect.bottom - edge)) / 4) : 0;
-      if (speed) {
-        list.scrollTop += speed;
-        placeAtPointer(id);
+      if (list) {
+        const rect = list.getBoundingClientRect();
+        const edge = 56;
+        const y = pointerY.current;
+        const speed = y < rect.top + edge ? -Math.ceil((rect.top + edge - y) / 5) : y > rect.bottom - edge ? Math.ceil((y - (rect.bottom - edge)) / 5) : 0;
+        if (speed) {
+          list.scrollTop += speed;
+          track();
+        }
       }
       scrollTimer.current = requestAnimationFrame(tick);
     };
@@ -264,40 +290,80 @@ function ReorderPanel({ items, onSave, onClose }: { items: ReorderItem[]; onSave
 
   useEffect(() => stopAutoScroll, []);
 
+  const beginDrag = (id: string, from: number, clientY: number) => {
+    const list = listRef.current;
+    const rows = order.map((item) => rowRefs.current.get(item.id));
+    const rects = rows.map((el) => el?.getBoundingClientRect());
+    const self = rects[from];
+    const gap = rects.length > 1 && rects[0] && rects[1] ? rects[1].top - rects[0].bottom : 6;
+    dragStart.current = {
+      pointerY: clientY,
+      scrollTop: list?.scrollTop ?? 0,
+      centers: rects.map((r) => (r ? r.top + r.height / 2 : 0)),
+    };
+    pointerY.current = clientY;
+    setDrag({ id, from, to: from, offset: 0, step: (self?.height ?? 52) + gap });
+    startAutoScroll();
+  };
+
+  const endDrag = () => {
+    stopAutoScroll();
+    if (!drag) return;
+    // Remember where every row is drawn right now, so the drop slides from there.
+    const tops = new Map<string, number>();
+    rowRefs.current.forEach((el, id) => tops.set(id, rowTop(el)));
+    lastTops.current = tops;
+    const { id, to } = drag;
+    setDrag(null);
+    move(id, to);
+  };
+
+  // How far a row is pushed aside to make room for the dragged one.
+  const shiftFor = (index: number) => {
+    if (!drag || index === drag.from) return 0;
+    if (drag.from < drag.to && index > drag.from && index <= drag.to) return -drag.step;
+    if (drag.from > drag.to && index >= drag.to && index < drag.from) return drag.step;
+    return 0;
+  };
+
   return (
     <Modal open onClose={onClose} size="lg" zClass="z-[99990]" labelledBy="reorder-title">
       <ModalHeader id="reorder-title" eyebrow="Short project" title="Reorder ideas" onClose={onClose}>
         <p className="mt-1 text-sm text-fg-3">Drag the handle, or use the arrows. The hook stays first.</p>
       </ModalHeader>
       <ModalBody className="p-0 sm:p-0">
-        <ol ref={listRef} className="max-h-[60dvh] space-y-1.5 overflow-y-auto overscroll-contain p-3 sm:p-4" aria-label="Ideas in order">
+        <ol ref={listRef} className={`max-h-[60dvh] space-y-1.5 overflow-y-auto overscroll-contain p-3 sm:p-4 ${drag ? "select-none" : ""}`} aria-label="Ideas in order">
           {order.map((item, index) => {
-            const dragging = dragId === item.id;
-            const color = item.linked ? ideaColor(index + 1) : NEUTRAL_COLOR;
+            const dragging = drag?.id === item.id;
+            const position = drag ? (dragging ? drag.to : index - (shiftFor(index) < 0 ? 1 : shiftFor(index) > 0 ? -1 : 0)) : index;
+            const style: React.CSSProperties = dragging
+              ? { transform: `translateY(${drag.offset}px) scale(1.03)`, transition: "box-shadow 150ms, scale 150ms", zIndex: 20 }
+              : drag
+                ? { transform: `translateY(${shiftFor(index)}px)`, transition: "transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1)" }
+                : {};
             return (
               <li
                 key={item.id}
                 ref={(el) => { if (el) rowRefs.current.set(item.id, el); else rowRefs.current.delete(item.id); }}
-                className={`flex items-center gap-2 rounded-xl border border-l-4 bg-surface py-1.5 pl-1.5 pr-1.5 transition-shadow ${color.bar} ${dragging ? "relative z-10 border-y-blue-500 border-r-blue-500 shadow-xl ring-2 ring-blue-500/40" : "border-y-line border-r-line"}`}
+                style={style}
+                className={`relative flex items-center gap-2 rounded-xl border border-l-4 border-l-blue-500/45 bg-surface py-1.5 pl-1.5 pr-1.5 ${dragging ? "cursor-grabbing border-y-blue-500 border-r-blue-500 shadow-2xl shadow-blue-900/25 ring-2 ring-blue-500/40" : "border-y-line border-r-line"}`}
               >
                 <button
                   type="button"
                   aria-label={`Drag ${item.title}. Arrow keys move it.`}
-                  className="flex h-10 w-9 shrink-0 cursor-grab touch-none items-center justify-center rounded-lg text-fg-4 hover:bg-surface-sunken hover:text-fg active:cursor-grabbing"
+                  className={`flex h-10 w-9 shrink-0 touch-none items-center justify-center rounded-lg transition ${dragging ? "cursor-grabbing bg-accent-soft text-accent" : "cursor-grab text-fg-4 hover:bg-surface-sunken hover:text-fg"}`}
                   onPointerDown={(e) => {
                     e.preventDefault();
                     e.currentTarget.setPointerCapture(e.pointerId);
-                    pointerY.current = e.clientY;
-                    setDragId(item.id);
-                    autoScroll(item.id);
+                    beginDrag(item.id, index, e.clientY);
                   }}
                   onPointerMove={(e) => {
-                    if (dragId !== item.id) return;
+                    if (!dragging) return;
                     pointerY.current = e.clientY;
-                    placeAtPointer(item.id);
+                    track();
                   }}
-                  onPointerUp={() => { setDragId(null); stopAutoScroll(); }}
-                  onPointerCancel={() => { setDragId(null); stopAutoScroll(); }}
+                  onPointerUp={endDrag}
+                  onPointerCancel={endDrag}
                   onKeyDown={(e) => {
                     if (e.key === "ArrowUp") { e.preventDefault(); move(item.id, index - 1); }
                     if (e.key === "ArrowDown") { e.preventDefault(); move(item.id, index + 1); }
@@ -305,12 +371,12 @@ function ReorderPanel({ items, onSave, onClose }: { items: ReorderItem[]; onSave
                 >
                   <Bars3Icon className="h-5 w-5" />
                 </button>
-                <span className={`flex h-7 min-w-7 shrink-0 items-center justify-center rounded-md px-1 text-xs font-bold tabular-nums ${color.badge}`}>{index + 1}</span>
+                <span className="flex h-7 min-w-7 shrink-0 items-center justify-center rounded-md bg-blue-600 px-1 text-xs font-bold tabular-nums text-white">{position + 1}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold text-fg">{item.title}</span>
                   {item.game && <span className="block truncate text-[11px] font-medium uppercase tracking-wide text-fg-4">{item.game}</span>}
                 </span>
-                <span className="flex shrink-0 items-center">
+                <span className={`flex shrink-0 items-center transition-opacity ${drag ? "opacity-0" : ""}`}>
                   <button type="button" onClick={() => move(item.id, 0)} disabled={index === 0} className="hidden h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-fg-4 hover:bg-surface-sunken hover:text-fg disabled:invisible sm:flex" aria-label={`Move ${item.title} to the top`} title="Move to top"><ChevronDoubleUpIcon className="h-4 w-4" /></button>
                   <button type="button" onClick={() => move(item.id, index - 1)} disabled={index === 0} className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-fg-3 hover:bg-surface-sunken hover:text-fg disabled:invisible" aria-label={`Move ${item.title} up`} title="Move up"><ChevronUpIcon className="h-4 w-4" /></button>
                   <button type="button" onClick={() => move(item.id, index + 1)} disabled={index === order.length - 1} className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-fg-3 hover:bg-surface-sunken hover:text-fg disabled:invisible" aria-label={`Move ${item.title} down`} title="Move down"><ChevronDownIcon className="h-4 w-4" /></button>
