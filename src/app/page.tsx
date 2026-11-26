@@ -17,6 +17,7 @@ import { AppPageHeader, appPageMainClass, appPageRootClass } from "@/components/
 import { GameEditorModal, IdeaItem, QuickViewModal, ScriptEditorModal } from "@/components/IdeaCards";
 import { AddIdeasToProjectModal } from "@/components/AddIdeasToProjectModal";
 import { CollectionPicker, type CollectionChange } from "@/components/CollectionPicker";
+import { AddToScriptModal } from "@/components/AddToScriptModal";
 import { useNotifications } from "@/components/NotificationCenter";
 import { Button } from "@/components/ui/Button";
 import { Dropdown, menuItemClass, menuPanelClass, pillTriggerClass, type DropdownOption } from "@/components/ui/Dropdown";
@@ -564,6 +565,8 @@ export default function Home() {
   const [showAddToProject, setShowAddToProject] = useState(false);
   /** Ideas whose collections are being changed from the library. */
   const [collectionTarget, setCollectionTarget] = useState<{ ids: number[]; label: string } | null>(null);
+  /** Idea being added to a Short Project straight from its card, with its clips. */
+  const [projectTarget, setProjectTarget] = useState<{ idea: DetailRow; footage: { file_path: string | null; title: string | null; channel_name: string | null }[] } | null>(null);
   const addedToProjectRef = useRef(false);
   const [showEditor, setShowEditor] = useState(false);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
@@ -1136,6 +1139,13 @@ export default function Home() {
     success("Collection renamed.", "Saved");
   }
 
+  async function openAddToProject(idea: DetailRow) {
+    // The card has no clips loaded; the project needs them for its clip list.
+    const { data, error } = await supabase.from("footage").select("file_path,title,channel_name").eq("detail_id", idea.id);
+    if (error) notifyError(error.message, "Could not load clips");
+    setProjectTarget({ idea, footage: (data ?? []) as { file_path: string | null; title: string | null; channel_name: string | null }[] });
+  }
+
   /** A tick in the collection picker: update cards, the tray and sidebar counts. */
   function applyCollectionChange({ group, ideaIds, added }: CollectionChange) {
     if (!ideaIds.length) return;
@@ -1321,6 +1331,15 @@ export default function Home() {
       <ScriptEditorModal isOpen={showEditor} onClose={() => { setShowEditor(false); setProjectIdeas([]); }} onSave={handleSaveScript} initialData={{ ids: projectIdeas.map((idea) => idea.id), ideas: projectIdeas, games: games, theme: selectedTheme }} />
       <GameEditorModal game={editingGame} isOpen={!!editingGame} onClose={() => setEditingGame(null)} onUpdate={(updatedGame) => { setGames(prev => prev.map(g => g.id === updatedGame.id ? updatedGame : g)); }} />
       <QuickViewModal idea={previewIdea} isOpen={!!previewIdea} onClose={() => setPreviewIdea(null)} />
+      {projectTarget && (
+        <AddToScriptModal
+          isOpen
+          onClose={() => setProjectTarget(null)}
+          detail={{ id: projectTarget.idea.id, title: projectTarget.idea.title, description: projectTarget.idea.description ?? null }}
+          game={games.find((g) => g.id === projectTarget.idea.game_id) ?? null}
+          footage={projectTarget.footage}
+        />
+      )}
       {collectionTarget && (
         <CollectionPicker
           ideaIds={collectionTarget.ids}
@@ -1746,7 +1765,7 @@ export default function Home() {
           ) : (
             <ul className={`idea-grid transition-opacity duration-150 ${loading ? "opacity-60" : ""}`} aria-busy={loading}>
               {currentIdeas.map((r, index) => (
-                 <IdeaItem key={r.id} priority={index < 6} r={r} game={games.find(g => g.id === r.game_id)} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={togglePin} usage={usageData ? usageOf(r.id) : null} onToggleRecord={(idea) => void toggleRecord(idea)} onEditCollections={(idea) => setCollectionTarget({ ids: [idea.id], label: idea.title })} onEditGame={setEditingGame} onQuickView={setPreviewIdea} onRemoveFromGroup={groupId && loadedGroupId === groupId ? removeIdeaFromGroup : undefined} groupName={activeGroup?.name} removingFromGroup={removingGroupItems.has(`${groupId}:${r.id}`)} />
+                 <IdeaItem key={r.id} priority={index < 6} r={r} game={games.find(g => g.id === r.game_id)} isSelectMode={isSelectMode} isSelected={selectedIds.includes(r.id)} onToggleSelect={toggleSelection} onTogglePin={togglePin} usage={usageData ? usageOf(r.id) : null} onToggleRecord={(idea) => void toggleRecord(idea)} onEditCollections={(idea) => setCollectionTarget({ ids: [idea.id], label: idea.title })} onAddToProject={(idea) => void openAddToProject(idea)} onEditGame={setEditingGame} onQuickView={setPreviewIdea} onRemoveFromGroup={groupId && loadedGroupId === groupId ? removeIdeaFromGroup : undefined} groupName={activeGroup?.name} removingFromGroup={removingGroupItems.has(`${groupId}:${r.id}`)} />
               ))}
             </ul>
           )}

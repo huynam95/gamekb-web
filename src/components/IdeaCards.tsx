@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { Bars3Icon, CheckIcon, FilmIcon, DocumentDuplicateIcon, ExclamationTriangleIcon, EyeIcon, FolderIcon, FolderPlusIcon, HashtagIcon, LinkIcon, PencilSquareIcon, SparklesIcon, StarIcon, TagIcon, TrashIcon, VideoCameraIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { Bars3Icon, CheckIcon, FilmIcon, DocumentDuplicateIcon, DocumentPlusIcon, ExclamationTriangleIcon, EyeIcon, FolderIcon, FolderPlusIcon, HashtagIcon, LinkIcon, PencilSquareIcon, SparklesIcon, StarIcon, TagIcon, TrashIcon, VideoCameraIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import { supabase } from "@/lib/supabaseClient";
 import type { DetailRow, Game, ScriptProject } from "@/types/gamekb";
@@ -529,6 +529,7 @@ export function IdeaItem({
   onTogglePin,
   onToggleRecord,
   onEditCollections,
+  onAddToProject,
   usage,
   onEditGame,
   onQuickView,
@@ -547,6 +548,8 @@ export function IdeaItem({
   onToggleRecord?: (idea: DetailRow) => void;
   /** Opens the collection picker for this idea. */
   onEditCollections?: (idea: DetailRow) => void;
+  /** Opens "Add to Script Project" for this idea. */
+  onAddToProject?: (idea: DetailRow) => void;
   /** How many videos already use this idea. */
   usage?: { total: number; published: number } | null;
   onEditGame: (game: Game) => void;
@@ -676,6 +679,11 @@ export function IdeaItem({
           {onToggleRecord && (
             <button onClick={(event) => { event.stopPropagation(); onToggleRecord(r); }} className={`touch-target flex h-8 w-8 cursor-pointer items-center justify-center rounded-full shadow-lg backdrop-blur-md transition-colors duration-150 ${r.capture_status ? "bg-rose-500 text-white" : "bg-white/10 text-white hover:bg-white/20"}`} type="button" aria-pressed={Boolean(r.capture_status)} aria-label={r.capture_status ? `Remove ${r.title} from the Recording List` : `Record ${r.title} myself`} title={r.capture_status ? "On your Recording List (click to remove)" : "Record myself"}>
               <VideoCameraIcon className="h-4 w-4" />
+            </button>
+          )}
+          {onAddToProject && (
+            <button onClick={(event) => { event.stopPropagation(); event.preventDefault(); onAddToProject(r); }} className="touch-target flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white shadow-lg backdrop-blur-md transition-colors duration-150 hover:bg-blue-600" type="button" aria-label={`Add ${r.title} to a Short Project`} title="Add to a Short Project">
+              <DocumentPlusIcon className="h-4 w-4" />
             </button>
           )}
           {onEditCollections && (
