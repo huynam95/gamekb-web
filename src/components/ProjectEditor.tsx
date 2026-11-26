@@ -169,7 +169,8 @@ function GameThumb({ src, className = "h-9 w-7" }: { src: string | null; classNa
   );
 }
 
-function ChipEditor({ label, values, onChange, prefix = "", placeholder }: { label: string; values: string[]; onChange: (values: string[]) => void; prefix?: string; placeholder: string }) {
+/** `bare` drops the label and box so the chips can sit inside another card. */
+function ChipEditor({ label, values, onChange, prefix = "", placeholder, bare = false }: { label: string; values: string[]; onChange: (values: string[]) => void; prefix?: string; placeholder: string; bare?: boolean }) {
   const [draft, setDraft] = useState("");
   const add = () => {
     const parts = draft.split(/[,\n]/).map((part) => part.trim()).filter(Boolean).map((part) => (prefix && !part.startsWith(prefix) ? `${prefix}${part}` : part));
@@ -178,8 +179,8 @@ function ChipEditor({ label, values, onChange, prefix = "", placeholder }: { lab
   };
   return (
     <div>
-      <p className="mb-1.5 text-xs font-medium text-fg-3">{label}</p>
-      <div className="flex min-h-11 flex-wrap items-center gap-1.5 rounded-xl border border-line bg-surface p-1.5 focus-within:border-blue-500">
+      {!bare && <p className="mb-1.5 text-xs font-medium text-fg-3">{label}</p>}
+      <div className={`flex min-h-11 flex-wrap items-center gap-1.5 ${bare ? "" : "rounded-xl border border-line bg-surface p-1.5 focus-within:border-blue-500"}`}>
         {values.map((value) => (
           <span key={value} className="inline-flex h-8 items-center gap-1 rounded-lg bg-surface-sunken pl-2.5 pr-1 text-xs font-semibold text-fg-2">
             {value}
@@ -1317,22 +1318,34 @@ export function ProjectEditor({
     </div>
   );
 
+  // Description with the hashtags at the end, the way YouTube expects them. Hashtags already typed in the text are not repeated.
+  const descriptionText = String(formData.description || "");
+  const missingHashtags = (formData.hashtags || []).filter((tag) => !new RegExp(`(^|\\s)${tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=\\s|$)`, "i").test(descriptionText));
+  const youtubeDescription = [descriptionText.trim(), missingHashtags.join(" ")].filter(Boolean).join("\n\n");
+
   const detailsPanel = (
     <div className="mx-auto w-full max-w-3xl space-y-5">
       <div>
-        <div className="mb-1.5 flex items-center justify-between gap-2">
-          <p className="text-xs font-medium text-fg-3">YouTube description</p>
-          <Button variant="ghost" size="sm" onClick={() => void copy(String(formData.description || ""), "description")}><DocumentDuplicateIcon className="h-4 w-4" /> Copy</Button>
+        <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs font-medium text-fg-3">YouTube description + hashtags</p>
+          <div className="flex items-center gap-1.5">
+            <Button variant="ghost" size="sm" onClick={() => void copy(descriptionText, "description")}>Description only</Button>
+            <Button variant="primary" size="sm" onClick={() => void copy(youtubeDescription, "description and hashtags")}><DocumentDuplicateIcon className="h-4 w-4" /> Copy description + hashtags</Button>
+          </div>
         </div>
-        <textarea
-          value={String(formData.description || "")}
-          onChange={(e) => update({ description: e.target.value })}
-          className="h-64 w-full resize-y rounded-2xl border border-line bg-surface p-4 text-sm leading-6 text-fg outline-none focus:border-blue-500"
-          aria-label="Description"
-        />
+        <div className="overflow-hidden rounded-2xl border border-line bg-surface focus-within:border-blue-500">
+          <textarea
+            value={descriptionText}
+            onChange={(e) => update({ description: e.target.value })}
+            className="block h-64 w-full resize-y bg-transparent p-4 text-sm leading-6 text-fg outline-none"
+            aria-label="Description"
+          />
+          <div className="border-t border-dashed border-line px-3 pb-2 pt-2">
+            <p className="mb-1 px-1 text-[11px] font-semibold uppercase tracking-wide text-fg-4">Hashtags · added at the end when copied</p>
+            <ChipEditor bare label="Hashtags" values={formData.hashtags || []} onChange={(hashtags) => update({ hashtags })} prefix="#" placeholder="#shorts, #gaming…" />
+          </div>
+        </div>
       </div>
-      <ChipEditor label="Hashtags" values={formData.hashtags || []} onChange={(hashtags) => update({ hashtags })} prefix="#" placeholder="#shorts, #gaming…" />
-      <div className="flex justify-end -mt-3"><Button variant="ghost" size="sm" onClick={() => void copy((formData.hashtags || []).join(" "), "hashtags")}><DocumentDuplicateIcon className="h-4 w-4" /> Copy hashtags</Button></div>
       <ChipEditor label="Tags" values={formData.tags || []} onChange={(tags) => update({ tags })} placeholder="GTA V, Gaming…" />
       <div className="flex justify-end -mt-3"><Button variant="ghost" size="sm" onClick={() => void copy((formData.tags || []).join(", "), "tags")}><DocumentDuplicateIcon className="h-4 w-4" /> Copy tags</Button></div>
     </div>
