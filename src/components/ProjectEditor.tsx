@@ -6,9 +6,14 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import {
   ArrowPathIcon,
   ArrowTopRightOnSquareIcon,
+  ArrowsUpDownIcon,
   Bars3Icon,
   CheckIcon,
+  ChevronDoubleDownIcon,
+  ChevronDoubleUpIcon,
+  ChevronDownIcon,
   ChevronLeftIcon,
+  ChevronUpIcon,
   ClockIcon,
   DocumentDuplicateIcon,
   DocumentTextIcon,
@@ -27,7 +32,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { supabase } from "@/lib/supabaseClient";
 import { useNotifications } from "@/components/NotificationCenter";
-import { Modal } from "@/components/ui/Modal";
+import { Modal, ModalBody, ModalFooter, ModalHeader } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { CoverImage } from "@/components/CoverImage";
 import { ProjectTopicSelect } from "@/components/ProjectTopicSelect";
@@ -194,6 +199,137 @@ function ChipEditor({ label, values, onChange, prefix = "", placeholder }: { lab
 }
 
 /** Search the library and add an idea to the project. */
+type ReorderItem = { id: string; title: string; game: string; linked: boolean };
+
+/**
+ * A compact list for putting a project's ideas in order. One short row per
+ * idea, so the whole list fits on screen. Drag the handle (mouse or finger),
+ * use the arrow buttons, or focus a handle and press ↑ / ↓.
+ */
+function ReorderPanel({ items, onSave, onClose }: { items: ReorderItem[]; onSave: (ids: string[]) => void; onClose: () => void }) {
+  const [order, setOrder] = useState(items);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const listRef = useRef<HTMLOListElement | null>(null);
+  const rowRefs = useRef(new Map<string, HTMLLIElement>());
+  const pointerY = useRef(0);
+  const scrollTimer = useRef<number | null>(null);
+  const changed = order.some((item, i) => item.id !== items[i]?.id);
+
+  const move = (id: string, to: number) => {
+    setOrder((current) => {
+      const from = current.findIndex((item) => item.id === id);
+      const target = Math.max(0, Math.min(current.length - 1, to));
+      if (from < 0 || from === target) return current;
+      const next = [...current];
+      const [moved] = next.splice(from, 1);
+      next.splice(target, 0, moved);
+      return next;
+    });
+  };
+
+  // While dragging, the row follows the pointer: it takes the slot whose middle the pointer has passed.
+  const placeAtPointer = (id: string) => {
+    const y = pointerY.current;
+    let target = 0;
+    for (const item of order) {
+      if (item.id === id) continue;
+      const rect = rowRefs.current.get(item.id)?.getBoundingClientRect();
+      if (rect && y > rect.top + rect.height / 2) target += 1;
+    }
+    move(id, target);
+  };
+
+  const stopAutoScroll = () => {
+    if (scrollTimer.current != null) cancelAnimationFrame(scrollTimer.current);
+    scrollTimer.current = null;
+  };
+
+  const autoScroll = (id: string) => {
+    stopAutoScroll();
+    const tick = () => {
+      const list = listRef.current;
+      if (!list) return;
+      const rect = list.getBoundingClientRect();
+      const edge = 48;
+      const y = pointerY.current;
+      const speed = y < rect.top + edge ? -Math.ceil((rect.top + edge - y) / 4) : y > rect.bottom - edge ? Math.ceil((y - (rect.bottom - edge)) / 4) : 0;
+      if (speed) {
+        list.scrollTop += speed;
+        placeAtPointer(id);
+      }
+      scrollTimer.current = requestAnimationFrame(tick);
+    };
+    scrollTimer.current = requestAnimationFrame(tick);
+  };
+
+  useEffect(() => stopAutoScroll, []);
+
+  return (
+    <Modal open onClose={onClose} size="lg" zClass="z-[99990]" labelledBy="reorder-title">
+      <ModalHeader id="reorder-title" eyebrow="Short project" title="Reorder ideas" onClose={onClose}>
+        <p className="mt-1 text-sm text-fg-3">Drag the handle, or use the arrows. The hook stays first.</p>
+      </ModalHeader>
+      <ModalBody className="p-0 sm:p-0">
+        <ol ref={listRef} className="max-h-[60dvh] space-y-1.5 overflow-y-auto overscroll-contain p-3 sm:p-4" aria-label="Ideas in order">
+          {order.map((item, index) => {
+            const dragging = dragId === item.id;
+            const color = item.linked ? ideaColor(index + 1) : NEUTRAL_COLOR;
+            return (
+              <li
+                key={item.id}
+                ref={(el) => { if (el) rowRefs.current.set(item.id, el); else rowRefs.current.delete(item.id); }}
+                className={`flex items-center gap-2 rounded-xl border border-l-4 bg-surface py-1.5 pl-1.5 pr-1.5 transition-shadow ${color.bar} ${dragging ? "relative z-10 border-y-blue-500 border-r-blue-500 shadow-xl ring-2 ring-blue-500/40" : "border-y-line border-r-line"}`}
+              >
+                <button
+                  type="button"
+                  aria-label={`Drag ${item.title}. Arrow keys move it.`}
+                  className="flex h-10 w-9 shrink-0 cursor-grab touch-none items-center justify-center rounded-lg text-fg-4 hover:bg-surface-sunken hover:text-fg active:cursor-grabbing"
+                  onPointerDown={(e) => {
+                    e.preventDefault();
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                    pointerY.current = e.clientY;
+                    setDragId(item.id);
+                    autoScroll(item.id);
+                  }}
+                  onPointerMove={(e) => {
+                    if (dragId !== item.id) return;
+                    pointerY.current = e.clientY;
+                    placeAtPointer(item.id);
+                  }}
+                  onPointerUp={() => { setDragId(null); stopAutoScroll(); }}
+                  onPointerCancel={() => { setDragId(null); stopAutoScroll(); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowUp") { e.preventDefault(); move(item.id, index - 1); }
+                    if (e.key === "ArrowDown") { e.preventDefault(); move(item.id, index + 1); }
+                  }}
+                >
+                  <Bars3Icon className="h-5 w-5" />
+                </button>
+                <span className={`flex h-7 min-w-7 shrink-0 items-center justify-center rounded-md px-1 text-xs font-bold tabular-nums ${color.badge}`}>{index + 1}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-fg">{item.title}</span>
+                  {item.game && <span className="block truncate text-[11px] font-medium uppercase tracking-wide text-fg-4">{item.game}</span>}
+                </span>
+                <span className="flex shrink-0 items-center">
+                  <button type="button" onClick={() => move(item.id, 0)} disabled={index === 0} className="hidden h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-fg-4 hover:bg-surface-sunken hover:text-fg disabled:invisible sm:flex" aria-label={`Move ${item.title} to the top`} title="Move to top"><ChevronDoubleUpIcon className="h-4 w-4" /></button>
+                  <button type="button" onClick={() => move(item.id, index - 1)} disabled={index === 0} className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-fg-3 hover:bg-surface-sunken hover:text-fg disabled:invisible" aria-label={`Move ${item.title} up`} title="Move up"><ChevronUpIcon className="h-4 w-4" /></button>
+                  <button type="button" onClick={() => move(item.id, index + 1)} disabled={index === order.length - 1} className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-fg-3 hover:bg-surface-sunken hover:text-fg disabled:invisible" aria-label={`Move ${item.title} down`} title="Move down"><ChevronDownIcon className="h-4 w-4" /></button>
+                  <button type="button" onClick={() => move(item.id, order.length - 1)} disabled={index === order.length - 1} className="hidden h-9 w-9 cursor-pointer items-center justify-center rounded-lg text-fg-4 hover:bg-surface-sunken hover:text-fg disabled:invisible sm:flex" aria-label={`Move ${item.title} to the bottom`} title="Move to bottom"><ChevronDoubleDownIcon className="h-4 w-4" /></button>
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      </ModalBody>
+      <ModalFooter className="items-center">
+        {changed && <button type="button" onClick={() => setOrder(items)} className="mr-auto cursor-pointer text-xs font-semibold text-fg-3 hover:text-fg">Reset</button>}
+        <Button variant="ghost" onClick={onClose}>Cancel</Button>
+        <Button variant="primary" disabled={!changed} onClick={() => { onSave(order.map((item) => item.id)); onClose(); }}>Save order</Button>
+      </ModalFooter>
+    </Modal>
+  );
+}
+
 function IdeaPicker({ excludeIds, suggested, onPick, onClose }: { excludeIds: Set<number>; suggested: { id: number; reason: string }[]; onPick: (row: IdeaRow) => Promise<void>; onClose: () => void }) {
   const [query, setQuery] = useState("");
   const [rows, setRows] = useState<IdeaRow[]>([]);
@@ -318,6 +454,7 @@ export function ProjectEditor({
   const [saveState, setSaveState] = useState<"saved" | "saving" | "error">("saved");
   const [ideas, setIdeas] = useState<ProjectIdea[] | null>(null);
   const [picking, setPicking] = useState(false);
+  const [reordering, setReordering] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
@@ -561,19 +698,18 @@ export function ProjectEditor({
     update({ content: nextContent });
   };
 
-  const moveSection = (sourceId: string, targetId: string) => {
-    if (sourceId === targetId) return;
+  /** Put the script's idea lines in this order (section ids, hook excluded). */
+  const applySectionOrder = (orderedIds: string[]) => {
     const text = String(latestRef.current.content || "");
     const all = buildScriptGuide(text);
     const hook = all.find((s) => s.isHook);
     const sections = all.filter((s) => !s.isHook);
-    const from = sections.findIndex((s) => s.id === sourceId);
-    const to = sections.findIndex((s) => s.id === targetId);
-    if (from < 0 || to < 0) return;
+    const byId = new Map(sections.map((s) => [s.id, s]));
+    const ordered = orderedIds.map((id) => byId.get(id)).filter((s): s is ScriptGuideSection => Boolean(s));
+    // Anything not named keeps its place at the end.
+    for (const section of sections) if (!orderedIds.includes(section.id)) ordered.push(section);
+    if (ordered.every((s, i) => s.id === sections[i]?.id)) return;
     const blocks = new Map(all.map((s) => [s.id, text.slice(s.start, s.end).trim()]));
-    const ordered = [...sections];
-    const [moved] = ordered.splice(from, 1);
-    ordered.splice(to, 0, moved);
     const nextContent = [hook ? blocks.get(hook.id) : null, ...ordered.map((s) => blocks.get(s.id))].filter(Boolean).join("\n\n");
     const newOrder = new Map<number, number>();
     ordered.forEach((s, i) => { if (s.number != null) newOrder.set(s.number, i + 1); });
@@ -586,9 +722,40 @@ export function ProjectEditor({
     if (script) {
       const orderedIdeaIds = ordered.map((s) => match.bySection.get(s.id)).filter((id): id is number => id != null);
       const rows = orderedIdeaIds.map((detailId, index) => ({ script_id: script.id, detail_id: detailId, position: index + 1 }));
-      if (rows.length) void supabase.from("script_ideas").upsert(rows, { onConflict: "script_id,detail_id" });
+      // Supabase queries only run once awaited or then()-ed; a bare `void query` never sends.
+      if (rows.length) {
+        supabase.from("script_ideas").upsert(rows, { onConflict: "script_id,detail_id" }).then(({ error }) => {
+          if (error) notifyError(error.message, "Idea order not saved");
+        });
+      }
       setIdeas((current) => (current ?? []).map((idea) => ({ ...idea, position: orderedIdeaIds.indexOf(idea.id) >= 0 ? orderedIdeaIds.indexOf(idea.id) + 1 : idea.position })));
     }
+  };
+
+  const ideaSectionIds = () => buildScriptGuide(String(latestRef.current.content || "")).filter((s) => !s.isHook).map((s) => s.id);
+
+  /** Drag-and-drop: move one line to where another one is. */
+  const moveSection = (sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return;
+    const ids = ideaSectionIds();
+    const from = ids.indexOf(sourceId);
+    const to = ids.indexOf(targetId);
+    if (from < 0 || to < 0) return;
+    const [moved] = ids.splice(from, 1);
+    ids.splice(to, 0, moved);
+    applySectionOrder(ids);
+  };
+
+  /** Arrow buttons: move a line by a step, or to the top / bottom. */
+  const nudgeSection = (sectionId: string, where: "up" | "down" | "top" | "bottom") => {
+    const ids = ideaSectionIds();
+    const from = ids.indexOf(sectionId);
+    if (from < 0) return;
+    const to = where === "top" ? 0 : where === "bottom" ? ids.length - 1 : where === "up" ? Math.max(0, from - 1) : Math.min(ids.length - 1, from + 1);
+    if (to === from) return;
+    const [moved] = ids.splice(from, 1);
+    ids.splice(to, 0, moved);
+    applySectionOrder(ids);
   };
 
   const addMissingClips = () => {
@@ -762,7 +929,12 @@ export function ProjectEditor({
               <CoverImage src={idea.game_cover} sizes="300px" className="scale-110 blur-[2px]" />
             </span>
           )}
-          <Bars3Icon className="relative mt-2 h-4 w-4 shrink-0 cursor-grab text-fg-4 active:cursor-grabbing pointer-coarse:hidden" aria-hidden="true" />
+          {/* Step a line up or down; the grip between them still drags on desktop. */}
+          <span className="relative -my-1 flex shrink-0 flex-col items-center">
+            <button type="button" onClick={() => nudgeSection(section.id, "up")} disabled={section.number === 1} className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-fg-4 transition hover:bg-surface/80 hover:text-fg disabled:invisible" aria-label="Move up" title="Move up"><ChevronUpIcon className="h-4 w-4" /></button>
+            <Bars3Icon className="h-4 w-4 cursor-grab text-fg-4 active:cursor-grabbing pointer-coarse:hidden" aria-hidden="true" />
+            <button type="button" onClick={() => nudgeSection(section.id, "down")} disabled={section.number === guide.filter((g) => !g.isHook).length} className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-fg-4 transition hover:bg-surface/80 hover:text-fg disabled:invisible" aria-label="Move down" title="Move down"><ChevronDownIcon className="h-4 w-4" /></button>
+          </span>
           <span className={`relative mt-0.5 flex h-8 min-w-8 shrink-0 items-center justify-center rounded-lg px-1.5 text-sm font-bold tabular-nums shadow-sm ${color.badge}`}>{section.number}</span>
           <div className="relative min-w-0 flex-1 pl-1">
             <button type="button" onClick={onJump} className="block w-full cursor-pointer text-left" title="Go to this line in the script">
@@ -848,13 +1020,18 @@ export function ProjectEditor({
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div className="min-w-0">
         <p className="text-sm font-semibold text-fg">Ideas & clips <span className="font-normal text-fg-4">· {ideas?.length ?? "…"} ideas · {clipStats.clips} clips · {downloadAssets.length} {downloadAssets.length === 1 ? "video" : "videos"} to download</span></p>
-        <p className="text-[11px] text-fg-4">Drag a card to reorder · click a title to go to its line</p>
+        <p className="text-[11px] text-fg-4">Use Reorder or the ↑ ↓ arrows to change the order · click a title to go to its line</p>
       </div>
       <div className="flex items-center gap-1.5">
         {toRecord > 0 && (
           <span className="inline-flex items-center gap-1 rounded-md bg-rose-100 px-1.5 py-0.5 text-[11px] font-semibold text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">
             <VideoCameraIcon className="h-3 w-3" /> {toRecord} to record
           </span>
+        )}
+        {guide.filter((g) => !g.isHook).length > 1 && (
+          <Button variant="secondary" size="sm" onClick={() => setReordering(true)} title="Put the ideas in a new order">
+            <ArrowsUpDownIcon className="h-4 w-4" /> Reorder
+          </Button>
         )}
         {downloadAssets.length > 0 && (
           <Button variant="secondary" size="sm" onClick={() => void copy(downloadAssets.map((a) => a.url).filter(Boolean).join("\n"), "links")} title={ownFootageIds.size ? "Copy every source video once (ideas you recorded are left out)" : "Copy every source video once"}>
@@ -1127,6 +1304,16 @@ export function ProjectEditor({
         {tab === "script" && (viewMode === "aligned" ? alignedView : plainView)}
         {tab === "details" && detailsPanel}
       </div>
+      {reordering && (
+        <ReorderPanel
+          items={guide.filter((g) => !g.isHook).map((section) => {
+            const idea = ideaById.get(match.bySection.get(section.id) ?? -1);
+            return { id: section.id, title: idea?.title ?? section.preview, game: idea?.game_title ?? section.label, linked: Boolean(idea) };
+          })}
+          onSave={applySectionOrder}
+          onClose={() => setReordering(false)}
+        />
+      )}
     </Modal>
   );
 }
