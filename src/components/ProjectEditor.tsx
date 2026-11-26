@@ -199,7 +199,7 @@ function ChipEditor({ label, values, onChange, prefix = "", placeholder }: { lab
 }
 
 /** Search the library and add an idea to the project. */
-type ReorderItem = { id: string; title: string; game: string; linked: boolean };
+type ReorderItem = { id: string; title: string; game: string; linked: boolean; recorded?: boolean };
 
 /**
  * A compact list for putting a project's ideas in order. One short row per
@@ -381,7 +381,10 @@ function ReorderPanel({ items, onSave, onClose }: { items: ReorderItem[]; onSave
                 </button>
                 <span className="flex h-7 min-w-7 shrink-0 items-center justify-center rounded-md bg-blue-600 px-1 text-xs font-bold tabular-nums text-white">{position + 1}</span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-fg">{item.title}</span>
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    {item.recorded && <CheckIcon className="h-4 w-4 shrink-0 stroke-[3] text-emerald-600 dark:text-emerald-400" aria-label="Recorded" />}
+                    <span className="truncate text-sm font-semibold text-fg">{item.title}</span>
+                  </span>
                   {item.game && <span className="block truncate text-[11px] font-medium uppercase tracking-wide text-fg-4">{item.game}</span>}
                 </span>
                 <span className={`flex shrink-0 items-center transition-opacity ${drag ? "opacity-0" : ""}`}>
@@ -984,7 +987,8 @@ export function ProjectEditor({
     const isOver = dragOverId === section.id && draggedId !== section.id;
     const capture = idea?.capture_status ? CAPTURE_META[idea.capture_status as keyof typeof CAPTURE_META] : undefined;
     const ownFootage = idea ? ownFootageIds.has(idea.id) : false;
-    // Recorded ideas fade back; hovering or working on one brings it forward.
+    // Recorded ideas stay faded while you scroll or hover; only working on one
+    // (its line focused, a button in it, the recording menu) brings it forward.
     const faded = ownFootage && !active && !isOver && recordMenuFor !== idea?.id;
     return (
       <div
@@ -994,7 +998,7 @@ export function ProjectEditor({
         onDragLeave={() => setDragOverId((c) => (c === section.id ? null : c))}
         onDrop={(e) => { e.preventDefault(); const src = e.dataTransfer.getData("text/plain") || draggedId; if (src) moveSection(src, section.id); setDraggedId(null); setDragOverId(null); }}
         onDragEnd={() => { setDraggedId(null); setDragOverId(null); }}
-        className={`group h-full overflow-hidden rounded-2xl border border-l-4 bg-surface transition ${faded ? "opacity-45 grayscale-[60%] hover:opacity-100 hover:grayscale-0 focus-within:opacity-100 focus-within:grayscale-0" : ""} ${color.bar} ${isOver ? "border-y-blue-500 border-r-blue-500 ring-2 ring-blue-500" : active ? "border-y-line-strong border-r-line-strong ring-2 ring-blue-500/50" : "border-y-line border-r-line"}`}
+        className={`group h-full overflow-hidden rounded-2xl border border-l-4 bg-surface transition ${faded ? "opacity-55 focus-within:opacity-100" : ""} ${color.bar} ${isOver ? "border-y-blue-500 border-r-blue-500 ring-2 ring-blue-500" : active ? "border-y-line-strong border-r-line-strong ring-2 ring-blue-500/50" : "border-y-line border-r-line"}`}
       >
         <div className={`relative flex items-start gap-3 overflow-hidden p-3 ${color.soft}`}>
           {idea?.game_cover && (
@@ -1009,12 +1013,19 @@ export function ProjectEditor({
             <Bars3Icon className="h-4 w-4 cursor-grab text-fg-4 active:cursor-grabbing pointer-coarse:hidden" aria-hidden="true" />
             <button type="button" onClick={() => nudgeSection(section.id, "down")} disabled={section.number === guide.filter((g) => !g.isHook).length} className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-md text-fg-4 transition hover:bg-surface/80 hover:text-fg disabled:invisible" aria-label="Move down" title="Move down"><ChevronDownIcon className="h-4 w-4" /></button>
           </span>
-          <span className={`relative mt-0.5 flex h-8 min-w-8 shrink-0 items-center justify-center rounded-lg px-1.5 text-sm font-bold tabular-nums shadow-sm ${color.badge}`}>{section.number}</span>
+          <span className={`relative mt-0.5 flex h-8 min-w-8 shrink-0 items-center justify-center rounded-lg px-1.5 text-sm font-bold tabular-nums shadow-sm ${ownFootage ? "bg-emerald-600 text-white" : color.badge}`}>{section.number}</span>
           <div className="relative min-w-0 flex-1 pl-1">
             <button type="button" onClick={onJump} className="block w-full cursor-pointer text-left" title="Go to this line in the script">
               {idea ? (
                 <>
-                  <span className="block truncate text-[11px] font-semibold uppercase tracking-wide text-fg-3">{idea.game_title}</span>
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    {ownFootage && capture && (
+                      <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-emerald-600 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-white">
+                        <CheckIcon className="h-3 w-3 stroke-[3]" /> {capture.short}
+                      </span>
+                    )}
+                    <span className="truncate text-[11px] font-semibold uppercase tracking-wide text-fg-3">{idea.game_title}</span>
+                  </span>
                   <span className={`line-clamp-2 text-[15px] font-bold leading-snug ${color.title}`}>{idea.title}</span>
                 </>
               ) : (
@@ -1221,7 +1232,7 @@ export function ProjectEditor({
               onClick={() => rowRefs.current.get(row.index)?.focus()}
               className={`flex h-full cursor-text gap-3 rounded-2xl border border-l-4 bg-surface p-3 transition sm:p-4 ${section?.isHook ? "border-l-cyan-400" : color.bar} ${active ? "border-y-blue-500 border-r-blue-500 ring-4 ring-blue-500/10" : "border-y-line border-r-line hover:border-y-line-strong hover:border-r-line-strong"}`}
             >
-              <span className={`mt-1 flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md px-1 text-xs font-bold tabular-nums ${section?.isHook ? "bg-brand-cyan text-slate-950" : section ? color.badge : NEUTRAL_COLOR.badge}`}>{section?.isHook ? "H" : section?.number ?? "·"}</span>
+              <span className={`mt-1 flex h-6 min-w-6 shrink-0 items-center justify-center rounded-md px-1 text-xs font-bold tabular-nums ${section?.isHook ? "bg-brand-cyan text-slate-950" : ideaId != null && ownFootageIds.has(ideaId) ? "bg-emerald-600 text-white" : section ? color.badge : NEUTRAL_COLOR.badge}`} title={ideaId != null && ownFootageIds.has(ideaId) ? "Recorded yourself" : undefined}>{section?.isHook ? "H" : section?.number ?? "·"}</span>
               <AutoTextarea
                 value={row.text}
                 inputRef={(el) => { if (el) rowRefs.current.set(row.index, el); else rowRefs.current.delete(row.index); }}
@@ -1382,7 +1393,7 @@ export function ProjectEditor({
         <ReorderPanel
           items={guide.filter((g) => !g.isHook).map((section) => {
             const idea = ideaById.get(match.bySection.get(section.id) ?? -1);
-            return { id: section.id, title: idea?.title ?? section.preview, game: idea?.game_title ?? section.label, linked: Boolean(idea) };
+            return { id: section.id, title: idea?.title ?? section.preview, game: idea?.game_title ?? section.label, linked: Boolean(idea), recorded: idea ? ownFootageIds.has(idea.id) : false };
           })}
           onSave={applySectionOrder}
           onClose={() => setReordering(false)}
