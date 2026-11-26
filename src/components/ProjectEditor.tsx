@@ -14,6 +14,8 @@ import {
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronUpIcon,
+  ClipboardDocumentIcon,
+  ClipboardDocumentCheckIcon,
   ClockIcon,
   DocumentDuplicateIcon,
   DocumentTextIcon,
@@ -69,6 +71,8 @@ export type EditorScript = {
   hashtags: string[];
   status: string;
   topic?: string | null;
+  /** Polished plain-text script (after AI). Missing until the final_script column exists. */
+  final_script?: string | null;
   created_at?: string;
 };
 
@@ -517,7 +521,7 @@ export function ProjectEditor({
 }) {
   const { success, error: notifyError, confirm } = useNotifications();
   const [formData, setFormData] = useState<Partial<EditorScript>>({});
-  const [tab, setTab] = useState<"script" | "details">("script");
+  const [tab, setTab] = useState<"script" | "final" | "details">("script");
   const [viewMode, setViewMode] = useState<"aligned" | "plain">(() => {
     try { return typeof window !== "undefined" && window.localStorage.getItem("ninjaplay-script-view") === "plain" ? "plain" : "aligned"; } catch { return "aligned"; }
   });
@@ -1334,9 +1338,59 @@ export function ProjectEditor({
     </div>
   );
 
+  // select("*") only returns final_script once the migration has added the column.
+  const hasFinalColumn = Object.prototype.hasOwnProperty.call(script, "final_script");
+  const finalText = String(formData.final_script ?? "");
+  const finalLength = estimateSeconds(finalText);
+
+  const pasteFinal = async () => {
+    let text = "";
+    try { text = await navigator.clipboard.readText(); }
+    catch { notifyError("The browser blocked reading the clipboard. Click in the box and press Ctrl+V instead.", "Paste failed"); return; }
+    if (!text.trim()) { notifyError("The clipboard is empty.", "Nothing to paste"); return; }
+    if (finalText.trim() && finalText.trim() !== text.trim()) {
+      const ok = await confirm({ kind: "warning", title: "Replace the final script?", message: "The text already in Final script will be replaced by what you copied.", confirmText: "Replace" });
+      if (!ok) return;
+    }
+    update({ final_script: text.replace(/\r\n?/g, "\n").trim() });
+    success("Final script pasted.", "Pasted");
+  };
+
+  const finalPanel = (
+    <div className="mx-auto w-full max-w-3xl space-y-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-base font-bold text-fg">Final script</h3>
+          <p className="text-xs text-fg-3">The polished version you record with. Plain text: it does not change the ideas, lines or clips.</p>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Button variant="secondary" size="sm" disabled={!hasFinalColumn} onClick={() => void pasteFinal()}><ClipboardDocumentIcon className="h-4 w-4" /> Paste</Button>
+          <Button variant="primary" size="sm" disabled={!hasFinalColumn} onClick={() => void copy(finalText, "final script")}><DocumentDuplicateIcon className="h-4 w-4" /> Copy</Button>
+        </div>
+      </div>
+      {!hasFinalColumn && (
+        <p className="flex gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+          <ExclamationTriangleIcon className="h-4 w-4 shrink-0" /> Final script needs a database update (migration 20261126_add_final_script) before it can be saved.
+        </p>
+      )}
+      <textarea
+        value={finalText}
+        onChange={(e) => update({ final_script: e.target.value })}
+        disabled={!hasFinalColumn}
+        placeholder="Paste the script you polished here…"
+        className="min-h-[55vh] w-full resize-y rounded-2xl border border-line bg-surface p-4 text-base leading-7 text-fg outline-none placeholder:text-fg-4 focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-60 sm:text-[17px] sm:leading-8"
+        aria-label="Final script"
+      />
+      <p className={`inline-flex items-center gap-1.5 text-xs font-medium ${finalLength.seconds > 60 ? "text-amber-700 dark:text-amber-300" : "text-fg-3"}`} title="Estimated at about 2.6 words per second">
+        <ClockIcon className="h-4 w-4" /> ≈ {formatDuration(finalLength.seconds)} · {finalLength.words} words{finalLength.seconds > 60 ? " · over 60s" : ""}
+      </p>
+    </div>
+  );
+
   const tabs = [
-    { key: "script" as const, label: "Script", Icon: DocumentTextIcon, mobileOnly: false },
-    { key: "details" as const, label: "Details", Icon: InformationCircleIcon, mobileOnly: false },
+    { key: "script" as const, label: "Script", Icon: DocumentTextIcon, mobileOnly: false, filled: false },
+    { key: "final" as const, label: "Final script", Icon: ClipboardDocumentCheckIcon, mobileOnly: false, filled: finalText.trim().length > 0 },
+    { key: "details" as const, label: "Details", Icon: InformationCircleIcon, mobileOnly: false, filled: false },
   ];
 
   return (
@@ -1392,9 +1446,10 @@ export function ProjectEditor({
 
       {/* Tabs */}
       <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-line-soft px-3 sm:px-6" role="tablist">
-        {tabs.map(({ key, label, Icon, mobileOnly }) => (
+        {tabs.map(({ key, label, Icon, mobileOnly, filled }) => (
           <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => setTab(key)} className={`${mobileOnly ? "lg:hidden" : ""} inline-flex h-11 shrink-0 cursor-pointer items-center gap-1.5 border-b-2 px-3 text-sm font-semibold transition ${tab === key ? "border-blue-600 text-fg" : "border-transparent text-fg-3 hover:text-fg"}`}>
             <Icon className="h-4 w-4" /> {label}
+            {filled && <span className="h-2 w-2 rounded-full bg-emerald-500" title="Has a final script" />}
           </button>
         ))}
       </div>
@@ -1402,6 +1457,7 @@ export function ProjectEditor({
       {/* Body */}
       <div className="min-h-0 flex-1 overflow-y-auto bg-surface-muted p-3 sm:p-6">
         {tab === "script" && (viewMode === "aligned" ? alignedView : plainView)}
+        {tab === "final" && finalPanel}
         {tab === "details" && detailsPanel}
       </div>
       {reordering && (
