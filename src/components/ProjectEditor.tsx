@@ -1038,15 +1038,6 @@ export function ProjectEditor({
             </button>
             {idea && (
               <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-fg-3">
-                <button
-                  type="button"
-                  onClick={() => void copy(idea.title, "title")}
-                  className="inline-flex cursor-pointer items-center gap-1 rounded bg-surface/80 px-1 font-semibold text-fg-2 ring-1 ring-line transition hover:text-accent hover:ring-blue-500/40"
-                  title={`Copy “${idea.title}”`}
-                  aria-label={`Copy title: ${idea.title}`}
-                >
-                  <DocumentDuplicateIcon className="h-3 w-3" /> Title
-                </button>
                 <span className="inline-flex items-center gap-1"><FilmIcon className="h-3 w-3" /> {sectionClips.length} clip{sectionClips.length === 1 ? "" : "s"}</span>
                 <button
                   type="button"
@@ -1080,13 +1071,11 @@ export function ProjectEditor({
             )}
           </div>
           <div className="relative -mr-1 -mt-1 flex shrink-0 flex-col gap-0.5 sm:flex-row">
-            {sectionClips.length > 0 && (
-              <button type="button" onClick={() => void copy(sectionClips.map(({ asset }) => asset.url).filter(Boolean).join("\n"), "links")} className={iconButton} aria-label="Copy this idea's links" title="Copy this idea's links">
-                <DocumentDuplicateIcon className="h-4 w-4" />
-              </button>
-            )}
             {idea && (
               <>
+                <button type="button" onClick={() => void copy(idea.title, "title")} className={iconButton} aria-label={`Copy title: ${idea.title}`} title="Copy title">
+                  <DocumentDuplicateIcon className="h-4 w-4" />
+                </button>
                 <Link href={ideaHref(idea.id)} onClick={(e) => void openIdea(e, idea.id)} className={iconButton} aria-label={`Open idea page: ${idea.title}`} title="Open idea page">
                   <ArrowTopRightOnSquareIcon className="h-4 w-4" />
                 </Link>
