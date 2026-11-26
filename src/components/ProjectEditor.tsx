@@ -1038,6 +1038,15 @@ export function ProjectEditor({
             </button>
             {idea && (
               <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-fg-3">
+                <button
+                  type="button"
+                  onClick={() => void copy(idea.title, "title")}
+                  className="inline-flex cursor-pointer items-center gap-1 rounded bg-surface/80 px-1 font-semibold text-fg-2 ring-1 ring-line transition hover:text-accent hover:ring-blue-500/40"
+                  title={`Copy “${idea.title}”`}
+                  aria-label={`Copy title: ${idea.title}`}
+                >
+                  <DocumentDuplicateIcon className="h-3 w-3" /> Title
+                </button>
                 <span className="inline-flex items-center gap-1"><FilmIcon className="h-3 w-3" /> {sectionClips.length} clip{sectionClips.length === 1 ? "" : "s"}</span>
                 <button
                   type="button"
@@ -1107,11 +1116,28 @@ export function ProjectEditor({
         <p className="text-sm font-semibold text-fg">Ideas & clips <span className="font-normal text-fg-4">· {ideas?.length ?? "…"} ideas · {clipStats.clips} clips · {downloadAssets.length} {downloadAssets.length === 1 ? "video" : "videos"} to download</span></p>
         <p className="text-[11px] text-fg-4">Use Reorder or the ↑ ↓ arrows to change the order · click a title to go to its line</p>
       </div>
-      <div className="flex items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
         {toRecord > 0 && (
           <span className="inline-flex items-center gap-1 rounded-md bg-rose-100 px-1.5 py-0.5 text-[11px] font-semibold text-rose-700 dark:bg-rose-500/15 dark:text-rose-300">
             <VideoCameraIcon className="h-3 w-3" /> {toRecord} to record
           </span>
+        )}
+        {match.placed.size > 0 && (
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => void copy(
+              guide.filter((g) => !g.isHook)
+                .map((section) => ideaById.get(match.bySection.get(section.id) ?? -1))
+                .filter((idea): idea is ProjectIdea => Boolean(idea))
+                .map((idea, i) => `${i + 1}. ${idea.title}`)
+                .join("\n"),
+              "titles",
+            )}
+            title="Copy every idea title in script order, numbered"
+          >
+            <DocumentDuplicateIcon className="h-4 w-4" /> Copy titles
+          </Button>
         )}
         {guide.filter((g) => !g.isHook).length > 1 && (
           <Button variant="secondary" size="sm" onClick={() => setReordering(true)} title="Put the ideas in a new order">
