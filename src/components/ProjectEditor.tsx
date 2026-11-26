@@ -14,6 +14,7 @@ import {
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronUpIcon,
+  ClipboardDocumentIcon,
   ClockIcon,
   DocumentDuplicateIcon,
   DocumentTextIcon,
@@ -36,6 +37,8 @@ import { Modal, ModalBody, ModalFooter, ModalHeader } from "@/components/ui/Moda
 import { Button } from "@/components/ui/Button";
 import { CoverImage } from "@/components/CoverImage";
 import { ProjectTopicSelect } from "@/components/ProjectTopicSelect";
+import { PasteScriptModal } from "@/components/PasteScriptModal";
+import { applyPastedScript } from "@/lib/pasteScript";
 import { useDismiss } from "@/components/ui/useDismiss";
 import { buildScriptGuide, type ScriptGuideSection } from "@/lib/scriptGuide";
 import { getScriptTopicValue } from "@/lib/scriptTopics";
@@ -532,6 +535,9 @@ export function ProjectEditor({
   const [ideas, setIdeas] = useState<ProjectIdea[] | null>(null);
   const [picking, setPicking] = useState(false);
   const [reordering, setReordering] = useState(false);
+  const [pasting, setPasting] = useState(false);
+  /** What the script was before the last paste, so the paste can be undone. */
+  const [pasteUndo, setPasteUndo] = useState<{ scriptId: number; content: string; assets: ProjectAsset[]; positions: { id: number; position: number }[] } | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
@@ -809,6 +815,53 @@ export function ProjectEditor({
     }
   };
 
+  const savePositions = (positions: { id: number; position: number }[]) => {
+    if (!script || !positions.length) return;
+    const rows = positions.map(({ id, position }) => ({ script_id: script.id, detail_id: id, position }));
+    // Supabase queries only run once awaited or then()-ed.
+    supabase.from("script_ideas").upsert(rows, { onConflict: "script_id,detail_id" }).then(({ error }) => {
+      if (error) notifyError(error.message, "Idea order not saved");
+    });
+    const byId = new Map(positions.map(({ id, position }) => [id, position]));
+    setIdeas((current) => (current ?? []).map((idea) => ({ ...idea, position: byId.get(idea.id) ?? idea.position })));
+  };
+
+  /** Replace the script with a pasted, polished version; clips follow their ideas. */
+  const applyPaste = (blocks: string[], assignments: (number | null)[]) => {
+    if (!script) return;
+    const before = {
+      scriptId: script.id,
+      content: String(latestRef.current.content || ""),
+      assets: latestRef.current.assets || [],
+      positions: (ideas ?? []).map((idea) => ({ id: idea.id, position: idea.position })),
+    };
+    const oldOrderToIdea = new Map<number, number>();
+    for (const section of match.sections) {
+      const ideaId = match.bySection.get(section.id);
+      if (ideaId != null && section.number != null) oldOrderToIdea.set(section.number, ideaId);
+    }
+    const next = applyPastedScript(blocks, assignments, before.assets, oldOrderToIdea);
+    setEditingRow(null);
+    lastSyncedContentRef.current = next.content;
+    update({ content: next.content, assets: next.assets });
+    // Ideas in the new script come first, in its order; the rest keep their order after them.
+    const rest = [...(ideas ?? [])].sort((a, b) => a.position - b.position).filter((idea) => !next.orderedIdeaIds.includes(idea.id)).map((idea) => idea.id);
+    savePositions([...next.orderedIdeaIds, ...rest].map((id, index) => ({ id, position: index + 1 })));
+    setPasteUndo(before);
+    setPasting(false);
+    success(`${blocks.length} paragraph${blocks.length === 1 ? "" : "s"} pasted · ${next.orderedIdeaIds.length} matched to ideas.`, "Script replaced");
+  };
+
+  const undoPaste = () => {
+    if (!pasteUndo || pasteUndo.scriptId !== script?.id) return;
+    setEditingRow(null);
+    lastSyncedContentRef.current = pasteUndo.content;
+    update({ content: pasteUndo.content, assets: pasteUndo.assets });
+    savePositions(pasteUndo.positions);
+    setPasteUndo(null);
+    success("The previous script is back.", "Paste undone");
+  };
+
   const ideaSectionIds = () => buildScriptGuide(String(latestRef.current.content || "")).filter((s) => !s.isHook).map((s) => s.id);
 
   /** Drag-and-drop: move one line to where another one is. */
@@ -962,8 +1015,17 @@ export function ProjectEditor({
             <button key={mode} type="button" role="radio" aria-checked={viewMode === mode} onClick={() => changeView(mode)} className={`h-8 cursor-pointer rounded-md px-2.5 text-xs font-semibold transition ${viewMode === mode ? "bg-surface text-fg shadow-sm ring-1 ring-line" : "text-fg-3 hover:text-fg"}`}>{label}</button>
           ))}
         </div>
+        <Button variant="secondary" size="sm" onClick={() => setPasting(true)} title="Replace the script with the version you polished"><ClipboardDocumentIcon className="h-4 w-4" /> Paste script</Button>
         <Button variant="primary" size="sm" onClick={() => void copy(content, "script")}><DocumentDuplicateIcon className="h-4 w-4" /> Copy script</Button>
       </div>
+      {pasteUndo?.scriptId === script.id && (
+        <div className="flex w-full items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-100" role="status">
+          <CheckIcon className="h-4 w-4 shrink-0" />
+          <span className="min-w-0 flex-1">Script replaced with your pasted version.</span>
+          <button type="button" onClick={undoPaste} className="cursor-pointer rounded-md px-2 py-1 font-semibold hover:bg-blue-100 dark:hover:bg-blue-500/20">Undo</button>
+          <button type="button" onClick={() => setPasteUndo(null)} className="cursor-pointer rounded-md p-1 hover:bg-blue-100 dark:hover:bg-blue-500/20" aria-label="Dismiss"><XMarkIcon className="h-4 w-4" /></button>
+        </div>
+      )}
     </>
   );
 
@@ -1404,6 +1466,18 @@ export function ProjectEditor({
         {tab === "script" && (viewMode === "aligned" ? alignedView : plainView)}
         {tab === "details" && detailsPanel}
       </div>
+      {pasting && (
+        <PasteScriptModal
+          ideas={[...(ideas ?? [])].sort((a, b) => a.position - b.position)}
+          currentLines={new Map(match.sections.flatMap((section) => {
+            const ideaId = match.bySection.get(section.id);
+            return ideaId != null ? [[ideaId, content.slice(section.start, section.end)] as [number, string]] : [];
+          }))}
+          currentWords={length.words}
+          onApply={applyPaste}
+          onClose={() => setPasting(false)}
+        />
+      )}
       {reordering && (
         <ReorderPanel
           items={guide.filter((g) => !g.isHook).map((section) => {
