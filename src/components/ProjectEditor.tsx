@@ -691,6 +691,16 @@ export function ProjectEditor({
   /* ---------- derived ---------- */
 
   const content = String(formData.content || "");
+
+  // On phones the plain-text script grows with its text, so the whole editor scrolls
+  // (script, then the ideas) instead of the box swallowing every swipe.
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    if (window.matchMedia("(min-width: 1024px)").matches) { el.style.height = ""; return; }
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight + 2}px`;
+  }, [content, viewMode, tab]);
   const assets = useMemo(() => formData.assets || [], [formData.assets]);
   const guide = useMemo(() => buildScriptGuide(content), [content]);
   const match = useMemo(() => matchSectionsToIdeas(content, ideas ?? [], assets), [content, ideas, assets]);
@@ -1302,7 +1312,8 @@ export function ProjectEditor({
   );
 
   const plainView = (
-    <div className={`grid h-full min-h-0 gap-4 ${columns}`}>
+    // Phones: the page scrolls as a whole (script box, then the ideas). Only wide screens pin both columns to the window height.
+    <div className={`grid min-h-0 gap-4 lg:h-full ${columns}`}>
       <div className="flex min-h-0 flex-1 flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-2">{scriptToolbar}</div>
         <textarea
@@ -1311,7 +1322,7 @@ export function ProjectEditor({
           onChange={(e) => onContentChange(e.target.value)}
           placeholder="Opening hook, then one line per idea…"
           aria-label="Script"
-          className="min-h-[50dvh] w-full flex-1 resize-none rounded-2xl border border-line bg-surface p-4 text-base leading-7 text-fg outline-none transition placeholder:text-fg-4 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 sm:p-6 sm:text-[17px] sm:leading-8 lg:min-h-0"
+          className="min-h-[40dvh] w-full flex-none resize-none overflow-hidden lg:flex-1 rounded-2xl border border-line bg-surface p-4 text-base leading-7 text-fg outline-none transition placeholder:text-fg-4 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 sm:p-6 sm:text-[17px] sm:leading-8 lg:min-h-0 lg:overflow-auto"
         />
       </div>
       <aside className="flex min-h-0 flex-col rounded-2xl border border-line bg-surface p-3">{ideasPanel}</aside>
